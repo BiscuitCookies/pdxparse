@@ -525,7 +525,7 @@ compoundMessagePronoun stmt@[pdx| $head = @scr |] = withCurrentIndent $ \i -> do
                     Just EU4Geographic -> Just MsgROOTGeographic
                     _ -> Nothing) -- warning printed below
         "prev" -> do
-                newscope <- getPrevScope
+                newscope <- getCurrentScope
                 return (newscope, case newscope of
                     Just EU4Country -> Just MsgPREVCountry
                     Just EU4Province -> Just MsgPREVProvince
