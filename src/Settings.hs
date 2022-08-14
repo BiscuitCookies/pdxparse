@@ -21,11 +21,11 @@ import Data.Yaml (FromJSON (..), Value (..), decodeFileEither, (.:), (.:?))
 
 import System.Console.GetOpt (OptDescr (..), ArgDescr (..), ArgOrder (..), getOpt)
 import System.Directory (getHomeDirectory)
-import System.Environment (getArgs)
+import System.Environment (getArgs, getExecutablePath )
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
 import qualified System.Info
-import System.FilePath ((</>))
+import System.FilePath ((</>), replaceFileName)
 
 import Control.Monad (when, liftM, forM_, unless)
 
@@ -115,8 +115,8 @@ readSettings = do
     unless (null errs) $ do
         forM_ errs $ \err -> putStrLn err
         exitFailure
-
-    settingsFilePath <- getDataFileName "settings.yml"
+    runpath <- getExecutablePath
+    let settingsFilePath = replaceFileName runpath "settings.yml"
 
     -- Check if info args were specified. If so, honour them, then exit.
     when (Paths `elem` opts || Version `elem` opts) $ do

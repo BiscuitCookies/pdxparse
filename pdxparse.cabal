@@ -17,7 +17,7 @@ maintainer:          pwberry@gmail.com
 category:            Game
 build-type:          Simple
 extra-source-files:  README.md
-data-files:          settings.yml
+--data-files:          settings.yml
 cabal-version:       >=1.10
 
 program-default-options

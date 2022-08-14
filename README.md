@@ -61,6 +61,7 @@ only the files you want, and rebuild.
     * alias tags aren't properly handled
     * equipment_bonus modifier isn't handled
     * add_ai_strategy not handled (do we want to?)
+    * Need to manually add a closing bracket "}" for SOV.txt in common/ideas to work
 
 ## To do
 Feel extremely free to help with any of these or the issues, I honestly doubt I can do any of these except maybe the additonal formatting
