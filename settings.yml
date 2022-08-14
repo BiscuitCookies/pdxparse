@@ -10,11 +10,11 @@ settings:
     #   Windows 7+: C:\Program Files (x86)
     # For other platforms, or if it's non-standard, you'll need to specify it
     # here. If you're on Windows, leave out the drive letter.
-    steam_dir: "/" # absolute
+    #steam_dir:  # absolute
 
     # The subdirectory of steam_dir where Steam keeps its apps. You shouldn't need to change this.
     # (For Windows, slashes are automatically changed to backslashes, so this ("Steam/steamapps/common") default works.)
-    steam_apps: "Games"
+    #steam_apps: "Steam/steamapps/common"
 
     # Which game we're looking at. This is the name of the directory under
     # steam_dir where the game is kept.
