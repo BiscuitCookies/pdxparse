@@ -1510,7 +1510,7 @@ toPct :: Double -> Double
 toPct num = fromIntegral (round (num * 1000)) / 10 -- round to one digit after the point
 
 randomList :: (HOI4Info g, Monad m) => StatementHandler g m
-randomList stmt@[pdx| %_ = @scr |] = if any chk scr then -- Ugly solution for vars in random list
+randomList stmt@[pdx| %_ = @scr |] = if all chk scr then -- Ugly solution for vars in random list
         fmtRandomList $ map entry scr
     else
         fmtRandomVarList $ map entryv scr
@@ -2241,20 +2241,41 @@ setAutonomy _ stmt = preStatement stmt
 ------------------------------
 -- Handler for set_politics --
 ------------------------------
-foldCompound "setPolitics" "SetPolitics" "sp"
-    []
-    [CompField "ruling_party" [t|Text|] Nothing True
-    ,CompField "elections_allowed" [t|Text|] Nothing False
-    ,CompField "last_election" [t|Text|] Nothing False
-    ,CompField "election_frequency" [t|Double|] Nothing False
-    ,CompField "long_name" [t|Text|] Nothing False
-    ,CompField "name" [t|Text|] Nothing False
-    ]
-    [|  do
-        let freq = fromMaybe 0 _election_frequency
-        party <- getGameL10n _ruling_party
-        return $ MsgSetPolitics (iconText party) party freq
-    |]
+data SetPolitics = SetPolitics
+        {   sp_ruling_party :: Text
+        ,   sp_elections_allowed :: Maybe Text
+        ,   sp_last_election :: Maybe Text
+        ,   sp_election_frequency :: Maybe Double
+        ,   sp_election_frequencyvar :: Maybe Text
+        ,   sp_long_name :: Maybe Text
+        ,   sp_name :: Maybe Text
+        }
+
+newSP :: SetPolitics
+newSP = SetPolitics undefined Nothing Nothing Nothing Nothing Nothing Nothing
+setPolitics :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
+setPolitics stmt@[pdx| %_ = @scr |]
+    = msgToPP =<< pp_sp =<< foldM addLine newSP scr
+    where
+        addLine :: SetPolitics -> GenericStatement -> PPT g m SetPolitics
+        addLine sp [pdx| ruling_party = $txt |] = return sp { sp_ruling_party = txt }
+        addLine sp [pdx| elections_allowed = %_ |] = return sp
+        addLine sp [pdx| last_election = %_ |] = return sp
+        addLine sp [pdx| election_frequency = $txt |] =
+            return sp { sp_election_frequencyvar = Just txt }
+        addLine sp [pdx| election_frequency = !amt |] =
+            return sp { sp_election_frequency = Just (amt :: Double) }
+        addLine sp [pdx| long_name = $yn |] = return sp
+        addLine sp [pdx| name = $yn |] = return sp
+        addLine sp stmt
+            = trace ("unknown section in set_politics: " ++ show stmt) $ return sp
+        pp_sp sp = do
+            let freq = fromMaybe 0 (sp_election_frequency sp)
+            party <- getGameL10n (sp_ruling_party sp)
+            case sp_election_frequencyvar sp of
+                Just freq -> return $ MsgSetPoliticsVar (iconText party) party freq
+                _ -> return $ MsgSetPolitics (iconText party) party freq
+setPolitics stmt = preStatement stmt
 
 ------------------------------------
 -- Handler for has_country_leader --
@@ -2591,6 +2612,7 @@ buildRailway stmt@[pdx| %_ = @scr |]
                 _ -> trace "bad level in build_railway" $ return br
             "build_only_on_allied" -> return br
             "fallback" -> return br
+            "controller_priority" -> return br
             "path" -> case rhs of
                 CompoundRhs arr ->
                     let provs = mapMaybe provinceFromArray arr in
@@ -2698,18 +2720,35 @@ canBuildRailway stmt = preStatement stmt
 ------------------------------
 -- Handler for add_resource --
 ------------------------------
-foldCompound "addResource" "AddResource" "ar"
-    []
-    [CompField "type" [t|Text|] Nothing True
-    ,CompField "amount" [t|Double|] Nothing True
-    ,CompField "state" [t|Double|] Nothing False -- if in state scope can be omitted
-    ]
-    [|  do
-        let buildicon = iconText _type
-        stateloc <- maybe (return "") (getStateLoc . round) _state
-        buildloc <- getGameL10n _type
-        return $ MsgAddResource buildicon buildloc _amount stateloc
-    |]
+data AddResource = AddResource
+        {   ar_type :: Text
+        ,   ar_amount :: Maybe Double
+        ,   ar_amountvar :: Maybe Text
+        ,   ar_state :: Maybe Double
+        }
+
+newAR :: AddResource
+newAR = AddResource undefined Nothing Nothing Nothing
+addResource  :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
+addResource stmt@[pdx| %_ = @scr |]
+    = msgToPP =<< pp_ar =<< foldM addLine newAR scr
+    where
+        addLine :: AddResource -> GenericStatement -> PPT g m AddResource
+        addLine ar [pdx| type = $txt |] = return ar { ar_type = txt }
+        addLine ar [pdx| amount = !num |] = return ar { ar_amount = Just num }
+        addLine ar [pdx| amount = $txt |] = return ar { ar_amountvar = Just txt }
+        addLine ar [pdx| state = !num |] = return ar { ar_state = Just num }
+        addLine ar [pdx| $other = %_ |] = trace ("unknown section in add_resource: " ++ show other) $ return ar
+        addLine ar stmt = trace ("unknown form in add_resource: " ++ show stmt) $ return ar
+        pp_ar ar = do
+            let buildicon = iconText $ ar_type ar
+            stateloc <- maybe (return "") (getStateLoc . round) $ ar_state ar
+            buildloc <- getGameL10n $ "PRODUCTION_MATERIALS_" <> T.toUpper (ar_type ar)
+            case (ar_amount ar, ar_amountvar ar) of
+                    (Just amount, _) -> return $ MsgAddResource buildicon buildloc amount stateloc
+                    (_, Just amountvar) -> return $ MsgAddResourceVar buildicon buildloc amountvar stateloc
+                    _ -> return $ preMessage stmt
+addResource stmt = preStatement stmt
 
 -------------------------------------------
 -- Handler for modify_building_resources --

@@ -259,27 +259,27 @@ data ScriptMessage
     | MsgStateFlag
     | MsgUnitLeaderFlag
     | MsgHasAddedTensionAmount {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgHasAddedTensionAmountVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgHasAddedTensionAmountVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgHasArmyManpower {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgHasArmyManpowerVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgHasArmyManpowerVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgHasManpower {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgHasManpowerVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgHasManpowerVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgHasStability {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgHasStabilityVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgHasStabilityVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgHasWarSupport {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgHasWarSupportVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgHasWarSupportVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgIndustrialComplex {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgIndustrialComplexVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgIndustrialComplexVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNumOfControlledFactories {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgNumOfControlledFactoriesVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgNumOfControlledFactoriesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNumOfControlledStates {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgNumOfControlledStatesVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgNumOfControlledStatesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNumOfFactories {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgNumOfFactoriesVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgNumOfFactoriesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNumOfNukes {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgNumOfNukesVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgNumOfNukesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgOriginalResearchSlots {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgOriginalResearchSlotsVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgOriginalResearchSlotsVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgIsControlledBy {scriptMessageWhom :: Text}
     | MsgHasDefensiveWarWith {scriptMessageWhom :: Text}
     | MsgAddClaimBy {scriptMessageWho :: Text}
@@ -397,7 +397,7 @@ data ScriptMessage
     | MsgDropCosmeticTag
     | MsgSetCompliance {scriptMessageAmt :: Double}
     | MsgSurrenderProgress {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgSurrenderProgressVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgSurrenderProgressVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgSetVariable { scriptMessageVar1 :: Text, scriptMessageVar2 :: Text}
     | MsgSetTempVariable { scriptMessageVar1 :: Text, scriptMessageVar2 :: Text}
     | MsgSetVariableVal { scriptMessageVar :: Text, scriptMessageAmt :: Double}
@@ -434,20 +434,20 @@ data ScriptMessage
     | MsgHasGovernment {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgIsHistoricalFocusOn { scriptMessageYn :: Bool }
     | MsgAirBase {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgAirBaseVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgAirBaseVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgAmountResearchSlots {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgAmountResearchSlotsVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgAmountResearchSlotsVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgAnyWarScore {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgAnyWarScoreVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgAnyWarScoreVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgArmsFactory {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgArmsFactoryVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgArmsFactoryVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgCompareAutonomyProgressRatio {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgCompareAutonomyProgressRatioVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgCompareAutonomyProgressRatioVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgDate {scriptMessageCompare :: Text, scriptMessageMonth :: Text, scriptMessageDay :: Double, scriptMessageYear :: Double}
     | MsgDockyard {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgDockyardVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgDockyardVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgEnemiesStrengthRatio {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgEnemiesStrengthRatioVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgEnemiesStrengthRatioVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgIsCharacter {scriptMessageWhat :: Text}
     | MsgIsOnContinent {scriptMessageWhat :: Text}
     | MsgHasCountryLeader {scriptMessageWhom :: Text}
@@ -455,15 +455,15 @@ data ScriptMessage
     | MsgExportVariable { scriptMessageVar1 :: Text, scriptMessageVar2 :: Text}
     | MsgExportVariableWho { scriptMessageVar1 :: Text, scriptMessageVar2 :: Text, scriptMessageWhom :: Text}
     | MsgThreat {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgThreatVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgThreatVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgFascismCompare {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgFascismCompareVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgFascismCompareVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgDemocraticCompare {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgDemocraticCompareVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgDemocraticCompareVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgCommunismCompare {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgCommunismCompareVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgCommunismCompareVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNeutralityCompare {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
-    | MsgNeutralityCompareVar {scriptMessageAmtT :: Text, scriptMessageCompare :: Text}
+    | MsgNeutralityCompareVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgAnnexCountry {scriptMessageWhom :: Text, scriptMessageWhat :: Text}
     | MsgIsInFactionWith {scriptMessageWhom :: Text}
     | MsgIsJustifyingWargoalAgainst {scriptMessageWhom :: Text}
@@ -473,6 +473,7 @@ data ScriptMessage
     | MsgModifyTechSharingBonus { scriptMessage_icon :: Text, scriptMessageWho :: Text, scriptMessageAmt :: Double }
     | MsgAddToFaction {scriptMessageWhom :: Text}
     | MsgAddResource {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmt :: Double, scriptMessageWhere :: Text}
+    | MsgAddResourceVar {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmtText :: Text, scriptMessageWhere :: Text}
     | MsgAddPopularity {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmt :: Double}
     | MsgBuildRailway {scriptMessageAmt :: Double, scriptMessageStart :: Text, scriptMessageEnd :: Text}
     | MsgBuildRailwayProv {scriptMessageAmt :: Double, scriptMessageStartProv :: Double, scriptMessageEndProv :: Double}
@@ -492,6 +493,7 @@ data ScriptMessage
     | MsgReleaseAutonomy {scriptMessageWho :: Text, scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmt :: Double, scriptMessage_war :: Text}
     | MsgSetAutonomy {scriptMessageWho :: Text, scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmt :: Double, scriptMessageWar :: Text}
     | MsgSetPolitics {scriptMessageIcon :: Text, scriptMessageWho :: Text, scriptMessageMonths :: Double}
+    | MsgSetPoliticsVar {scriptMessageIcon :: Text, scriptMessageWho :: Text, scriptMessageAmtText :: Text}
     | MsgStartCivilWar {scriptMessageWhat :: Text, scriptMessageAmtText :: Text}
     | MsgSetPartyName {scriptMessageIcon :: Text, scriptMessageWho :: Text, scriptMessageWhat :: Text}
     | MsgIsInTechSharingGroup {scriptMessageWhat :: Text}
@@ -501,7 +503,7 @@ data ScriptMessage
     | MsgHasRule {scriptMessageIcon :: Text, scriptMessageWhom :: Text, scriptMessageWhat :: Text}
     | MsgHasOffensiveWar {scriptMessageYn :: Bool}
     | MsgIsMajor {scriptMessageYn :: Bool}
-    | MsgSendEquipment {scriptMessageAmtT :: Text, scriptMessageWhat :: Text, scriptMessageWhom :: Text, scriptMessageYn :: Bool}
+    | MsgSendEquipment {scriptMessageAmtText :: Text, scriptMessageWhat :: Text, scriptMessageWhom :: Text, scriptMessageYn :: Bool}
     | MsgRandomListTrigger
     | MsgRandomListModifier {scriptMessageAmt :: Double}
     | MsgRandomListAddModifier {scriptMessageAmt :: Double}
@@ -1087,7 +1089,7 @@ instance RenderMessage Script ScriptMessage where
                 , " {{icon|world tension|1}} "
                 , toMessage (bold (plainNum _amt))
                 ]
-        MsgHasAddedTensionAmountVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgHasAddedTensionAmountVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has caused"
                 , _comp
@@ -1102,7 +1104,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , " {{icon|manpower|1}} in the field"
                 ]
-        MsgHasArmyManpowerVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgHasArmyManpowerVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1117,7 +1119,7 @@ instance RenderMessage Script ScriptMessage where
                 , " {{icon|manpower|1}} "
                 , toMessage (bold (plainNum _amt))
                 ]
-        MsgHasManpowerVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgHasManpowerVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1131,7 +1133,7 @@ instance RenderMessage Script ScriptMessage where
                 , " {{icon|stability|1}} "
                 , toMessage (bold (reducedNum plainPc _amt))
                 ]
-        MsgHasStabilityVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgHasStabilityVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1146,7 +1148,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (reducedNum plainPc _amt))
                 , " {{icon|war support|1}}"
                 ]
-        MsgHasWarSupportVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgHasWarSupportVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1162,7 +1164,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , " {{icon|cic|1}}"
                 ]
-        MsgIndustrialComplexVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgIndustrialComplexVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1178,7 +1180,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , plural _amt " controlled factory" " controlled factories"
                 ]
-        MsgNumOfControlledFactoriesVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgNumOfControlledFactoriesVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1194,7 +1196,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , plural _amt " controlled state" " controlled states"
                 ]
-        MsgNumOfControlledStatesVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgNumOfControlledStatesVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1210,7 +1212,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , plural _amt " factory" " factories"
                 ]
-        MsgNumOfFactoriesVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgNumOfFactoriesVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1226,7 +1228,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , plural _amt " nuke" " nukes"
                 ]
-        MsgNumOfNukesVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgNumOfNukesVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -1242,7 +1244,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , plural _amt " research slot" " research slots"
                 ]
-        MsgOriginalResearchSlotsVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgOriginalResearchSlotsVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Starts with "
                 , _comp
@@ -2067,7 +2069,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (reducedNum plainPc _amt))
                 , " surrender progress"
                 ]
-        MsgSurrenderProgressVar  {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgSurrenderProgressVar  {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -2323,7 +2325,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , " {{icon|air base|1}} "
                 ]
-        MsgAirBaseVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgAirBaseVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -2340,7 +2342,7 @@ instance RenderMessage Script ScriptMessage where
                 , " research "
                 , plural _amt "slot" "slots"
                 ]
-        MsgAmountResearchSlotsVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgAmountResearchSlotsVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -2356,7 +2358,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainPc _amt))
                 , " war progress"
                 ]
-        MsgAnyWarScoreVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgAnyWarScoreVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -2372,7 +2374,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , " {{icon|mic|1}}"
                 ]
-        MsgArmsFactoryVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgArmsFactoryVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -2388,7 +2390,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (reducedNum plainPc _amt))
                 , " {{icon|autonomy|1}} progress"
                 ]
-        MsgCompareAutonomyProgressRatioVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgCompareAutonomyProgressRatioVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -2404,7 +2406,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (bold (plainNum _amt))
                 , " {{icon|nic|1}}"
                 ]
-        MsgDockyardVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgDockyardVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
                 , _comp
@@ -2420,7 +2422,7 @@ instance RenderMessage Script ScriptMessage where
                 , toMessage (reducedNum plainPc _amt)
                 , " compared to the current scope"
                 ]
-        MsgEnemiesStrengthRatioVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgEnemiesStrengthRatioVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "The enemies strength is "
                 , _comp
@@ -2474,7 +2476,7 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , toMessage $ bold $ if _amt > 1 then plainPc _amt else reducedNum plainPc _amt
                 ]
-        MsgThreatVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgThreatVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "{{icon|world tension|1}} is "
                 , _comp
@@ -2488,7 +2490,7 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , toMessage (bold (reducedNum plainPc _amt))
                 ]
-        MsgFascismCompareVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgFascismCompareVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "{{icon|fascism|1}} popularity is "
                 , _comp
@@ -2502,7 +2504,7 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , toMessage (bold (reducedNum plainPc _amt))
                 ]
-        MsgDemocraticCompareVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgDemocraticCompareVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "{{icon|democratic|1}} popularity is "
                 , _comp
@@ -2516,7 +2518,7 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , toMessage (bold (reducedNum plainPc _amt))
                 ]
-        MsgCommunismCompareVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgCommunismCompareVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "{{icon|communism|1}} popularity is "
                 , _comp
@@ -2530,7 +2532,7 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , toMessage (bold (reducedNum plainPc _amt))
                 ]
-        MsgNeutralityCompareVar {scriptMessageAmtT = _amtT, scriptMessageCompare = _comp}
+        MsgNeutralityCompareVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
             -> mconcat
                 [ "{{icon|neutrality|1}} popularity is "
                 , _comp
@@ -2588,6 +2590,17 @@ instance RenderMessage Script ScriptMessage where
                 [ addOrRemove _amt
                 , " production of "
                 , toMessage $ bold (plainNum _amt)
+                , " "
+                , _icon
+                , " "
+                , _what
+                , ifThenElseT (T.null _where) "" " to "
+                , _where
+                ]
+        MsgAddResourceVar {scriptMessageIcon = _icon, scriptMessageWhat = _what, scriptMessageAmtText = _amtT, scriptMessageWhere = _where}
+            -> mconcat
+                [ "Add or Remove production of "
+                , toMessage $ boldText _amtT
                 , " "
                 , _icon
                 , " "
@@ -2747,6 +2760,15 @@ instance RenderMessage Script ScriptMessage where
                 , if _months > 0 then " with elections every " else ""
                 , if _months > 0 then formatMonths _months else ""
                 ]
+        MsgSetPoliticsVar {scriptMessageIcon = _icon, scriptMessageWho = _who, scriptMessageAmtText = _amtT}
+            -> mconcat
+                [ "Set the ruling party to "
+                , _icon
+                , " "
+                , _who
+                ," with elections every "
+                , _amtT
+                ]
         MsgStartCivilWar {scriptMessageWhat = _what, scriptMessageAmtText = _amtT}
             -> mconcat
                 [ "Start a {{icon|"
@@ -2816,7 +2838,7 @@ instance RenderMessage Script ScriptMessage where
                 , ifThenElseT (_day /= 0) (" " <> toMessage (plainNum _day)) ""
                 , ifThenElseT (_day /= 0) (" of " <> toMessage (plainNum _year)) (toMessage (plainNum _year))
                 ]
-        MsgSendEquipment {scriptMessageAmtT = _amtT, scriptMessageWhat = _what, scriptMessageWhom = _whom, scriptMessageYn = _yn}
+        MsgSendEquipment {scriptMessageAmtText = _amtT, scriptMessageWhat = _what, scriptMessageWhom = _whom, scriptMessageYn = _yn}
             -> mconcat
                 [ "Send "
                 , _amtT

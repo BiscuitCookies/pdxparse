@@ -82,13 +82,33 @@ readScript :: Settings -> FilePath -> IO GenericScript
 readScript settings file = do
     let filepath = buildPath settings file
     contents <- readFileRetry filepath
-    case Ap.parseOnly (Ap.option undefined (Ap.char '\xFEFF') -- BOM
-                        *> skipSpace
-                        *> genericScript) contents of
+    case contentsparse contents of
+        Right [] ->
+            case contentsparse (contents<>"}") of
+                Right [] ->
+                    case contentsparse (contents<>"}}") of
+                        Right [] -> do
+                            putStrLn $ "File " ++ file ++ ": Missing 2 closing curly brackets, applied fix"
+                            return []
+                        Right result ->
+                            return result
+                        Left err -> do
+                            putStrLn $ "Couldn't parse " ++ file ++ ": " ++ err
+                            return []
+                Right result -> do
+                    putStrLn $ "File " ++ file ++ ": Missing closing curly bracket, applied fix"
+                    return result
+                Left err -> do
+                    putStrLn $ "Couldn't parse " ++ file ++ ": " ++ err
+                    return []
         Right result -> return result
         Left err -> do
             putStrLn $ "Couldn't parse " ++ file ++ ": " ++ err
             return []
+    where
+        contentsparse = Ap.parseOnly (Ap.option undefined (Ap.char '\xFEFF') -- BOM
+                        *> skipSpace
+                        *> genericScript)
 
 readSpecificScript :: Settings -> FilePath -> IO GenericScript
 readSpecificScript settings filepath = do

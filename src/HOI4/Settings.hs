@@ -251,7 +251,7 @@ readHOI4Scripts = do
     let readOneScript :: Bool -> String -> String -> PPT HOI4 m (String, GenericScript)
         readOneScript specific category target = do
             content <- if specific then liftIO $ readScript settings target else liftIO $ readSpecificScript settings target
---            traceM (show target)
+            --traceM (show target)
             when (null content) $
                 liftIO $ hPutStrLn stderr $
                     "Warning: " ++ target

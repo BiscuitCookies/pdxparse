@@ -50,9 +50,10 @@ parseHOI4OpinionModifiers :: (IsGameState (GameState g), IsGameData (GameData g)
 parseHOI4OpinionModifiers scripts = HM.unions . HM.elems <$> do
     tryParse <- hoistExceptions $
         HM.traverseWithKey
-            (\sourceFile scr -> setCurrentFile sourceFile $ mapM parseHOI4OpinionModifier $ case scr of
-                [[pdx| opinion_modifiers = @mods |]] -> mods
+            (\sourceFile scr -> setCurrentFile sourceFile $ mapM parseHOI4OpinionModifier $ concatMap (\case
+                [pdx| opinion_modifiers = @mods |] -> mods
                 _ -> scr)
+                scr)
             scripts
     case tryParse of
         Left err -> do

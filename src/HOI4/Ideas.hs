@@ -53,7 +53,7 @@ parseHOI4Ideas scripts = HM.unions . HM.elems <$> do
             (\sourceFile scr ->
                 setCurrentFile sourceFile $ concat <$> mapM parseHOI4IdeaGroup (case scr of
                     [[pdx| ideas = @mods |]] -> mods
-                    _ -> scr))
+                    _ -> []))
             scripts
     case tryParse of
         Left err -> do

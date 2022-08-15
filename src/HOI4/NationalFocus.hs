@@ -142,6 +142,9 @@ nationalFocusAddSection nf stmt
                 GenericRhs txt [] ->
                     let txtd = if "GFX_" `T.isPrefixOf` txt then txt else "GFX_" <> txt in
                     nf { nf_icon = txtd}
+                StringRhs txt ->
+                    let txtd = if "GFX_" `T.isPrefixOf` txt then txt else "GFX_" <> txt in
+                    nf { nf_icon = txtd}
                 _-> trace ("bad nf icon in: " ++ show stmt) nf
             "cost" -> case rhs of
                 (floatRhs -> Just num) -> nf {nf_cost = num}

@@ -107,7 +107,7 @@ parseHOI4Event stmt@[pdx| %left = %right |] = case right of
         IntLhs _ -> throwError "int lhs at top level"
         AtLhs _ -> return (Right Nothing)
         GenericLhs etype _ ->
-            let mescope = case etype of
+            let mescope = case T.toLower etype of
                     "country_event" -> Just HOI4Country
                     "unit_leader_event" -> Just HOI4UnitLeader
                     "operative_leader_event" -> Just HOI4Operative

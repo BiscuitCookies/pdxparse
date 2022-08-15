@@ -258,7 +258,7 @@ decisionAddSection Nothing _ = return Nothing
 decisionAddSection dec stmt
     = return $ (`decisionAddSection'` stmt) <$> dec
     where -- the QQ pdx patternmatching takes to long to compile with this many patterns so using case of here
-        decisionAddSection' dec stmt@[pdx| $lhs = %rhs |] = case lhs of
+        decisionAddSection' dec stmt@[pdx| $lhs = %rhs |] = case T.toLower lhs of
             "icon" -> case rhs of
                 GenericRhs txt _ ->
                     dec { dec_icon = Just (HOI4DecisionIconSimple txt) }
@@ -327,6 +327,7 @@ decisionAddSection dec stmt
                 _ -> dec
             "war_with_on_remove" -> dec -- used to inform if a decison declares war when finished
             "war_with_on_complete" -> dec -- used to inform if a decison declares war when selected
+            "war_with_on_timeout" -> dec -- used to inform if a decison declares war when selected
             "fixed_random_seed" -> dec --bool, standard True
             "days_mission_timeout" -> case rhs of -- how long the mission takes to finish, and turns decision into mission
                 FloatRhs num -> dec { dec_days_remove = Just num }
