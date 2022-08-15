@@ -87,10 +87,9 @@ readScript settings file = do
             case contentsparse (contents<>"}") of
                 Right [] ->
                     case contentsparse (contents<>"}}") of
-                        Right [] -> do
+                        Right [] -> return []
+                        Right result -> do
                             putStrLn $ "File " ++ file ++ ": Missing 2 closing curly brackets, applied fix"
-                            return []
-                        Right result ->
                             return result
                         Left err -> do
                             putStrLn $ "Couldn't parse " ++ file ++ ": " ++ err

@@ -2865,13 +2865,13 @@ instance RenderMessage Script ScriptMessage where
         MsgUnlockDecisionCategoryTooltip {scriptMessageWhat = _what}
             -> mconcat
                 [ "Unlock the "
-                , _what
+                , boldText _what
                 , " decisions"
                 ]
         MsgUnlockDecisionTooltip {scriptMessageWhat = _what}
             -> mconcat
                 [ "Unlock the "
-                , _what
+                , boldText _what
                 , " decision"
                 ]
         MsgIsPuppet {scriptMessageYn = _yn}
