@@ -51,6 +51,7 @@ import Yaml (L10n, L10nLang, LocEntry (..))
 data CLArgs
     = Paths
     | Version
+    | Help
     | Onlyextra
     | Nowait
     | ProcessFile String

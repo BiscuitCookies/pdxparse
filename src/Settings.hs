@@ -20,7 +20,7 @@ import qualified Data.Version as V
 
 import Data.Yaml (FromJSON (..), Value (..), decodeFileEither, (.:), (.:?))
 
-import System.Console.GetOpt (OptDescr (..), ArgDescr (..), ArgOrder (..), getOpt)
+import System.Console.GetOpt (OptDescr (..), ArgDescr (..), ArgOrder (..), getOpt, usageInfo)
 import System.Directory (getHomeDirectory)
 import System.Environment (getArgs, getExecutablePath )
 import System.Exit (exitFailure, exitSuccess)
@@ -101,7 +101,8 @@ programOpts :: [OptDescr CLArgs]
 programOpts =
     [ Option ['p'] ["paths"]   (NoArg Paths)   "show location of configuration files"
     , Option ['v'] ["version"] (NoArg Version) "show version information"
-    , Option ['e'] ["onlyextra"] (NoArg Onlyextra) "skip normal game files and only process file, countryscope, provincescope and modifiers arguments"
+    , Option ['h'] ["help"]    (NoArg Help) "show this message"
+    , Option ['e'] ["onlyextra"] (NoArg Onlyextra) "skip writing normal game files and only write the result of parsing the file, countryscope, provincescope and modifiers arguments"
     , Option ['n'] ["nowait"] (NoArg Nowait) "don't wait for the user to press a key before exiting"
     , Option ['f'] ["file"]    (ReqArg ProcessFile "FILE")  "also process FILE"
     , Option ['c'] ["countryscope"]    (ReqArg ProcessCountryScopeFile "FILE")  "also process FILE as containing code in the counrty scope"
@@ -119,17 +120,20 @@ readSettings = do
     (opts, nonopts, errs) <- readCommandLineOptions
     unless (null errs) $ do
         forM_ errs $ \err -> putStrLn err
+        putStrLn $ usageInfo "pdxparse" programOpts
         exitFailure
     runpath <- getExecutablePath
     let settingsFilePath = replaceFileName runpath "settings.yml"
 
     -- Check if info args were specified. If so, honour them, then exit.
-    when (Paths `elem` opts || Version `elem` opts) $ do
+    when (Paths `elem` opts || Version `elem` opts || Help `elem` opts) $ do
         when (Version `elem` opts) $
             let V.Version branch _ = version
             in putStrLn $ "pdxparse " ++ intercalate "." (map show branch)
         when (Paths `elem` opts) $
             putStrLn $ "Settings file is at " ++ settingsFilePath
+        when (Help `elem` opts) $
+            putStrLn $ usageInfo "pdxparse" programOpts
         exitSuccess
 
     result <- decodeFileEither settingsFilePath

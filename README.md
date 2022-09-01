@@ -1,8 +1,8 @@
 # pdxparse
 A parser for scripts used in Paradox Development Studios games, written in Haskell.
 
-Currently only Europa Universalis IV is supported, but there are plans for
-other games as well.
+Currently only Europa Universalis IV and Hearts of Iron IV are supported,
+but there are plans for other games as well.
 
 ## Building
 
@@ -21,21 +21,36 @@ You may also be able to just use `cabal-install` if you have it:
 
 ## Usage
 
+Rename settings_example.yml to settings.yml and optionally change game, version
+and the steam_ folders if you don't use HOI4 in the default steam location.
+
 `pdxparse` should be run from the command line. It will create a directory
 `output` in the current directory. Its structure is the same as that of the game
 directory, except that the `.txt` files are directories. Each file in these
-directories is one "object": one event, one decision, etc.
+directories is one "object": one event, one decision, etc. Normally it will
+wait for a user input at the end so that it can be used in a command window
+which closes automatically (use `--nowait` to change that).
 
-If you got EU4 from Steam, `pdxparse` should be able to find it automatically
-as long as your steamapps folder is in the default location.  If it's somewhere
-else, you'll need to edit `settings.yml` to point to it.
+The following command line options are supported:
 
-Currently there is no command line processing; it just processes everything it
-finds and puts the results in the directory `output`. There is, however, a
-clause in Main.hs that restricts the parser to only attempt to process certain
-files. This is to make the program finish sooner while testing. If you want to
-process only certain files, uncomment those lines, edit the list to include
-only the files you want, and rebuild.
+    -h, --help      show a help about the command line options
+    -p, --paths     show location of configuration files and exit
+    -v, --version   show version information and exit
+    -n, --nowait    don't wait for the user to press a key before exiting
+
+In addition to that, EU4 parsing supports the following additional options, each of which can be used multiple times:
+
+    -e, --onlyextra                skip writing normal game files and only write the result of parsing
+                                       the files which are specified in the following options
+    -f FILE, --file=FILE           also process FILE without any special handling
+    -c FILE, --countryscope=FILE   also process FILE as containing code in the counrty scope
+    -s FILE, --provincescope=FILE  also process FILE as containing code in the province scope
+    -m FILE, --modifiers=FILE      also process FILE as containing modifiers
+
+
+Without command line options, pdxparse just processes everything it finds and puts
+the results in the directory `output`. `--onlyextra` can be used to restrict the output,
+but the parsing of the extra files is not content-aware.
 
 ## Known Issues
 

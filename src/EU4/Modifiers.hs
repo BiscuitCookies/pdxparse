@@ -327,7 +327,7 @@ writeEU4ProvTrigModifiers = do
         pp_prov_trig_modifier :: (EU4Info g, Monad m) => EU4ProvinceTriggeredModifier -> PPT g m Doc
         pp_prov_trig_modifier mod = do
             req <- imsg2doc =<< ppMany ((ptmodPotential mod) ++ (ptmodTrigger mod))
-            eff <- imsg2doc =<< ppMany (ptmodEffects mod)
+            eff <- imsg2doc =<< scope EU4Bonus (ppMany (ptmodEffects mod))
             act <- withHeader "When activated:" (ptmodOnActivation mod)
             dea <- withHeader "When deactivated:" (ptmodOnDeactivation mod)
             return $ mconcat

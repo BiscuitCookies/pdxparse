@@ -146,7 +146,7 @@ fixup = Doc.strictText . T.unlines . map (TE.decodeUtf8
         . TE.encodeUtf8) . T.lines . Doc.doc2text where
     badIcons, singleIdeaIcons, multiIdeaIcons{-, multiIdeaStartIcons -} :: Regex
     badIcons = RE.makeRegex ("((tradition.|bonus)=|\\* )({{icon[^}]*}}|\\[\\[File:[^]]*\\]\\]) "::ByteString)
-    singleIdeaIcons = RE.makeRegex ("idea(.)effect=({{icon\\||\\[\\[File:)([a-z ]*)(.png)?\\|28px(}}|\\]\\]) "::ByteString)
+    singleIdeaIcons = RE.makeRegex ("idea(.)effect=({{icon\\||\\[\\[File:)([a-z ]*)(.png)?\\|28px(}}|(\\|link=[^]]*)?\\]\\]) "::ByteString)
     multiIdeaIcons = RE.makeRegex ("(:)({{icon[^}]*}}|\\[\\[File:[^]]*\\]\\]) "::ByteString)
     greenTemplate = RE.makeRegex ("{{green\\|([^}]*)}}"::ByteString)
 --    multiIdeaStartIcons = RE.makeRegex ("idea(.)effect = {{plainlist\\|\\* {{icon\\|([a-z ]*)\\|28px}} "::ByteString)
@@ -187,7 +187,7 @@ writeEU4IdeaGroups = do
                                 ,   featureId = Just (ig_name ig)
                                 ,   theFeature = Right ig })
                             (HM.elems groups)
-    writeFeatures "idea groups"
+    scope EU4Bonus $ writeFeatures "idea groups"
                   pathedGroups
                   ppIdeaGroup {- need IdeaGroup -> PPT g IO (FilePath, Doc) -}
 
@@ -221,7 +221,7 @@ ppIdeaGroup ig = fixup <$> do
             bonus_pp'd <- imsg2doc . unindent =<< ppMany bonus
             mtrigger_pp'd <- case ig_trigger ig of
                 Nothing -> return Nothing
-                Just trigger -> Just <$> (imsg2doc =<< ppMany trigger)
+                Just trigger -> Just <$> (imsg2doc =<< scope EU4Country (ppMany trigger))
             let name_loc = Doc.strictText . T.replace " Ideas" "" $ name
                 ig_id_t = ig_name ig
                 ig_id = Doc.strictText ig_id_t

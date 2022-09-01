@@ -41,8 +41,6 @@ module EU4.Handlers (
     ,   withTagOrNumber
     ,   numericIcon
     ,   numericIconLoc
-    ,   numericIconBonus
-    ,   numericIconBonusAllowTag
     ,   boolIconLoc
     ,   tryLoc
     ,   tryLocAndIcon
@@ -95,7 +93,6 @@ module EU4.Handlers (
     ,   withFlagOrProvinceEU4Scope
     ,   tradeMod
     ,   isMonth
-    ,   range
     ,   area
     ,   dominantCulture
     ,   customTriggerTooltip
@@ -157,6 +154,10 @@ module EU4.Handlers (
     ,   isOrAcceptsReligionGroup
     ,   genericTextLines
     ,   handleModifier
+    ,   handleModifierWithIcon
+    ,   handleModifierWithIconPlural
+    ,   handleModifierDlcOnly
+    ,   handleModifierAlwaysYesWithIcon
     ) where
 
 import Data.Char (toUpper, toLower, isUpper)
@@ -864,6 +865,8 @@ scriptIconTable = HM.fromList
 scriptIconFileTable :: HashMap Text (Text, Text)
 scriptIconFileTable = HM.fromList
     [("all estates loyalty equilibrium", ("", "all estates loyalty equilibrium"))
+    ,("auto explore adjacent to colony", ("", "discovery"))
+    ,("average monarch lifespan", ("", "average monarch lifespan"))
     ,("cost to promote mercantilism", ("", "cost to promote mercantilism"))
     ,("establish holy order cost", ("", "establish holy order cost"))
     ,("fleet movement speed", ("", "fleet movement speed"))
@@ -871,8 +874,12 @@ scriptIconFileTable = HM.fromList
     ,("local state maintenance modifier", ("", "local state maintenance modifier"))
     ,("maximum tolerance of heathens", ("", "maximum tolerance of heathens"))
     ,("maximum tolerance of heretics", ("", "maximum tolerance of heretics"))
+    ,("may establish siberian frontiers", ("", "Siberian frontier"))
+    ,("may fabricate claims for subjects", ("", "Fabricate claims"))
     ,("monthly heir claim increase", ("", "monthly heir claim increase"))
     ,("monthly piety accelerator", ("", "monthly piety accelerator"))
+    ,("monthly reform progress", ("", "reform progress growth"))
+    ,("overlord naval force limit", ("", "overlord naval force limit"))
     ,("yearly authority", ("", "yearly authority"))
     ,("yearly doom reduction", ("", "yearly doom reduction"))
     -- Trade company investments
@@ -1336,41 +1343,6 @@ numericIconLoc the_icon what msg [pdx| %_ = !amt |]
     = do whatloc <- getGameL10n what
          msgToPP $ msg (iconText the_icon) whatloc amt
 numericIconLoc _ _ _ stmt = plainMsg $ pre_statement' stmt
-
--- | Handler for statements that have a number and an icon, whose meaning
--- differs depending on what scope it's in.
-numericIconBonus :: (EU4Info g, Monad m) =>
-    Text
-        -> (Text -> Double -> ScriptMessage) -- ^ Message for country / other scope
-        -> (Text -> Double -> ScriptMessage) -- ^ Message for bonus scope
-        -> StatementHandler g m
-numericIconBonus the_icon plainmsg yearlymsg [pdx| %_ = !amt |]
-    = do
-        mscope <- getCurrentScope
-        let icont = iconText the_icon
-            yearly = msgToPP $ yearlymsg icont amt
-        case mscope of
-            Nothing -> yearly -- ideas / bonuses
-            Just thescope -> case thescope of
-                EU4Bonus -> yearly
-                _ -> -- act as though it's country for all others
-                    msgToPP $ plainmsg icont amt
-numericIconBonus _ _ _ stmt = plainMsg $ pre_statement' stmt
-
-
--- | Like numericIconBonus but allow rhs to be a tag/scope (used for e.g. "prestige")
-numericIconBonusAllowTag :: (EU4Info g, Monad m) =>
-    Text
-        -> (Text -> Double -> ScriptMessage) -- ^ Message for country / other scope
-        -> (Text -> Text -> ScriptMessage)   -- ^ Message for tag/scope
-        -> (Text -> Double -> ScriptMessage) -- ^ Message for bonus scope
-        -> StatementHandler g m
-numericIconBonusAllowTag the_icon plainmsg plainAsMsg yearlymsg stmt@[pdx| %_ = $what |]
-    = do
-        whatLoc <- flagText (Just EU4Country) what
-        msgToPP $ plainAsMsg (iconText the_icon) whatLoc
-numericIconBonusAllowTag the_icon plainmsg _ yearlymsg stmt
-    = numericIconBonus the_icon plainmsg yearlymsg stmt
 
 -- | Handler for values that use a different message and icon depending on
 -- whether the value is positive or negative.
@@ -3019,11 +2991,6 @@ isMonth [pdx| %_ = !(num :: Int) |] | num >= 0, num <= 11
         msgToPP $ MsgIsMonth month_loc
 isMonth stmt = preStatement stmt
 
-range :: (EU4Info g, Monad m) => StatementHandler g m
-range stmt@[pdx| %_ = !(_ :: Double) |]
-    = numericIcon "colonial range" MsgGainColonialRange stmt
-range stmt = withFlag MsgIsInColonialRange stmt
-
 area :: (EU4Info g, Monad m) => StatementHandler g m
 area stmt@[pdx| %_ = @_ |] = scope EU4Geographic $ compoundMessage MsgArea stmt
 area stmt                  = locAtomTagOrProvince (const MsgAreaIs) MsgAreaIsAs stmt
@@ -4201,11 +4168,48 @@ handleModifier :: (EU4Info g, Monad m) =>
     Text
     -> (Double -> Doc)
         -> StatementHandler g m
-handleModifier locKey modifierTransformer [pdx| %_ = !amt |] = do
+handleModifier locKey modifierTransformer stmt = do
     modifierLoc <- getGameL10n locKey
-    let lowerLoc = T.toLower modifierLoc
-    msgToPP $ MsgGenericModifier (iconText lowerLoc) amt (capitalizeFirstLetter lowerLoc) modifierTransformer
-handleModifier _ _  stmt = plainMsg $ pre_statement' stmt
+    handleModifierWithIcon locKey (T.toLower modifierLoc) modifierTransformer stmt
+
+-- | Handler for generic modifiers
+-- The localisation is loaded dynamically from the game files and the supplied icon key is used
+-- if the localisation can't be found, the locKey is used unchanged
+handleModifierWithIcon :: (EU4Info g, Monad m) =>
+    Text
+    -> Text
+    -> (Double -> Doc)
+        -> StatementHandler g m
+handleModifierWithIcon locKey iconKey modifierTransformer [pdx| %_ = !amt |] = do
+    modifierLoc <- getGameL10nIfPresent locKey
+    let capitalizedText = case modifierLoc of
+            Nothing -> locKey
+            Just str -> capitalizeFirstLetter (T.toLower str)
+    msgToPP $ MsgGenericModifier (iconText iconKey) amt capitalizedText modifierTransformer
+handleModifierWithIcon _ _ _  stmt = plainMsg $ pre_statement' stmt
+
+-- | Handler for modifiers with a specific message which changes depending on the value
+-- e.g. "+1 Diplomat" / "+2 Diplomats"
+handleModifierWithIconPlural :: (EU4Info g, Monad m) => Text -> Text -> Text -> (Double -> Doc) -> StatementHandler g m
+handleModifierWithIconPlural singularMessage pluralMessage iconKey modifierTransformer [pdx| %_ = !amt |] = do
+    msgToPP $ MsgGenericModifier (iconText iconKey) amt (plural amt singularMessage pluralMessage) modifierTransformer
+handleModifierWithIconPlural _ _ _ _  stmt = plainMsg $ pre_statement' stmt
+
+-- | Handler for modifiers which wrap their message and value in a DLC-only template
+-- e.g. {{DLC-only|Administrative free policies|+1}}
+handleModifierDlcOnly :: (EU4Info g, Monad m) => Text -> Text -> (Double -> Doc) -> StatementHandler g m
+handleModifierDlcOnly message iconKey modifierTransformer [pdx| %_ = !amt |] = do
+    msgToPP $ MsgGenericModifierDlcOnly (iconText iconKey) amt message modifierTransformer
+handleModifierDlcOnly _ _ _  stmt = plainMsg $ pre_statement' stmt
+
+-- | Handler for modifiers which have an icon and always have "yes" as their value
+-- e.g. "may_recruit_female_generals = yes" =>
+-- "{{icon|may recruit female generals|28px}} May recruit female generals"
+handleModifierAlwaysYesWithIcon :: (EU4Info g, Monad m) => Text -> Text -> StatementHandler g m
+-- handleModifierAlwaysYesWithIcon message iconKey [pdx| %_ = "yes" |] = do
+handleModifierAlwaysYesWithIcon message iconKey [pdx| %_ = ?rhs |] | T.toLower rhs == "yes" = do
+    msgToPP $ MsgGenericTextWithIcon (iconText iconKey) message
+handleModifierAlwaysYesWithIcon _ _  stmt = plainMsg $ pre_statement' stmt
 
 -- | statement handler for a list of lines.
 -- Lines which are prefixed with one or more *, will be indented accordingly
