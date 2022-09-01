@@ -461,7 +461,7 @@ ppEvent evt = maybe
             (if conditional then ["| option conditions = yes", PP.line] else []) ++
             -- option_conditions = no (not implemented yet)
             ["| options = ", options_pp'd, PP.line] ++
-            ["| collapse = yes", PP.line
+            ["| collapse = no", PP.line
             ,"}}", PP.line
             ,"<section end=", evtId, "/>", PP.line
             ])

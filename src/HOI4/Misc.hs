@@ -128,9 +128,9 @@ parseHOI4Interface :: (IsGameState (GameState g), IsGameData (GameData g), Monad
 parseHOI4Interface scripts = HM.unions . HM.elems <$> do
     tryParse <- hoistExceptions $
         HM.traverseWithKey
-            (\sourceFile scr -> setCurrentFile sourceFile $ mapM processInterface $ case scr of
-                [[pdx| $spriteTypes = @spr |]] | T.toLower spriteTypes == "spritetypes" -> spr
-                _ -> [])
+            (\sourceFile scr -> setCurrentFile sourceFile $ mapM processInterface $ concatMap (\case
+                [pdx| $spriteTypes = @spr |] | T.toLower spriteTypes == "spritetypes" -> spr
+                _ -> []) scr)
             scripts
     case tryParse of
         Left err -> do
@@ -185,9 +185,9 @@ parseHOI4Characters scripts = do
     charmap <- HM.unions . HM.elems <$> do
         tryParse <- hoistExceptions $
             HM.traverseWithKey
-                (\sourceFile scr -> setCurrentFile sourceFile $ mapM character $ case scr of
-                    [[pdx| characters = @chars |]] -> chars
-                    _ -> scr)
+                (\sourceFile scr -> setCurrentFile sourceFile $ mapM character $ concatMap (\case
+                    [pdx| characters = @chars |] -> chars
+                    _ -> scr) scr)
                 scripts
         case tryParse of
             Left err -> do
