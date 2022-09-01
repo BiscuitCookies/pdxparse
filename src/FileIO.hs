@@ -39,6 +39,7 @@ import qualified Text.PrettyPrint.Leijen.Text as PP
 
 import Abstract -- everything
 import SettingsTypes (Settings (..), IsGameData (..), GameData (..), PPT, hoistExceptions)
+import Data.List (intercalate)
 
 -- | Read a file as Text. Unfortunately EU4 script files use several incompatible
 -- encodings. Try the following encodings in order:
@@ -76,49 +77,69 @@ buildPath settings path =
 -- Reading scripts from file --
 -------------------------------
 
--- | Read and parse a script file. On error, report to standard output and
+-- | Read and parse a script file. On error, report to standard error and
 -- return an empty script.
 readScript :: Settings -> FilePath -> IO GenericScript
 readScript settings file = do
     let filepath = buildPath settings file
-    contents <- readFileRetry filepath
-    case contentsparse contents of
-        Right [] ->
-            case contentsparse (contents<>"}") of
-                Right [] ->
-                    case contentsparse (contents<>"}}") of
-                        Right [] -> return []
-                        Right result -> do
-                            putStrLn $ "File " ++ file ++ ": Missing 2 closing curly brackets, applied fix"
-                            return result
-                        Left err -> do
-                            putStrLn $ "Couldn't parse " ++ file ++ ": " ++ err
-                            return []
-                Right result -> do
-                    putStrLn $ "File " ++ file ++ ": Missing closing curly bracket, applied fix"
-                    return result
-                Left err -> do
-                    putStrLn $ "Couldn't parse " ++ file ++ ": " ++ err
-                    return []
-        Right result -> return result
-        Left err -> do
-            putStrLn $ "Couldn't parse " ++ file ++ ": " ++ err
-            return []
-    where
-        contentsparse = Ap.parseOnly (Ap.option undefined (Ap.char '\xFEFF') -- BOM
-                        *> skipSpace
-                        *> genericScript)
+    readSpecificScript settings filepath
 
 readSpecificScript :: Settings -> FilePath -> IO GenericScript
 readSpecificScript settings filepath = do
     contents <- readFileRetry filepath
-    case Ap.parseOnly (Ap.option undefined (Ap.char '\xFEFF') -- BOM
-                        *> skipSpace
-                        *> genericScript) contents of
-        Right result -> return result
-        Left err -> do
-            putStrLn $ "Couldn't parse " ++ filepath ++ ": " ++ err
+    case runparserAndAddClosingCurlyBrackets filepath contents of
+        -- this case probably can't happen with our parser
+        Ap.Fail _ context err -> do
+            hPutStrLn stderr $ "Couldn't parse " ++ filepath ++ ": " ++ err
+            hPutStrLn stderr $ "Context: " ++ intercalate ", " context
             return []
+        Ap.Partial _ -> do
+            hPutStrLn stderr $ "Got partial from file: " ++ filepath ++ " This should not happen"
+            return []
+        -- no result, but also not leftovers
+        Ap.Done "" [] -> do
+            hPutStrLn stderr $ "The file " ++ filepath ++ " seems to only contain whitespace and comments"
+            return []
+        Ap.Done "" result -> return result
+        Ap.Done leftover result -> do
+            hPutStrLn stderr $ "Warning: The file \"" ++ filepath ++ "\" was not fully parsed. The following lines were discarded:"
+            hPutStrLn stderr $ T.unpack leftover
+            return result
+    where
+        runparser contents = case Ap.parse
+                (Ap.option undefined (Ap.char '\xFEFF') *> skipSpace
+                   *> genericScript
+                   -- discard extra whitespace and comments at the end of the file. This is needed so that
+                   -- a successful parse has no leftovers
+                   <* skipSpace
+                   ) contents of
+            -- pass an empty string to the partial to tell it that there is no more input
+            Ap.Partial f -> f ""
+            -- just pass on all other cases
+            x -> x
+
+        runparserAndAddClosingCurlyBrackets filepath contents = case runparser contents of
+            -- no leftovers means that the parsing was successful (result could be empty in case of a file which just has whitespace and comments)
+            Ap.Done "" result -> Ap.Done "" result
+            -- we have some leftover, so the file was either not parsed at all or just partially parsed
+            -- so we try again with an extra closing }
+            Ap.Done originalLeftover originalResult -> case runparser (contents<>"}") of
+                -- good, it worked now and we can return the new result
+                Ap.Done "" newResult -> do
+                    trace ( "File " ++ filepath ++ ": Missing closing curly bracket, applied fix" )
+                        Ap.Done "" newResult
+                -- still didn't work, so we try with two }
+                Ap.Done newLeftover newResult -> case runparser (contents<>"}}") of
+                    -- good, it worked now and we can return the new result
+                    Ap.Done "" newResult -> do
+                        trace ("File " ++ filepath ++ ": Missing 2 closing curly brackets, applied fix")
+                            Ap.Done "" newResult
+                    -- to not make matters worse, we return the original results if adding } didn't result in a successful parse
+                    _ -> Ap.Done originalLeftover originalResult
+                _ -> Ap.Done originalLeftover originalResult
+            -- just pass on all other cases
+            x -> x
+
 ------------------------------
 -- Writing features to file --
 ------------------------------

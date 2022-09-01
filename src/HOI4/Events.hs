@@ -8,9 +8,10 @@ module HOI4.Events (
     ,   findTriggeredEventsInEvents
     ,   findTriggeredEventsInDecisions
     ,   findTriggeredEventsInOnActions
---    ,   findTriggeredEventsInDisasters
---    ,   findTriggeredEventsInMissions
     ,   findTriggeredEventsInNationalFocus
+    ,   findTriggeredEventsInIdeas
+    ,   findTriggeredEventsInCharacters
+    ,   findTriggeredEventsInScriptedEffects
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -46,6 +47,7 @@ import SettingsTypes ( PPT, Settings (..), Game (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile
                      , hoistErrors, hoistExceptions)
+import HOI4.Handlers (flagText)
 
 -- | Empty event value. Starts off Nothing/empty everywhere.
 newHOI4Event :: HOI4Scope -> FilePath -> HOI4Event
@@ -359,127 +361,6 @@ ppEventLoc id = do
         (Just t) | T.length (T.strip t) /= 0 -> return $ "<!-- " <> id <> " -->" <> iquotes't t -- TODO: Add link if possible
         _ -> return $ "<tt>" <> id <> "</tt>"
 
-formatWeight :: HOI4EventWeight -> Text
-formatWeight Nothing = ""
-formatWeight (Just (n, d)) = T.pack (" (Base weight: " ++ show n ++ "/" ++ show d ++ ")")
-
-ppEventSource :: (HOI4Info g, Monad m) => HOI4EventSource -> PPT g m Doc
-ppEventSource (HOI4EvtSrcOption eventId optionId) = do
-    eventLoc <- ppEventLoc eventId
-    optLoc <- getGameL10n optionId
-    return $ Doc.strictText $ mconcat [ "The event "
-        , eventLoc
-        , " option "
-        , iquotes't optLoc
-        ]
-ppEventSource (HOI4EvtSrcImmediate eventId) = do
-    eventLoc <- ppEventLoc eventId
-    return $ Doc.strictText $ mconcat [ "As an immediate effect of the "
-        , eventLoc
-        , " event"
-        ]
-ppEventSource (HOI4EvtSrcDecComplete id loc) = do
-    return $ Doc.strictText $ mconcat ["Taking the decision "
-        , "<!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        ]
-ppEventSource (HOI4EvtSrcDecRemove id loc) = do
-    return $ Doc.strictText $ mconcat ["Finishing the decision "
-        , "<!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        ]
-ppEventSource (HOI4EvtSrcDecCancel id loc) = do
-    return $ Doc.strictText $ mconcat ["Triggering the cancel trigger on the decision "
-        , "<!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        ]
-ppEventSource (HOI4EvtSrcDecTimeout id loc) = do
-    return $ Doc.strictText $ mconcat ["Running out the timer on the decision "
-        , "<!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        ]
-ppEventSource (HOI4EvtSrcOnAction act weight) = do
-    return $ Doc.strictText $ act <> formatWeight weight
-ppEventSource (HOI4EvtSrcNFComplete id loc icon) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
-        return $ "[[File:" <> iconname <> ".png|28px]]"
-    return $ Doc.strictText $ mconcat ["Completing the national focus "
-        , iconnf
-        , " <!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        ]
-ppEventSource (HOI4EvtSrcNFSelect id loc icon) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
-        return $ "[[File:" <> iconname <> ".png|28px]]"
-    return $ Doc.strictText $ mconcat ["Selecting the national focus "
-        , iconnf
-        , " <!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        ]
-ppEventSource (HOI4EvtSrcIdeaOnAdd id loc icon categ) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
-        return $ "[[File:" <> iconname <> ".png|28px]]"
-    catloc <- getGameL10n categ
-    return $ Doc.strictText $ mconcat ["When the "
-        , catloc
-        , " "
-        , iconnf
-        , " <!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        , " is added"
-        ]
-ppEventSource (HOI4EvtSrcIdeaOnRemove id loc icon categ) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
-        return $ "[[File:" <> iconname <> ".png|28px]]"
-    catloc <- getGameL10n categ
-    return $ Doc.strictText $ mconcat ["When the "
-        , catloc
-        , " "
-        , iconnf
-        , " <!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        , " is removed"
-        ]
-ppEventSource (HOI4EvtSrcCharacterOnAdd id loc) =
-    return $ Doc.strictText $ mconcat ["When the advisor "
-        , " <!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        , " is added"
-        ]
-ppEventSource (HOI4EvtSrcCharacterOnRemove id loc) =
-    return $ Doc.strictText $ mconcat ["When the advisor "
-        , " <!-- "
-        , id
-        , " -->"
-        , iquotes't loc
-        , " is removed"
-        ]
 
 ppTriggeredBy :: (HOI4Info g, Monad m) => Text -> [Doc] -> PPT g m Doc
 ppTriggeredBy eventId trig = do
@@ -636,99 +517,89 @@ ppoption evtid hidden triggered opt = do
                 ["}}"
                 ]
 
-findInStmt :: GenericStatement -> [(HOI4EventWeight, Text)]
-findInStmt stmt@[pdx| $lhs = @scr |] | lhs == "country_event" || lhs == "news_event" || lhs == "unit_leader_event" || lhs == "state_event" || lhs == "operative_leader_event" =
-    maybe (trace ("Unrecognized event trigger: " ++ show stmt) [])
-        (\triggeredId -> [(Nothing, triggeredId)])
-        (getId scr)
+formatWeight :: HOI4EventWeight -> Text
+formatWeight Nothing = ""
+formatWeight (Just (n, d)) = T.pack (" (Base weight: " ++ show n ++ "/" ++ show d ++ ")")
+
+ppEventSource :: (HOI4Info g, Monad m) => HOI4EventSource -> PPT g m Doc
+ppEventSource (HOI4EvtSrcOption eventId optionId) = do
+    eventLoc <- ppEventLoc eventId
+    optLoc <- getGameL10n optionId
+    return $ Doc.strictText $ mconcat [ "The event "
+        , eventLoc
+        , " option "
+        , iquotes't optLoc
+        ]
+ppEventSource (HOI4EvtSrcImmediate eventId) = do
+    eventLoc <- ppEventLoc eventId
+    return $ Doc.strictText $ mconcat [ "As an immediate effect of the "
+        , eventLoc
+        , " event"
+        ]
+ppEventSource (HOI4EvtSrcDecComplete id loc) = do
+    return $ Doc.strictText $ mconcat ["Taking the decision "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        ]
+ppEventSource (HOI4EvtSrcDecRemove id loc) = do
+    return $ Doc.strictText $ mconcat ["Finishing the decision "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        ]
+ppEventSource (HOI4EvtSrcDecCancel id loc) = do
+    return $ Doc.strictText $ mconcat ["Triggering the cancel trigger on the decision "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        ]
+ppEventSource (HOI4EvtSrcDecTimeout id loc) = do
+    return $ Doc.strictText $ mconcat ["Running out the timer on the decision "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        ]
+ppEventSource (HOI4EvtSrcOnAction act weight) = do
+    actn <- actionName act
+    return $ Doc.strictText $ actn <> formatWeight weight
     where
-        getId :: [GenericStatement] -> Maybe Text
-        getId [] = Nothing
-        getId (stmt@[pdx| id = ?!id |] : _) = case id of
-            Just (Left n) -> Just $ T.pack (show (n :: Int))
-            Just (Right t) -> Just t
-            _ -> trace ("Invalid event id statement: " ++ show stmt) Nothing
-        getId (_ : ss) = getId ss
-findInStmt stmt@[pdx| $lhs = $id |] | lhs == "country_event" || lhs == "news_event" || lhs == "unit_leader_event" || lhs == "state_event" || lhs == "operative_leader_event" = [(Nothing, id)]
-findInStmt [pdx| events = @scr |]  = mapMaybe extractEvent scr
-    where
-        extractEvent :: GenericStatement -> Maybe (HOI4EventWeight, Text)
-        extractEvent (StatementBare (GenericLhs e [])) = Just (Nothing, e)
-        extractEvent (StatementBare (IntLhs e)) = Just (Nothing, T.pack (show e))
-        extractEvent stmt = trace ("Unknown in events statement: " ++ show stmt) Nothing
-findInStmt [pdx| random_events = @scr |] =
-    let evts = mapMaybe extractRandomEvent scr
-        total = sum $ map fst evts
-    in map (\t -> (Just (fst t, total), snd t)) evts
-    where
-        extractRandomEvent :: GenericStatement -> Maybe (Integer, Text)
-        extractRandomEvent stmt@[pdx| !weight = ?!id |] = case id of
-            Just (Left n) -> Just (fromIntegral weight, T.pack (show (n :: Int)))
-            Just (Right t) -> Just (fromIntegral weight, t)
-            _ -> trace ("Invalid event id in random_events: " ++ show stmt) Nothing
-        extractRandomEvent stmt = trace ("Unknown in random_events statement: " ++ show stmt) Nothing
-findInStmt [pdx| %lhs = @scr |] = findInStmts scr
-findInStmt _ = []
+        actionName :: (HOI4Info g, Monad m) =>
+            Text -> PPT g m Text
+        actionName n
+            | "on_monthly_" `T.isPrefixOf` n = do
+                let tag = case T.stripPrefix "on_monthly_" n of
+                        Just nc -> nc
+                        _ -> "<!-- Check game Script -->"
+                let actmsg = "<!-- " <> n <>  " -->On every month for "
+                tagloc <- flagText (Just HOI4Country) tag
+                return $ actmsg <> tagloc
+            | "on_weekly_" `T.isPrefixOf` n = do
+                let tag = case T.stripPrefix "on_weekly_" n of
+                        Just nc -> nc
+                        _ -> "<!-- Check game Script -->"
+                let actmsg = "<!-- " <> n <>  " -->On every week for "
+                tagloc <- flagText (Just HOI4Country) tag
+                return $ actmsg <> tagloc
+            | "on_daily_" `T.isPrefixOf` n = do
+                let tag = case T.stripPrefix "on_daily_" n of
+                        Just nc -> nc
+                        _ -> "<!-- Check game Script -->"
+                let actmsg = "<!-- " <> n <>  " -->On every day for "
+                tagloc <- flagText (Just HOI4Country) tag
+                return $ actmsg <> tagloc
+            | otherwise =
+                return $ HM.findWithDefault ("<pre>" <> n <> "</pre>") n actionNameTable
 
-findInStmts :: [GenericStatement] -> [(HOI4EventWeight, Text)]
-findInStmts = concatMap findInStmt
-
-addEventSource :: (HOI4EventWeight -> HOI4EventSource) -> [(HOI4EventWeight, Text)] -> [(Text, HOI4EventSource)]
-addEventSource es = map (\t -> (snd t, es (fst t)))
-
-findInOptions :: Text -> [HOI4Option] -> [(Text, HOI4EventSource)]
-findInOptions eventId = concatMap (\o -> maybe []
-    (\optName -> addEventSource (const (HOI4EvtSrcOption eventId optName)) (maybe [] (concatMap findInStmt) (hoi4opt_effects o)))
-    (hoi4opt_name o)
-    )
-
-addEventTriggers :: HOI4EventTriggers -> [(Text, HOI4EventSource)] -> HOI4EventTriggers
-addEventTriggers hm l = foldl' ins hm l
-    where
-        ins :: HOI4EventTriggers -> (Text, HOI4EventSource) -> HOI4EventTriggers
-        ins hm (k, v) = HM.alter (\case
-            Just l -> Just $ l ++ [v]
-            Nothing -> Just [v]) k hm
-
-findTriggeredEventsInEvents :: HOI4EventTriggers -> [HOI4Event] -> HOI4EventTriggers
-findTriggeredEventsInEvents hm evts = addEventTriggers hm (concatMap findInEvent evts)
-    where
-        findInEvent :: HOI4Event -> [(Text, HOI4EventSource)]
-        findInEvent evt@HOI4Event{hoi4evt_id = Just eventId} =
-            (case hoi4evt_options evt of
-                Just opts -> findInOptions eventId opts
-                _ -> []) ++
-            addEventSource (const (HOI4EvtSrcImmediate eventId)) (maybe [] findInStmts (hoi4evt_immediate evt))
-        findInEvent _ = []
-
-findTriggeredEventsInDecisions :: HOI4EventTriggers -> [HOI4Decision] -> HOI4EventTriggers
-findTriggeredEventsInDecisions hm ds = addEventTriggers hm (concatMap findInDecision ds)
-    where
-        findInDecision :: HOI4Decision -> [(Text, HOI4EventSource)]
-        findInDecision d =
-            addEventSource (const (HOI4EvtSrcDecComplete (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_complete_effect d)) ++
-            addEventSource (const (HOI4EvtSrcDecRemove (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_remove_effect d)) ++
-            addEventSource (const (HOI4EvtSrcDecCancel (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_cancel_effect d)) ++
-            addEventSource (const (HOI4EvtSrcDecTimeout (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_timeout_effect d))
-
-findTriggeredEventsInOnActions :: HOI4EventTriggers -> [GenericStatement] -> HOI4EventTriggers
-findTriggeredEventsInOnActions hm scr = foldl' findInAction hm scr -- needs editing
-    where
-        findInAction :: HOI4EventTriggers -> GenericStatement -> HOI4EventTriggers
-        findInAction hm [pdx|on_actions = @stmts |] = foldl' findInAction hm stmts
-        findInAction hm stmt@[pdx| $lhs = @scr |] = addEventTriggers hm (addEventSource (HOI4EvtSrcOnAction (actionName lhs)) (findInStmts scr))
-        findInAction hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm
-
-        actionName :: Text -> Text
-        actionName n = HM.findWithDefault ("<pre>" <> n <> "</pre>") n actionNameTable
-
-
-        -- TODO: deal with on_weekly_<TAG> on_daily_<TAG> etc.
         actionNameTable :: HashMap Text Text
         actionNameTable = HM.fromList
             [("on_ace_killed","<!-- on_ace_killed -->On ace killed")
-            ,("on_ace_killed_by_ace","<!-- on_ace_killed_by_ace -->On ace killed by ace")
-            ,("on_ace_killed_other_ace","<!-- on_ace_killed_other_ace -->On ace kills ace")
+            ,("on_ace_killed_by_ace","<!-- on_ace_killed_by_ace -->On ace killed by enemy ace")
+            ,("on_ace_killed_other_ace","<!-- on_ace_killed_other_ace -->On ace kills enemy ace")
             ,("on_aces_killed_each_other","<!-- on_aces_killed_each_other -->On aces killed each other")
             ,("on_ace_promoted","<!-- on_ace_promoted -->On ace promoted")
             ,("on_annex", "<!-- on_annex -->On nation annexed")
@@ -766,7 +637,171 @@ findTriggeredEventsInOnActions hm scr = foldl' findInAction hm scr -- needs edit
             ,("on_unit_leader_created","<!-- on_unit_leader_created -->On army leader created")
             ,("on_war_relation_added","<!-- on_war_relation_added -->On nation joined war")
             ,("on_wargoal_expire","<!-- on_wargoal_expire -->On wargoal expired")
+            ,("on_weekly","<!-- on_weekly -->On every week")
             ]
+ppEventSource (HOI4EvtSrcNFComplete id loc icon) = do
+    gfx <- getInterfaceGFX
+    iconnf <-
+        let iconname = HM.findWithDefault icon icon gfx in
+        return $ "[[File:" <> iconname <> ".png|28px]]"
+    return $ Doc.strictText $ mconcat ["Completing the national focus "
+        , iconnf
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        ]
+ppEventSource (HOI4EvtSrcNFSelect id loc icon) = do
+    gfx <- getInterfaceGFX
+    iconnf <-
+        let iconname = HM.findWithDefault icon icon gfx in
+        return $ "[[File:" <> iconname <> ".png|28px]]"
+    return $ Doc.strictText $ mconcat ["Selecting the national focus "
+        , iconnf
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        ]
+ppEventSource (HOI4EvtSrcIdeaOnAdd id loc icon categ) = do
+    gfx <- getInterfaceGFX
+    iconnf <-
+        let iconname = HM.findWithDefault icon icon gfx in
+        return $ "[[File:" <> iconname <> ".png|28px]]"
+    catloc <- getGameL10n categ
+    return $ Doc.strictText $ mconcat ["When the "
+        , catloc
+        , " "
+        , iconnf
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " is added"
+        ]
+ppEventSource (HOI4EvtSrcIdeaOnRemove id loc icon categ) = do
+    gfx <- getInterfaceGFX
+    iconnf <-
+        let iconname = HM.findWithDefault icon icon gfx in
+        return $ "[[File:" <> iconname <> ".png|28px]]"
+    catloc <- getGameL10n categ
+    return $ Doc.strictText $ mconcat ["When the "
+        , catloc
+        , " "
+        , iconnf
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " is removed"
+        ]
+ppEventSource (HOI4EvtSrcCharacterOnAdd id loc) =
+    return $ Doc.strictText $ mconcat ["When the advisor "
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " is added"
+        ]
+ppEventSource (HOI4EvtSrcCharacterOnRemove id loc) =
+    return $ Doc.strictText $ mconcat ["When the advisor "
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " is removed"
+        ]
+ppEventSource (HOI4EvtSrcScriptedEffect id weight) =
+    return $ Doc.strictText $ mconcat ["When scripted effect "
+        , iquotes't id
+        , " is activated"
+        ]
+
+findInStmt :: GenericStatement -> [(HOI4EventWeight, Text)]
+findInStmt stmt@[pdx| $lhs = @scr |] | lhs == "country_event" || lhs == "news_event" || lhs == "unit_leader_event" || lhs == "state_event" || lhs == "operative_leader_event" =
+    maybe (trace ("Unrecognized event trigger: " ++ show stmt) [])
+        (\triggeredId -> [(Nothing, triggeredId)])
+        (getId scr)
+    where
+        getId :: [GenericStatement] -> Maybe Text
+        getId [] = Nothing
+        getId (stmt@[pdx| id = ?!id |] : _) = case id of
+            Just (Left n) -> Just $ T.pack (show (n :: Int))
+            Just (Right t) -> Just t
+            _ -> trace ("Invalid event id statement: " ++ show stmt) Nothing
+        getId (_ : ss) = getId ss
+findInStmt stmt@[pdx| $lhs = $id |]
+    | lhs == "country_event" || lhs == "news_event" || lhs == "unit_leader_event" || lhs == "state_event" || lhs == "operative_leader_event" || lhs == "on_win" || lhs == "on_lose" || lhs == "on_cancel"=
+        [(Nothing, id)]
+findInStmt [pdx| events = @scr |]  = mapMaybe extractEvent scr
+    where
+        extractEvent :: GenericStatement -> Maybe (HOI4EventWeight, Text)
+        extractEvent (StatementBare (GenericLhs e [])) = Just (Nothing, e)
+        extractEvent (StatementBare (IntLhs e)) = Just (Nothing, T.pack (show e))
+        extractEvent stmt = trace ("Unknown in events statement: " ++ show stmt) Nothing
+findInStmt [pdx| random_events = @scr |] =
+    let evts = mapMaybe extractRandomEvent scr
+        total = sum $ map fst evts
+    in map (\t -> (Just (fst t, total), snd t)) evts
+    where
+        extractRandomEvent :: GenericStatement -> Maybe (Integer, Text)
+        extractRandomEvent stmt@[pdx| !weight = ?!id |] = case id of
+            Just (Left n) -> Just (fromIntegral weight, T.pack (show (n :: Int)))
+            Just (Right t) -> Just (fromIntegral weight, t)
+            _ -> trace ("Invalid event id in random_events: " ++ show stmt) Nothing
+        extractRandomEvent stmt = trace ("Unknown in random_events statement: " ++ show stmt) Nothing
+findInStmt [pdx| %lhs = @scr |] = findInStmts scr
+findInStmt _ = []
+
+findInStmts :: [GenericStatement] -> [(HOI4EventWeight, Text)]
+findInStmts = concatMap findInStmt
+
+addEventSource :: (HOI4EventWeight -> HOI4EventSource) -> [(HOI4EventWeight, Text)] -> [(Text, HOI4EventSource)]
+addEventSource es = map (\t -> (snd t, es (fst t)))
+
+findInOptions :: Text -> [HOI4Option] -> [(Text, HOI4EventSource)]
+findInOptions eventId = concatMap (\o ->
+    (\optName -> addEventSource (const (HOI4EvtSrcOption eventId optName)) (maybe [] (concatMap findInStmt) (hoi4opt_effects o)))
+    (fromMaybe "(Un-named option)" (hoi4opt_name o))
+    )
+
+addEventTriggers :: HOI4EventTriggers -> [(Text, HOI4EventSource)] -> HOI4EventTriggers
+addEventTriggers hm l = foldl' ins hm l
+    where
+        ins :: HOI4EventTriggers -> (Text, HOI4EventSource) -> HOI4EventTriggers
+        ins hm (k, v) = HM.alter (\case
+            Just l -> Just $ l ++ [v]
+            Nothing -> Just [v]) k hm
+
+findTriggeredEventsInEvents :: HOI4EventTriggers -> [HOI4Event] -> HOI4EventTriggers
+findTriggeredEventsInEvents hm evts = addEventTriggers hm (concatMap findInEvent evts)
+    where
+        findInEvent :: HOI4Event -> [(Text, HOI4EventSource)]
+        findInEvent evt@HOI4Event{hoi4evt_id = Just eventId} =
+            (case hoi4evt_options evt of
+                Just opts -> findInOptions eventId opts
+                _ -> []) ++
+            addEventSource (const (HOI4EvtSrcImmediate eventId)) (maybe [] findInStmts (hoi4evt_immediate evt))
+        findInEvent _ = []
+
+findTriggeredEventsInDecisions :: HOI4EventTriggers -> [HOI4Decision] -> HOI4EventTriggers
+findTriggeredEventsInDecisions hm ds = addEventTriggers hm (concatMap findInDecision ds)
+    where
+        findInDecision :: HOI4Decision -> [(Text, HOI4EventSource)]
+        findInDecision d =
+            addEventSource (const (HOI4EvtSrcDecComplete (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_complete_effect d)) ++
+            addEventSource (const (HOI4EvtSrcDecRemove (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_remove_effect d)) ++
+            addEventSource (const (HOI4EvtSrcDecCancel (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_cancel_effect d)) ++
+            addEventSource (const (HOI4EvtSrcDecTimeout (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_timeout_effect d))
+
+findTriggeredEventsInOnActions :: HOI4EventTriggers -> [GenericStatement] -> HOI4EventTriggers
+findTriggeredEventsInOnActions hm scr = foldl' findInAction hm scr -- needs editing
+    where
+        findInAction :: HOI4EventTriggers -> GenericStatement -> HOI4EventTriggers
+        findInAction hm [pdx|on_actions = @stmts |] = foldl' findInAction hm stmts
+        findInAction hm stmt@[pdx| $lhs = @scr |] = addEventTriggers hm (addEventSource (HOI4EvtSrcOnAction lhs) (findInStmts scr))
+        findInAction hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm
+
 
 findTriggeredEventsInNationalFocus :: HOI4EventTriggers -> [HOI4NationalFocus] -> HOI4EventTriggers
 findTriggeredEventsInNationalFocus hm nf = addEventTriggers hm (concatMap findInFocus nf)
@@ -777,17 +812,24 @@ findTriggeredEventsInNationalFocus hm nf = addEventTriggers hm (concatMap findIn
             addEventSource (const (HOI4EvtSrcNFSelect (nf_id f) (nf_name_loc f) (nf_icon f))) (maybe [] findInStmts (nf_select_effect f))
 
 findTriggeredEventsInIdeas :: HOI4EventTriggers -> [HOI4Idea] -> HOI4EventTriggers
-findTriggeredEventsInIdeas hm idea = addEventTriggers hm (concatMap findInFocus idea)
+findTriggeredEventsInIdeas hm idea = addEventTriggers hm (concatMap findInIdea idea)
     where
-        findInFocus :: HOI4Idea -> [(Text, HOI4EventSource)]
-        findInFocus idea =
+        findInIdea :: HOI4Idea -> [(Text, HOI4EventSource)]
+        findInIdea idea =
             addEventSource (const (HOI4EvtSrcIdeaOnAdd (id_id idea) (id_name_loc idea) (id_picture idea) (id_category idea))) (maybe [] findInStmts (id_on_add idea)) ++
             addEventSource (const (HOI4EvtSrcIdeaOnRemove (id_id idea) (id_name_loc idea) (id_picture idea) (id_category idea))) (maybe [] findInStmts (id_on_remove idea))
 
 findTriggeredEventsInCharacters :: HOI4EventTriggers -> [HOI4Character] -> HOI4EventTriggers
-findTriggeredEventsInCharacters hm hChar = addEventTriggers hm (concatMap findInFocus hChar)
+findTriggeredEventsInCharacters hm hChar = addEventTriggers hm (concatMap findInCharacter hChar)
     where
-        findInFocus :: HOI4Character -> [(Text, HOI4EventSource)]
-        findInFocus hChar =
+        findInCharacter :: HOI4Character -> [(Text, HOI4EventSource)]
+        findInCharacter hChar =
             addEventSource (const (HOI4EvtSrcCharacterOnAdd (chaTag hChar) (chaName hChar))) (maybe [] findInStmts (chaOn_add hChar)) ++
             addEventSource (const (HOI4EvtSrcCharacterOnRemove (chaTag hChar) (chaName hChar))) (maybe [] findInStmts (chaOn_remove hChar))
+
+findTriggeredEventsInScriptedEffects :: HOI4EventTriggers -> [GenericStatement] -> HOI4EventTriggers
+findTriggeredEventsInScriptedEffects hm scr = foldl' findInScriptEffect hm scr -- needs editing
+    where
+        findInScriptEffect :: HOI4EventTriggers -> GenericStatement -> HOI4EventTriggers
+        findInScriptEffect hm stmt@[pdx| $lhs = @scr |] = addEventTriggers hm (addEventSource (HOI4EvtSrcScriptedEffect lhs) (findInStmts scr))
+        findInScriptEffect hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm

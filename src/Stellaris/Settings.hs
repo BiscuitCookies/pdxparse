@@ -53,6 +53,7 @@ instance IsGame Stellaris where
         st { stScopeStack = s : stScopeStack st }
     getCurrentScope = asks $ listToMaybe . stScopeStack . sts
     getPrevScope = asks $ safeIndex 1 . stScopeStack . sts
+    getPrevScopeCustom i = asks $ safeIndex i . stScopeStack . sts
     getRootScope = asks $ safeLast . stScopeStack . sts
 
 instance StellarisInfo Stellaris where

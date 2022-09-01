@@ -153,12 +153,16 @@ module EU4.Handlers (
     ,   isPronoun
     ,   flag
     ,   estatePrivilege
+    ,   isOrAcceptsReligion
+    ,   isOrAcceptsReligionGroup
+    ,   genericTextLines
+    ,   handleModifier
     ) where
 
 import Data.Char (toUpper, toLower, isUpper)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import Data.Text (Text)
+import Data.Text (Text, stripPrefix)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as TE
@@ -248,8 +252,8 @@ msgToPP' msg = alsoIndent' msg
 -- Emit icon template.
 icon :: Text -> Doc
 icon what = case HM.lookup what scriptIconFileTable of
-    Just "" -> Doc.strictText $ "[[File:" <> what <> ".png|28px]]" -- shorthand notation
-    Just file -> Doc.strictText $ "[[File:" <> file <> ".png|28px]]"
+    Just ("", link) -> Doc.strictText $ "[[File:" <> what <> ".png|28px|link=" <> link <> "]]" -- shorthand notation
+    Just (file, link) -> Doc.strictText $ "[[File:" <> file <> ".png|28px|link=" <> link <> "]]"
     _ -> template "icon" [HM.lookupDefault what what scriptIconTable, "28px"]
 iconText :: Text -> Text
 iconText = Doc.doc2text . icon
@@ -857,41 +861,48 @@ scriptIconTable = HM.fromList
 
 -- | Table of script atom -> file. For things that don't have icons and should instead just
 -- show an image. An empty string can be used as a short hand for just appending ".png".
-scriptIconFileTable :: HashMap Text Text
+scriptIconFileTable :: HashMap Text (Text, Text)
 scriptIconFileTable = HM.fromList
-    [("cost to promote mercantilism", "")
-    ,("establish holy order cost", "")
-    ,("fleet movement speed", "")
-    ,("local state maintenance modifier", "")
-    ,("monthly piety accelerator", "")
+    [("all estates loyalty equilibrium", ("", "all estates loyalty equilibrium"))
+    ,("cost to promote mercantilism", ("", "cost to promote mercantilism"))
+    ,("establish holy order cost", ("", "establish holy order cost"))
+    ,("fleet movement speed", ("", "fleet movement speed"))
+    ,("hostile fleet attrition", ("", "hostile fleet attrition"))
+    ,("local state maintenance modifier", ("", "local state maintenance modifier"))
+    ,("maximum tolerance of heathens", ("", "maximum tolerance of heathens"))
+    ,("maximum tolerance of heretics", ("", "maximum tolerance of heretics"))
+    ,("monthly heir claim increase", ("", "monthly heir claim increase"))
+    ,("monthly piety accelerator", ("", "monthly piety accelerator"))
+    ,("yearly authority", ("", "yearly authority"))
+    ,("yearly doom reduction", ("", "yearly doom reduction"))
     -- Trade company investments
-    ,("local_quarter", "TC local quarters")
-    ,("permanent_quarters", "TC permanent quarters")
-    ,("officers_mess", "TC officers mess")
-    ,("company_warehouse", "TC warehouse")
-    ,("company_depot", "TC depot")
-    ,("admiralty", "TC admiralty")
-    ,("brokers_office", "TC brokers office")
-    ,("brokers_exchange", "TC brokers exchange")
-    ,("property_appraiser", "TC property appraiser")
-    ,("settlements", "TC settlement")
-    ,("district", "TC district")
-    ,("townships", "TC township")
-    ,("company_administration", "TC company administration")
-    ,("military_administration", "TC military administration")
-    ,("governor_general_mansion", "TC governor generals mansion")
+    ,("local_quarter", ("TC local quarters", "Trade company#Trade company investments"))
+    ,("permanent_quarters", ("TC permanent quarters", "Trade company#Trade company investments"))
+    ,("officers_mess", ("TC officers mess", "Trade company#Trade company investments"))
+    ,("company_warehouse", ("TC warehouse", "Trade company#Trade company investments"))
+    ,("company_depot", ("TC depot", "Trade company#Trade company investments"))
+    ,("admiralty", ("TC admiralty", "Trade company#Trade company investments"))
+    ,("brokers_office", ("TC brokers office", "Trade company#Trade company investments"))
+    ,("brokers_exchange", ("TC brokers exchange", "Trade company#Trade company investments"))
+    ,("property_appraiser", ("TC property appraiser", "Trade company#Trade company investments"))
+    ,("settlements", ("TC settlement", "Trade company#Trade company investments"))
+    ,("district", ("TC district", "Trade company#Trade company investments"))
+    ,("townships", ("TC township", "Trade company#Trade company investments"))
+    ,("company_administration", ("TC company administration", "Trade company#Trade company investments"))
+    ,("military_administration", ("TC military administration", "Trade company#Trade company investments"))
+    ,("governor_general_mansion", ("TC governor generals mansion", "Trade company#Trade company investments"))
     -- Disasters
-    ,("coup_attempt_disaster", "Coup Attempt")
+    ,("coup_attempt_disaster", ("Coup Attempt", "Coup Attempt"))
     -- Holy orders
-    ,("dominican_order", "Dominicans")
-    ,("franciscan_order", "Franciscans")
-    ,("jesuit_order", "Jesuits")
+    ,("dominican_order", ("Dominicans", "Dominicans"))
+    ,("franciscan_order", ("Franciscans", "Franciscans"))
+    ,("jesuit_order", ("Jesuits", "Jesuits"))
     -- Icons
-    ,("icon_climacus"   , "Icon of St. John Climacus")
-    ,("icon_eleusa"     , "Icon of Eleusa")
-    ,("icon_michael"    , "Icon of St. Michael")
-    ,("icon_nicholas"   , "Icon of St. Nicholas")
-    ,("icon_pancreator" , "Icon of Christ Pantocrator")
+    ,("icon_climacus"   , ("Icon of St. John Climacus", "Icons"))
+    ,("icon_eleusa"     , ("Icon of Eleusa", "Icons"))
+    ,("icon_michael"    , ("Icon of St. Michael", "Icons"))
+    ,("icon_nicholas"   , ("Icon of St. Nicholas", "Icons"))
+    ,("icon_pancreator" , ("Icon of Christ Pantocrator", "Icons"))
     ]
 
 -- Given a script atom, return the corresponding icon key, if any.
@@ -4155,3 +4166,54 @@ hasGovernmentReforTier :: (EU4Info g, Monad m) => StatementHandler g m
 hasGovernmentReforTier stmt@(Statement _ OpEq (CompoundRhs [Statement (GenericLhs tier []) OpEq (GenericRhs "yes" [])])) | T.isPrefixOf "tier_" tier =
     msgToPP $ MsgHasReformTier $ (read (T.unpack $ T.drop 5 tier) :: Double)
 hasGovernmentReforTier stmt = (trace $ "Not handled in hasGovernmentReforTier: " ++ show stmt) $ preStatement stmt
+
+isOrAcceptsReligion :: (EU4Info g, Monad m) => StatementHandler g m
+isOrAcceptsReligion stmt =
+    case getEffectArg "religion" stmt of
+        Just (GenericRhs atom _) -> do
+            loc <- getGameL10n atom
+            genericTextLines ["Either:"
+                , mconcat ["*The province religion is ", (iconText atom), " ", loc, " which is either the state or syncretic religion of its owner"]
+                , mconcat ["* The province has the state religion of its owner who has ", (iconText atom), " ", loc, " as a syncretic religion"]
+                ] stmt
+        _ -> (trace $ "warning: Not handled by isOrAcceptsReligion: " ++ (show stmt)) $ preStatement stmt
+
+isOrAcceptsReligionGroup :: (EU4Info g, Monad m) => StatementHandler g m
+isOrAcceptsReligionGroup stmt =
+    case getEffectArg "religion_group" stmt of
+        Just (GenericRhs atom _) -> do
+            loc <- getGameL10n atom
+            genericTextLines ["Either:"
+                , mconcat ["*The province religion is the state religion of its owner ''and'' in the ", loc," group"]
+                , "*All of the following:"
+                , mconcat ["** The owner has a syncretic religion in the ", loc, " group"]
+                , mconcat ["** The province religion is the state religion of its owner ''or'' is is in the ", loc, " group"]
+                ] stmt
+        _ -> (trace $ "warning: Not handled by isOrAcceptsReligionGroup: " ++ (show stmt)) $ preStatement stmt
+
+capitalizeFirstLetter :: Text -> Text
+capitalizeFirstLetter txt = T.toUpper (T.take 1 txt) <> T.drop 1 txt
+
+-- | Handler for generic modifiers
+-- The localisation is loaded dynamically from the game files
+-- the icon is assumed to be the same as the localisation
+handleModifier :: (EU4Info g, Monad m) =>
+    Text
+    -> (Double -> Doc)
+        -> StatementHandler g m
+handleModifier locKey modifierTransformer [pdx| %_ = !amt |] = do
+    modifierLoc <- getGameL10n locKey
+    let lowerLoc = T.toLower modifierLoc
+    msgToPP $ MsgGenericModifier (iconText lowerLoc) amt (capitalizeFirstLetter lowerLoc) modifierTransformer
+handleModifier _ _  stmt = plainMsg $ pre_statement' stmt
+
+-- | statement handler for a list of lines.
+-- Lines which are prefixed with one or more *, will be indented accordingly
+-- the rest of the lines will be passed on unchanged
+genericTextLines :: forall g m. (EU4Info g, Monad m) => [Text] -> StatementHandler g m
+genericTextLines lines stmt  = mapM handleLine lines
+    where
+        handleLine :: Text -> PPT g m IndentedMessage
+        handleLine (stripPrefix "* " -> Just suf) = indentUp (handleLine suf)
+        handleLine (stripPrefix "*" -> Just suf) = indentUp (handleLine suf)
+        handleLine x = msgToPP' $ MsgGenericText x

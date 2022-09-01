@@ -136,7 +136,8 @@ ideaAddSection iidea stmt
                 _-> trace "bad idea modifer" iidea
             "targeted_modifier" -> case rhs of
                 CompoundRhs [] -> iidea
-                CompoundRhs scr -> iidea { id_targeted_modifier = Just stmt }
+                CompoundRhs scr -> let oldstmt = fromMaybe [] (id_targeted_modifier iidea) in
+                    iidea { id_targeted_modifier = Just (oldstmt ++ [stmt]) }
                 _-> trace "bad idea targeted_modifier" iidea
             "research_bonus" -> case rhs of
                 CompoundRhs [] -> iidea

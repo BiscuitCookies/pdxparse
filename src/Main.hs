@@ -4,7 +4,7 @@ Description : Entry point for pdxparse executable
 -}
 module Main where
 
-import Control.Monad (join)
+import Control.Monad (join, unless)
 import Control.Monad.Reader (MonadReader (..), runReaderT)
 import Control.Monad.State (MonadState (..), gets, evalStateT)
 import Control.Monad.Trans (MonadIO (..))
@@ -17,10 +17,10 @@ import System.IO
 import Data.Text (Text, unpack)
 
 import Platform (initPlatform)
-import Settings (readSettings)
+import Settings (readSettings, readCommandLineOptions)
 import SettingsTypes ( Settings (..), Game (..), IsGame (..)
                      , readScripts, parseScripts, writeScripts
-                     , hoistExceptions)
+                     , hoistExceptions, CLArgs (..))
 import HOI4.Settings
 
 -- | Entry point for the program.
@@ -59,11 +59,13 @@ withExitOnInput theMain = do
   exitOnInput exitCode
  where
   exitOnInput exitCode = do
-    putStrLn "Press any key to exit."
-    hSetBuffering stdin NoBuffering
-    hSetEcho stdin False
-    getChar
-    exitWith exitCode
+    (opts, nonopts, errs) <- readCommandLineOptions
+    unless (Nowait `elem` opts) $ do
+      putStrLn "Press any key to exit."
+      hSetBuffering stdin NoBuffering
+      hSetEcho stdin False
+      getChar
+      exitWith exitCode
 
   run = do
     theMain

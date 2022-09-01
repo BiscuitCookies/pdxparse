@@ -118,6 +118,7 @@ instance IsGame EU4 where
         st { eu4scopeStack = s : eu4scopeStack st }
     getCurrentScope = asks $ listToMaybe . eu4scopeStack . eu4s
     getPrevScope = asks $ safeIndex 1 . eu4scopeStack . eu4s
+    getPrevScopeCustom i = asks $ safeIndex i . eu4scopeStack . eu4s
     getRootScope = asks $ safeLast . eu4scopeStack . eu4s
     getScopeStack = asks $ eu4scopeStack . eu4s
     getIsInEffect = asks $ eu4IsInEffect . eu4s

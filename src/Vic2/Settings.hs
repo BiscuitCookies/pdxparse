@@ -61,6 +61,7 @@ instance IsGame Vic2 where
         Vic2S $ st { vic2ScopeStack = s : vic2ScopeStack st }
     getCurrentScope = asks $ listToMaybe . vic2ScopeStack . v2s
     getPrevScope = asks $ safeIndex 1 . vic2ScopeStack . v2s
+    getPrevScopeCustom i = asks $ safeIndex i . vic2ScopeStack . v2s
     getRootScope = asks $ safeLast . vic2ScopeStack . v2s
 
 data Vic2Data = Vic2Data {

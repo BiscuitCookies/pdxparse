@@ -18,6 +18,8 @@ module HOI4.Types (
 
     ,   HOI4CountryHistory (..)
     ,   HOI4Character (..)
+    ,   HOI4CountryLeaderTrait (..)
+    ,   HOI4UnitLeaderTrait (..)
         -- * Low level types
     ,   HOI4Scope (..)
     ,   AIWillDo (..)
@@ -71,6 +73,19 @@ data HOI4Data = HOI4Data {
     ,   hoi4interfacegfx :: HashMap Text Text
     ,   hoi4characterScripts :: HashMap FilePath GenericScript
     ,   hoi4characters :: HashMap Text HOI4Character
+    ,   hoi4countryleadertraitScripts :: HashMap FilePath GenericScript
+    ,   hoi4countryleadertraits :: HashMap Text HOI4CountryLeaderTrait
+    ,   hoi4unitleadertraitScripts :: HashMap FilePath GenericScript
+    ,   hoi4unitleadertraits :: HashMap Text HOI4UnitLeaderTrait
+    ,   hoi4terrainScripts :: HashMap FilePath GenericScript
+    ,   hoi4terrain :: [Text]
+    ,   hoi4ideologyScripts :: HashMap FilePath GenericScript
+    ,   hoi4ideology :: HashMap Text Text
+    ,   hoi4chartoken :: HashMap Text HOI4Character
+    ,   hoi4scriptedeffectScripts :: HashMap FilePath GenericScript
+    ,   hoi4scriptedeffects :: HashMap Text GenericStatement
+    ,   hoi4scriptedtriggerScripts :: HashMap FilePath GenericScript
+    ,   hoi4scriptedtriggers:: HashMap Text GenericStatement
 
     ,   hoi4extraScriptsCountryScope :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
     ,   hoi4extraScriptsProvinceScope :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
@@ -144,9 +159,35 @@ class (IsGame g,
     -- | Get the interface, for icon paths, parsed
     getInterfaceGFX :: Monad m => PPT g m (HashMap Text Text)
     -- | Get character script
-    getCharacters :: Monad m => PPT g m (HashMap Text HOI4Character)
-    -- | Get the characters parsed
     getCharacterScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the characters parsed
+    getCharacters :: Monad m => PPT g m (HashMap Text HOI4Character)
+    -- | Get leader traits script
+    getCountryLeaderTraitScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the leader traits parsed
+    getCountryLeaderTraits :: Monad m => PPT g m (HashMap Text HOI4CountryLeaderTrait)
+    -- | Get leader traits script
+    getUnitLeaderTraitScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the leader traits parsed
+    getUnitLeaderTraits :: Monad m => PPT g m (HashMap Text HOI4UnitLeaderTrait)
+    -- | Get terrain script
+    getTerrainScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the terrain parsed
+    getTerrain :: Monad m => PPT g m [Text]
+    -- | Get leader traits script
+    getIdeologyScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the leader traits parsed
+    getIdeology :: Monad m => PPT g m (HashMap Text Text)
+    -- | Get the characters keyed on ideatoken
+    getCharToken :: Monad m => PPT g m (HashMap Text HOI4Character)
+    -- | Get scripted effects script
+    getScriptedEffectScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the scripted effects parsed
+    getScriptedEffects  :: Monad m => PPT g m (HashMap Text GenericStatement)
+    -- | Get scripted triggers script
+    getScriptedTriggerScripts  :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the scripted triggers parsed
+    getScriptedTriggers  :: Monad m => PPT g m (HashMap Text GenericStatement)
 
     -- | Get extra scripts parsed from command line arguments
     getExtraScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
@@ -235,8 +276,9 @@ data HOI4EventSource =
     | HOI4EvtSrcNFSelect Text Text Text             -- Effect of selecting a national focus
     | HOI4EvtSrcIdeaOnAdd Text Text Text Text       -- Effect of adding an idea
     | HOI4EvtSrcIdeaOnRemove Text Text Text Text    -- Effect of removing an idea
-    | HOI4EvtSrcCharacterOnAdd Text Text            -- Effect of adding an idea
-    | HOI4EvtSrcCharacterOnRemove Text Text         -- Effect of removing an idea
+    | HOI4EvtSrcCharacterOnAdd Text Text            -- Effect of adding an advisor
+    | HOI4EvtSrcCharacterOnRemove Text Text         -- Effect of removing an advisor
+    | HOI4EvtSrcScriptedEffect Text HOI4EventWeight -- Effect of a scripted effect
     deriving Show
 
 type HOI4EventTriggers = HashMap Text [HOI4EventSource]
@@ -251,8 +293,13 @@ data HOI4DecisionSource =
     | HOI4DecSrcDecCancel Text Text                  -- Effect of taking a decision and it being canceled (args are id and localized decision text)
     | HOI4DecSrcDecTimeout Text Text                 -- Effect of taking a decision/mission and letting it timeout (args are id and localized decision text)
     | HOI4DecSrcOnAction Text HOI4DecisionWeight     -- An effect from on_actions (args are the trigger and weight)
-    | HOI4DecSrcNFComplete Text Text             -- Effect of completing a national focus
-    | HOI4DecSrcNFSelect Text Text               -- Effect of selecting a national focus
+    | HOI4DecSrcNFComplete Text Text                -- Effect of completing a national focus
+    | HOI4DecSrcNFSelect Text Text                  -- Effect of selecting a national focus
+    | HOI4DecSrcIdeaOnAdd Text Text Text Text       -- Effect of adding an idea
+    | HOI4DecSrcIdeaOnRemove Text Text Text Text    -- Effect of removing an idea
+    | HOI4DecSrcCharacterOnAdd Text Text            -- Effect of adding an advisor
+    | HOI4DecSrcCharacterOnRemove Text Text         -- Effect of removing an advisor
+    | HOI4DecSrcScriptedEffect Text HOI4EventWeight -- Effect of a scripted effect
     deriving Show
 
 type HOI4DecisionTriggers = HashMap Text [HOI4DecisionSource]
@@ -268,7 +315,7 @@ data HOI4Idea = HOI4Idea
     ,   id_visible :: Maybe GenericScript
     ,   id_available :: Maybe GenericScript
     ,   id_modifier :: Maybe GenericStatement
-    ,   id_targeted_modifier :: Maybe GenericStatement
+    ,   id_targeted_modifier :: Maybe GenericScript
     ,   id_research_bonus :: Maybe GenericStatement
     ,   id_equipment_bonus :: Maybe GenericStatement
     ,   id_rule :: Maybe GenericScript
@@ -331,7 +378,7 @@ data HOI4Decision = HOI4Decision
     ,   dec_days_remove :: Maybe Double
     ,   dec_remove_effect :: Maybe GenericScript
     ,   dec_remove_trigger :: Maybe GenericScript
-    ,   dec_modifier :: Maybe GenericScript
+    ,   dec_modifier :: Maybe GenericStatement
     ,   dec_cancel_trigger ::  Maybe GenericScript
     ,   dec_cancel_effect ::  Maybe GenericScript
 
@@ -410,15 +457,47 @@ data HOI4CountryHistory = HOI4CountryHistory
     } deriving (Show)
 
 data HOI4Character = HOI4Character
-    {   chaTag :: Text
-    ,   chaName :: Text
+    {   chaTag          :: Text
+    ,   chaName         :: Text
 --    ,   chaId :: Maybe Int -- ^ legacy character id system is sometimes still used,
                          --   negative numbers count as not being there
     ,   chaAdvisorTraits :: Maybe [Text]
     ,   chaLeaderTraits :: Maybe [Text]
-    ,   chaOn_add :: Maybe GenericScript
-    ,   chaOn_remove :: Maybe GenericScript
-    ,   chaPath :: FilePath -- ^ Source file
+    ,   cha_leader_ideology :: Maybe Text
+    ,   cha_idea_token  :: Maybe Text
+    ,   cha_advisor_slot :: Maybe Text
+    ,   chaOn_add       :: Maybe GenericScript
+    ,   chaOn_remove    :: Maybe GenericScript
+    ,   cha_adv_modifier :: Maybe GenericStatement
+    ,   cha_adv_research_bonus :: Maybe GenericStatement
+    ,   chaPath         :: FilePath -- ^ Source file
+    } deriving (Show)
+
+data HOI4CountryLeaderTrait = HOI4CountryLeaderTrait
+    {   clt_id :: Text
+    ,   clt_loc_name :: Maybe Text
+    ,   clt_path :: FilePath
+    ,   clt_targeted_modifier :: Maybe GenericScript
+    ,   clt_equipment_bonus :: Maybe GenericStatement
+    ,   clt_hidden_modifier :: Maybe GenericStatement
+    ,   clt_modifier :: Maybe GenericScript
+    } deriving (Show)
+
+data HOI4UnitLeaderTrait = HOI4UnitLeaderTrait
+    {   ult_id :: Text
+    ,   ult_loc_name :: Maybe Text
+    ,   ult_path :: FilePath
+    ,   ult_modifier :: Maybe GenericStatement
+    ,   ult_non_shared_modifier :: Maybe GenericStatement
+    ,   ult_corps_commander_modifier :: Maybe GenericStatement
+    ,   ult_field_marshal_modifier :: Maybe GenericStatement
+    ,   ult_sub_unit_modifiers :: Maybe GenericStatement
+    ,   ult_attack_skill :: Maybe Double
+    ,   ult_defense_skill :: Maybe Double
+    ,   ult_planning_skill :: Maybe Double
+    ,   ult_logistics_skill :: Maybe Double
+    ,   ult_maneuvering_skill :: Maybe Double
+    ,   ult_coordination_skill :: Maybe Double
     } deriving (Show)
 
 

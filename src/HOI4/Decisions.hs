@@ -9,6 +9,9 @@ module HOI4.Decisions (
     ,   findActivatedDecisionsInDecisions
     ,   findActivatedDecisionsInOnActions
     ,   findActivatedDecisionsInNationalFocus
+    ,   findActivatedDecisionsInIdeas
+    ,   findActivatedDecisionsInCharacters
+    ,   findActivatedDecisionsInScriptedEffects
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -366,11 +369,12 @@ decisionAddSection dec stmt
             "on_map_mode" -> dec
             "modifier" -> case rhs of -- effects that apply when decision is active (timer/mission?)
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
-                CompoundRhs scr -> dec { dec_modifier = Just scr }
+                CompoundRhs scr -> dec { dec_modifier = Just stmt }
                 _ -> dec
             "targeted_modifier" -> case rhs of -- effects for country/state targeted and duration?
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
-                CompoundRhs scr -> dec { dec_targeted_modifier = Just scr }
+                CompoundRhs scr -> let oldstmt = fromMaybe [] (dec_targeted_modifier dec) in
+                    dec { dec_targeted_modifier = Just (oldstmt ++ [stmt]) }
                 _ -> dec
             "cancel_if_not_visible" -> case rhs of -- cancels mission if visible is false
                 GenericRhs "yes" [] -> dec { dec_cancel_if_not_visible = True }
@@ -466,8 +470,8 @@ ppdecision dec gfx = do
             _ -> return []
     custom_cost_trigger_pp'd  <- decArg "custom_cost_trigger" dec_custom_cost_trigger ppScript
     activation_pp'd <- decArg "activation" dec_activation ppScript
-    modifier_pp'd <- setIsInEffect True (decArg "modifier" dec_modifier ppScript)
-    targetedModifier_pp'd <- setIsInEffect True (decArg "targeted_modifier" dec_modifier ppScript)
+    modifier_pp'd <- setIsInEffect True (decArg "modifier" dec_modifier ppStatement)
+    targetedModifier_pp'd <- setIsInEffect True (decArg "targeted_modifier" dec_targeted_modifier ppScript)
     name_loc <- getGameL10n name
     icon_pp'd <- case dec_icon dec of
             Just (HOI4DecisionIconSimple txt) ->
@@ -618,88 +622,41 @@ ppDecisionSource (HOI4DecSrcDecTimeout id loc) = do
         , iquotes't loc
         ]
 ppDecisionSource (HOI4DecSrcOnAction act weight) = do
-    return $ Doc.strictText $ act <> formatWeight weight
-ppDecisionSource (HOI4DecSrcNFComplete id loc) = do
-    nfloc <- getGameL10n loc
-    return $ Doc.strictText $ mconcat ["Completing the national focus "
-        , "<!-- "
-        , id
-        , " -->"
-        , iquotes't nfloc
-        ]
-ppDecisionSource (HOI4DecSrcNFSelect id loc) = do
-    nfloc <- getGameL10n loc
-    return $ Doc.strictText $ mconcat ["Selecting the national focus "
-        , "<!-- "
-        , id
-        , " -->"
-        , iquotes't nfloc
-        ]
-
-
-findInStmt :: GenericStatement -> [(HOI4DecisionWeight, Text)]
-findInStmt stmt@[pdx| $lhs = $id |] | lhs == "activate_mission" = [(Nothing, id)]
-findInStmt [pdx| %lhs = @scr |] = findInStmts scr
-findInStmt _ = []
-
-findInStmts :: [GenericStatement] -> [(HOI4DecisionWeight, Text)]
-findInStmts = concatMap findInStmt
-
-addDecisionSource :: (HOI4DecisionWeight -> HOI4DecisionSource) -> [(HOI4DecisionWeight, Text)] -> [(Text, HOI4DecisionSource)]
-addDecisionSource ds = map (\t -> (snd t, ds (fst t)))
-
-findInOptions :: Text -> [HOI4Option] -> [(Text, HOI4DecisionSource)]
-findInOptions decisionId = concatMap (\o -> maybe []
-    (\optName -> addDecisionSource (const (HOI4DecSrcOption decisionId optName)) (maybe [] (concatMap findInStmt) (hoi4opt_effects o)))
-    (hoi4opt_name o))
-
-addDecisionTriggers :: HOI4DecisionTriggers -> [(Text, HOI4DecisionSource)] -> HOI4DecisionTriggers
-addDecisionTriggers hm l = foldl' ins hm l
+    actn <- actionName act
+    return $ Doc.strictText $ actn <> formatWeight weight
     where
-        ins :: HOI4DecisionTriggers -> (Text, HOI4DecisionSource) -> HOI4DecisionTriggers
-        ins hm (k, v) = HM.alter (\case
-            Just l -> Just $ l ++ [v]
-            Nothing -> Just [v]) k hm
+        actionName :: (HOI4Info g, Monad m) =>
+            Text -> PPT g m Text
+        actionName n
+            | "on_monthly_" `T.isPrefixOf` n = do
+                let tag = case T.stripPrefix "on_monthly_" n of
+                        Just nc -> nc
+                        _ -> "<!-- Check game Script -->"
+                let actmsg = "<!-- " <> n <>  " -->On every month for "
+                tagloc <- flagText (Just HOI4Country) tag
+                return $ actmsg <> tagloc
+            | "on_weekly_" `T.isPrefixOf` n = do
+                let tag = case T.stripPrefix "on_weekly_" n of
+                        Just nc -> nc
+                        _ -> "<!-- Check game Script -->"
+                let actmsg = "<!-- " <> n <>  " -->On every week for "
+                tagloc <- flagText (Just HOI4Country) tag
+                return $ actmsg <> tagloc
+            | "on_daily_" `T.isPrefixOf` n = do
+                let tag = case T.stripPrefix "on_daily_" n of
+                        Just nc -> nc
+                        _ -> "<!-- Check game Script -->"
+                let actmsg = "<!-- " <> n <>  " -->On every day for "
+                tagloc <- flagText (Just HOI4Country) tag
+                return $ actmsg <> tagloc
+            | otherwise =
+                return $ HM.findWithDefault ("<pre>" <> n <> "</pre>") n actionNameTable
 
-findActivatedDecisionsInEvents :: HOI4DecisionTriggers -> [HOI4Event] -> HOI4DecisionTriggers
-findActivatedDecisionsInEvents hm evts = addDecisionTriggers hm (concatMap findInEvent evts)
-    where
-        findInEvent :: HOI4Event -> [(Text, HOI4DecisionSource)]
-        findInEvent evt@HOI4Event{hoi4evt_id = Just eventId} =
-            (case hoi4evt_options evt of
-                Just opts -> findInOptions eventId opts
-                _ -> []) ++
-            addDecisionSource (const (HOI4DecSrcImmediate eventId)) (maybe [] findInStmts (hoi4evt_immediate evt))
-        findInEvent _ = []
-
-findActivatedDecisionsInDecisions :: HOI4DecisionTriggers -> [HOI4Decision] -> HOI4DecisionTriggers
-findActivatedDecisionsInDecisions hm ds = addDecisionTriggers hm (concatMap findInDecision ds)
-    where
-        findInDecision :: HOI4Decision -> [(Text, HOI4DecisionSource)]
-        findInDecision d =
-            addDecisionSource (const (HOI4DecSrcDecComplete (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_complete_effect d)) ++
-            addDecisionSource (const (HOI4DecSrcDecRemove (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_remove_effect d)) ++
-            addDecisionSource (const (HOI4DecSrcDecCancel (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_cancel_effect d)) ++
-            addDecisionSource (const (HOI4DecSrcDecTimeout (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_timeout_effect d))
-
-findActivatedDecisionsInOnActions :: HOI4DecisionTriggers -> [GenericStatement] -> HOI4DecisionTriggers
-findActivatedDecisionsInOnActions hm scr = foldl' findInAction hm scr
-    where
-        findInAction :: HOI4DecisionTriggers -> GenericStatement -> HOI4DecisionTriggers
-        findInAction hm [pdx|on_actions = @stmts |] = foldl' findInAction hm stmts
-        findInAction hm stmt@[pdx| $lhs = @scr |] = addDecisionTriggers hm (addDecisionSource (HOI4DecSrcOnAction (actionName lhs)) (findInStmts scr))
-        findInAction hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm
-
-        actionName :: Text -> Text
-        actionName n = HM.lookupDefault ("<pre>" <> n <> "</pre>") n actionNameTable
-
-
-        -- TODO: deal with on_weekly_<TAG> on_daily_<TAG> etc.
         actionNameTable :: HashMap Text Text
         actionNameTable = HM.fromList
             [("on_ace_killed","<!-- on_ace_killed -->On ace killed")
-            ,("on_ace_killed_by_ace","<!-- on_ace_killed_by_ace -->On ace killed by ace")
-            ,("on_ace_killed_other_ace","<!-- on_ace_killed_other_ace -->On ace kills ace")
+            ,("on_ace_killed_by_ace","<!-- on_ace_killed_by_ace -->On ace killed by enemy ace")
+            ,("on_ace_killed_other_ace","<!-- on_ace_killed_other_ace -->On ace kills enemy ace")
             ,("on_aces_killed_each_other","<!-- on_aces_killed_each_other -->On aces killed each other")
             ,("on_ace_promoted","<!-- on_ace_promoted -->On ace promoted")
             ,("on_annex", "<!-- on_annex -->On nation annexed")
@@ -737,7 +694,131 @@ findActivatedDecisionsInOnActions hm scr = foldl' findInAction hm scr
             ,("on_unit_leader_created","<!-- on_unit_leader_created -->On army leader created")
             ,("on_war_relation_added","<!-- on_war_relation_added -->On nation joined war")
             ,("on_wargoal_expire","<!-- on_wargoal_expire -->On wargoal expired")
+            ,("on_weekly","<!-- on_weekly -->On every week")
             ]
+ppDecisionSource (HOI4DecSrcNFComplete id loc) = do
+    nfloc <- getGameL10n loc
+    return $ Doc.strictText $ mconcat ["Completing the national focus "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't nfloc
+        ]
+ppDecisionSource (HOI4DecSrcNFSelect id loc) = do
+    nfloc <- getGameL10n loc
+    return $ Doc.strictText $ mconcat ["Selecting the national focus "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't nfloc
+        ]
+ppDecisionSource (HOI4DecSrcIdeaOnAdd id loc icon categ) = do
+    gfx <- getInterfaceGFX
+    iconnf <-
+        let iconname = HM.findWithDefault icon icon gfx in
+        return $ "[[File:" <> iconname <> ".png|28px]]"
+    catloc <- getGameL10n categ
+    return $ Doc.strictText $ mconcat ["When the "
+        , catloc
+        , " "
+        , iconnf
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " is added"
+        ]
+ppDecisionSource (HOI4DecSrcIdeaOnRemove id loc icon categ) = do
+    gfx <- getInterfaceGFX
+    iconnf <-
+        let iconname = HM.findWithDefault icon icon gfx in
+        return $ "[[File:" <> iconname <> ".png|28px]]"
+    catloc <- getGameL10n categ
+    return $ Doc.strictText $ mconcat ["When the "
+        , catloc
+        , " "
+        , iconnf
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " is removed"
+        ]
+ppDecisionSource (HOI4DecSrcCharacterOnAdd id loc) =
+    return $ Doc.strictText $ mconcat ["When the advisor "
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " is added"
+        ]
+ppDecisionSource (HOI4DecSrcCharacterOnRemove id loc) =
+    return $ Doc.strictText $ mconcat ["When the advisor "
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " is removed"
+        ]
+ppDecisionSource (HOI4DecSrcScriptedEffect id weight) =
+    return $ Doc.strictText $ mconcat ["When scripted effect "
+        , iquotes't id
+        , " is activated"
+        ]
+
+
+findInStmt :: GenericStatement -> [(HOI4DecisionWeight, Text)]
+findInStmt stmt@[pdx| $lhs = $id |] | lhs == "activate_mission" = [(Nothing, id)]
+findInStmt [pdx| %lhs = @scr |] = findInStmts scr
+findInStmt _ = []
+
+findInStmts :: [GenericStatement] -> [(HOI4DecisionWeight, Text)]
+findInStmts = concatMap findInStmt
+
+addDecisionSource :: (HOI4DecisionWeight -> HOI4DecisionSource) -> [(HOI4DecisionWeight, Text)] -> [(Text, HOI4DecisionSource)]
+addDecisionSource ds = map (\t -> (snd t, ds (fst t)))
+
+findInOptions :: Text -> [HOI4Option] -> [(Text, HOI4DecisionSource)]
+findInOptions decisionId = concatMap (\o ->
+    (\optName -> addDecisionSource (const (HOI4DecSrcOption decisionId optName)) (maybe [] (concatMap findInStmt) (hoi4opt_effects o)))
+    (fromMaybe "(Un-named option)" (hoi4opt_name o)))
+
+addDecisionTriggers :: HOI4DecisionTriggers -> [(Text, HOI4DecisionSource)] -> HOI4DecisionTriggers
+addDecisionTriggers hm l = foldl' ins hm l
+    where
+        ins :: HOI4DecisionTriggers -> (Text, HOI4DecisionSource) -> HOI4DecisionTriggers
+        ins hm (k, v) = HM.alter (\case
+            Just l -> Just $ l ++ [v]
+            Nothing -> Just [v]) k hm
+
+findActivatedDecisionsInEvents :: HOI4DecisionTriggers -> [HOI4Event] -> HOI4DecisionTriggers
+findActivatedDecisionsInEvents hm evts = addDecisionTriggers hm (concatMap findInEvent evts)
+    where
+        findInEvent :: HOI4Event -> [(Text, HOI4DecisionSource)]
+        findInEvent evt@HOI4Event{hoi4evt_id = Just eventId} =
+            (case hoi4evt_options evt of
+                Just opts -> findInOptions eventId opts
+                _ -> []) ++
+            addDecisionSource (const (HOI4DecSrcImmediate eventId)) (maybe [] findInStmts (hoi4evt_immediate evt))
+        findInEvent _ = []
+
+findActivatedDecisionsInDecisions :: HOI4DecisionTriggers -> [HOI4Decision] -> HOI4DecisionTriggers
+findActivatedDecisionsInDecisions hm ds = addDecisionTriggers hm (concatMap findInDecision ds)
+    where
+        findInDecision :: HOI4Decision -> [(Text, HOI4DecisionSource)]
+        findInDecision d =
+            addDecisionSource (const (HOI4DecSrcDecComplete (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_complete_effect d)) ++
+            addDecisionSource (const (HOI4DecSrcDecRemove (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_remove_effect d)) ++
+            addDecisionSource (const (HOI4DecSrcDecCancel (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_cancel_effect d)) ++
+            addDecisionSource (const (HOI4DecSrcDecTimeout (dec_name d) (dec_name_loc d))) (maybe [] findInStmts (dec_timeout_effect d))
+
+findActivatedDecisionsInOnActions :: HOI4DecisionTriggers -> [GenericStatement] -> HOI4DecisionTriggers
+findActivatedDecisionsInOnActions hm scr = foldl' findInAction hm scr
+    where
+        findInAction :: HOI4DecisionTriggers -> GenericStatement -> HOI4DecisionTriggers
+        findInAction hm [pdx|on_actions = @stmts |] = foldl' findInAction hm stmts
+        findInAction hm stmt@[pdx| $lhs = @scr |] = addDecisionTriggers hm (addDecisionSource (HOI4DecSrcOnAction lhs) (findInStmts scr))
+        findInAction hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm
 
 findActivatedDecisionsInNationalFocus :: HOI4DecisionTriggers -> [HOI4NationalFocus] -> HOI4DecisionTriggers
 findActivatedDecisionsInNationalFocus hm nf = addDecisionTriggers hm (concatMap findInFocus nf)
@@ -746,3 +827,26 @@ findActivatedDecisionsInNationalFocus hm nf = addDecisionTriggers hm (concatMap 
         findInFocus f =
             addDecisionSource (const (HOI4DecSrcNFComplete (nf_id f) (nf_name_loc f))) (maybe [] findInStmts (nf_completion_reward f)) ++
             addDecisionSource (const (HOI4DecSrcNFSelect (nf_id f) (nf_name_loc f))) (maybe [] findInStmts (nf_select_effect f))
+
+findActivatedDecisionsInIdeas :: HOI4DecisionTriggers -> [HOI4Idea] -> HOI4DecisionTriggers
+findActivatedDecisionsInIdeas hm idea = addDecisionTriggers hm (concatMap findInIdea idea)
+    where
+        findInIdea :: HOI4Idea -> [(Text, HOI4DecisionSource)]
+        findInIdea idea =
+            addDecisionSource (const (HOI4DecSrcIdeaOnAdd (id_id idea) (id_name_loc idea) (id_picture idea) (id_category idea))) (maybe [] findInStmts (id_on_add idea)) ++
+            addDecisionSource (const (HOI4DecSrcIdeaOnRemove (id_id idea) (id_name_loc idea) (id_picture idea) (id_category idea))) (maybe [] findInStmts (id_on_remove idea))
+
+findActivatedDecisionsInCharacters :: HOI4DecisionTriggers -> [HOI4Character] -> HOI4DecisionTriggers
+findActivatedDecisionsInCharacters hm hChar = addDecisionTriggers hm (concatMap findInCharacter hChar)
+    where
+        findInCharacter :: HOI4Character -> [(Text, HOI4DecisionSource)]
+        findInCharacter hChar =
+            addDecisionSource (const (HOI4DecSrcCharacterOnAdd (chaTag hChar) (chaName hChar))) (maybe [] findInStmts (chaOn_add hChar)) ++
+            addDecisionSource (const (HOI4DecSrcCharacterOnRemove (chaTag hChar) (chaName hChar))) (maybe [] findInStmts (chaOn_remove hChar))
+
+findActivatedDecisionsInScriptedEffects :: HOI4DecisionTriggers -> [GenericStatement] -> HOI4DecisionTriggers
+findActivatedDecisionsInScriptedEffects hm scr = foldl' findInScriptEffect hm scr -- needs editing
+    where
+        findInScriptEffect :: HOI4DecisionTriggers -> GenericStatement -> HOI4DecisionTriggers
+        findInScriptEffect hm stmt@[pdx| $lhs = @scr |] = addDecisionTriggers hm (addDecisionSource (HOI4DecSrcScriptedEffect lhs) (findInStmts scr))
+        findInScriptEffect hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm

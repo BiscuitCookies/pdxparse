@@ -303,7 +303,7 @@ writeHOI4DynamicModifiers = do
         pp_dynamic_modifier :: (HOI4Info g, Monad m) => HOI4DynamicModifier -> PPT g m Doc
         pp_dynamic_modifier mod = do
             req <- imsg2doc =<< ppMany (dmodEnable mod)
-            eff <- withCurrentIndent $ \_ -> do imsg2doc . fold =<< traverse modifierMSG (dmodEffects mod)
+            eff <- withCurrentIndent $ \_ -> do imsg2doc . fold =<< traverse (modifierMSG False) (dmodEffects mod)
             return $ mconcat
                 [ "|- style=\"vertical-align:top;\"", PP.line
                 , "| ", PP.line

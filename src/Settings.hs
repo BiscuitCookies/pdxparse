@@ -5,6 +5,7 @@ Description : Load configuration files and localization
 module Settings (
         Settings (..)
     ,   readSettings
+    ,   readCommandLineOptions
     ) where
 
 import Data.Maybe (fromMaybe)
@@ -101,17 +102,21 @@ programOpts =
     [ Option ['p'] ["paths"]   (NoArg Paths)   "show location of configuration files"
     , Option ['v'] ["version"] (NoArg Version) "show version information"
     , Option ['e'] ["onlyextra"] (NoArg Onlyextra) "skip normal game files and only process file, countryscope, provincescope and modifiers arguments"
+    , Option ['n'] ["nowait"] (NoArg Nowait) "don't wait for the user to press a key before exiting"
     , Option ['f'] ["file"]    (ReqArg ProcessFile "FILE")  "also process FILE"
     , Option ['c'] ["countryscope"]    (ReqArg ProcessCountryScopeFile "FILE")  "also process FILE as containing code in the counrty scope"
     , Option ['s'] ["provincescope"]    (ReqArg ProcessProvinceScopeFile "FILE")  "also process FILE as containing code in the province scope"
     , Option ['m'] ["modifiers"]    (ReqArg ProcessModifierFile "FILE")  "also process FILE as containing modifiers"
     ]
 
+readCommandLineOptions :: IO ([CLArgs], [String], [String])
+readCommandLineOptions = getOpt Permute programOpts <$> getArgs
+
 -- | Process command-line arguments, then read the settings and localization
 -- files. If we can't, abort.
 readSettings :: IO Settings
 readSettings = do
-    (opts, nonopts, errs) <- getOpt Permute programOpts <$> getArgs
+    (opts, nonopts, errs) <- readCommandLineOptions
     unless (null errs) $ do
         forM_ errs $ \err -> putStrLn err
         exitFailure

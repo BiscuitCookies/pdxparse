@@ -50,7 +50,7 @@ import qualified Text.PrettyPrint.Leijen.Text as PP
 import Abstract -- everything
 import qualified Doc
 import Messages -- everything
-import MessageTools (plural)
+import MessageTools (plural, colourNumSign)
 import QQ (pdx)
 import SettingsTypes -- everything
 import EU4.Handlers -- everything
@@ -235,6 +235,22 @@ handlersRhsIrrelevant = Tr.fromList
         -- Religious currency
         ,("increase_religious_currency_effect"     , rhsAlwaysYes MsgIncreaseReligiousCurrencyEffect)
         ,("reduce_religious_currency_effect"       , rhsAlwaysYes MsgReduceReligiousCurrencyEffect)
+
+        ,("province_is_or_accepts_culture"         , rhsAlwaysYes (MsgGenericText "Culture is accepted by its owner"))
+        ,("province_is_buddhist_or_accepts_buddhism", genericTextLines [
+                        "Either:"
+                        ,"* Province has one of the following religions (which is either the state religion, the syncretic religion, or harmonized):"
+                        ,"** {{icon|buddhism}} Theravada"
+                        ,"** {{icon|vajrayana}} Vajrayana"
+                        ,"** {{icon|mahayana}} Mahayana"
+                        ,"* The province and state religion are {{icon|tengri}} Tengri with any Buddhist religion as the syncretic religion."
+                        ,"* The province and state religion are {{icon|confucian}} Confucian with a harmonized Buddhist religion."
+                        ,"* The province and state religion are one of the following:"
+                        ,"** {{icon|hinduism}} Hindu with {{icon|buddha}} Buddha as personal deity"
+                        ,"** {{icon|fetishism}} Fetishist with the {{icon|buddhadharma}} Buddhadharma cult"
+                        ,"** {{icon|shinto}} Shinto"
+                        ,"* The state religion is {{icon|confucian}} Confucian with a harmonized Buddhist religion and the province has another harmonized religion"
+                ])
         ]
 
 -- | Handlers for numeric statements
@@ -319,7 +335,6 @@ handlersNumeric = Tr.fromList
         ,("tributary_state"                  , numeric MsgNumTributaryStates)
         ,("units_in_province"                , numeric MsgUnitsInProvince)
         ,("vassal"                           , numeric MsgHasNumVassals)
-        ,("yearly_doom_reduction"            , numeric MsgYearlyDoomReduction)
         -- Special cases
         ,("legitimacy_or_horde_unity"        , numeric MsgLegitimacyOrHordeUnity)
         ]
@@ -831,7 +846,9 @@ handlersNumericIcons = Tr.fromList
         ,("move_capital_cost_modifier"        , numericIcon "move capital cost modifier" MsgMoveCapitalCostModifier)
         ,("prestige_per_development_from_conversion", numericIcon "prestige per development from missionary" MsgPrestigePerDevelopmentFromConversion)
         ,("state_governing_cost"              , numericIcon "state governing cost" MsgStateGoverningCost)
-        ,("tolerance_of_heathens_capacity"    , numericIcon "maximum tolerance of heathens" MsgToleranceOfHeathensCapacity)
+        ,("tolerance_of_heathens_capacity"    , handleModifier "MODIFIER_TOLERANCE_OF_HEATHENS_CAPACITY" (colourNumSign True))
+        ,("tolerance_of_heretics_capacity"    , handleModifier "MODIFIER_TOLERANCE_OF_HERETICS_CAPACITY" (colourNumSign True))
+        ,("yearly_doom_reduction"             , handleModifier "MODIFIER_YEARLY_DOOM_REDUCTION" (colourNumSign True))
         ,("yearly_authority"                  , numericIcon "yearly authority" MsgYearlyAuthority)
         ,("monthly_piety_accelerator"         , numericIcon "monthly piety accelerator" MsgMonthlyPietyAccelerator)
         ,("movement_speed_in_fleet_modifier"  , numericIcon "fleet movement speed" MsgMovementSpeedInFleetModifier)
@@ -1576,8 +1593,8 @@ handlersTextValue = Tr.fromList
 -- | Handlers for text/atom pairs
 handlersTextAtom :: (EU4Info g, Monad m) => Trie (StatementHandler g m)
 handlersTextAtom = Tr.fromList
-        [("create_flagship"      , taDescAtomIcon "name" "type" MsgCreateNamedShip)
-        ,("create_named_ship"    , taDescAtomIcon "name" "type" MsgCreateFlagShip)
+        [("create_flagship"      , taDescAtomIcon "name" "type" MsgCreateFlagShip)
+        ,("create_named_ship"    , taDescAtomIcon "name" "type" MsgCreateNamedShip)
         ,("pick_random_estate_if_present" , textAtom "flag" "estate_action" MsgPickRandomEstateIfPresent tryLoc) -- Localization/icon ignored
         ,("religious_school"     , textAtom "school" "group" MsgReligiousSchool tryLoc)
         ,("set_religious_school" , textAtom "school" "group" MsgSetReligiousSchool tryLoc)
@@ -1644,7 +1661,7 @@ handlersSpecialComplex = Tr.fromList
         ,("trading_policy_in_node"       , tradingPolicyInNode)
         ,("trigger_switch"               , triggerSwitch)
 
-        -- Effects
+        -- Effects/Triggers
         ,("add_loot_from_rich_province_general_effect" , simpleEffectAtom "looter" MsgAddLootFromRichProvince) -- Note: RHS ignored
         ,("allow_baseline_invite_scholar"   , simpleEffectAtom "religious_school" MsgAllowBaselineInviteScholar)
         ,("check_reducing_estate_revolt_size_trigger" , simpleEffectAtom "flag" (MsgCheckEstateRevoltSize False))
@@ -1656,6 +1673,8 @@ handlersSpecialComplex = Tr.fromList
         ,("our_scholar_matches_their_school_trigger" , simpleEffectAtom "school" MsgOurScholarMatchesTheirSchool)
         ,("kill_advisor_by_category_effect" , killAdvisorByCategory)
         ,("select_primary_cult"             , simpleEffectAtom "cult" MsgSelectPrimaryCult)
+        ,("province_is_or_accepts_religion" , isOrAcceptsReligion)
+        ,("province_is_or_accepts_religion_group" , isOrAcceptsReligionGroup)
         ,("set_great_project_tier_1"        , simpleEffectAtom "type" (MsgSetGreatProjectTier 1))
         ,("set_great_project_tier_2"        , simpleEffectAtom "type" (MsgSetGreatProjectTier 2))
         ,("set_great_project_tier_3"        , simpleEffectAtom "type" (MsgSetGreatProjectTier 3))

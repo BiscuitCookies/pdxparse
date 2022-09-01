@@ -52,6 +52,7 @@ data CLArgs
     = Paths
     | Version
     | Onlyextra
+    | Nowait
     | ProcessFile String
     | ProcessCountryScopeFile String
     | ProcessProvinceScopeFile String
@@ -147,6 +148,8 @@ class IsGame g where
     getCurrentScope :: Monad m => PPT g m (Maybe (Scope g))
     -- | Query the previous scope (i.e. the type of PREV).
     getPrevScope :: Monad m => PPT g m (Maybe (Scope g))
+    -- | Query the previous scope (i.e. the type of PREV).
+    getPrevScopeCustom :: Monad m => Int -> PPT g m (Maybe (Scope g))
     -- | Query the root scope (i.e. the type of ROOT).
     getRootScope :: Monad m => PPT g m (Maybe (Scope g))
     -- | Get the entire scope stack. Wanted only for debugging purposes.
@@ -184,6 +187,7 @@ instance IsGame UnknownGame where
         UGS $ st { ugScopeStack = s : ugScopeStack st }
     getCurrentScope = asks $ listToMaybe . ugScopeStack . ugs
     getPrevScope = asks $ safeIndex 1 . ugScopeStack . ugs
+    getPrevScopeCustom i = asks $ safeIndex i . ugScopeStack . ugs
     getRootScope = asks $ safeLast . ugScopeStack . ugs
     getScopeStack = asks $ ugScopeStack . ugs
 

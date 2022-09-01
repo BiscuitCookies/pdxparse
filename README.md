@@ -55,11 +55,11 @@ only the files you want, and rebuild.
     * ~~Localization files need to be directly in the localisation folder and not the localisation->english folder to work~~
     * ~~There are like 5 events where hidden and picture have the first letter capitilized making them fail to parse~~
     * ~~Fractions can be written as 0.15 or .15 the second case the parser sees it as text instead of a double~~
-    * add_country_leader, promote_character aren't processed. Would probably need to load common/characters for it to be properly handled.
+    * ~~add_country_leader, promote_character aren't processed. Would probably need to load common/characters for it to be properly handled.~~
     * ~~add_ideas, remove_ideas can have multiple ideas in an array, but they aren't handled (no clue how to do it)~~
     * no icons in modifier statements
     * alias tags aren't properly handled
-    * equipment_bonus modifier isn't handled
+    * ~~equipment_bonus modifier isn't handled~~
     * add_ai_strategy not handled (do we want to?)
     * ~~Need to manually add a closing bracket "}" for SOV.txt in common/ideas to work~~
 
@@ -72,7 +72,6 @@ Feel extremely free to help with any of these or the issues, I honestly doubt I 
 * ~~Have script look for triggers in national focuses~~
 * Add more formatting for various lines, best case scenarion minimal editing is needed to place it on the wiki
 * ~~Replace the files in the HoI4 folder with the edited EU4 files and properly remove mentions of EU4 stuff~~
-* Get rid of stuff only for EU4 in HoI4 stuff
 * ~~Support mods better by having additional settings and making localization reading more elaborate~~
     * ~~Also make it so check for EU4 or HoI4 for proper folder location?~~
 * Make ~~add_Building_construction~~, random_list work properly
@@ -87,22 +86,23 @@ Feel extremely free to help with any of these or the issues, I honestly doubt I 
 * Find out how hostility_reason affects add_to_war
 * In localization automatically change color of words, add icons, get nested localization etc.
 * make set_politics more elaborate maybe?
-* maybe load scripted_effects, scripted_triggers for parsing?
+* ~~ maybe load scripted_effects, scripted_triggers for parsing? ~~ sort of
 * ~~maybe load characters for parsing?~~
-    * create hashmap er edit idea hashmap based of idea_token in characters, also useful for has_idea, remove_idea etc.
+    * ~~create hashmap er edit idea hashmap based of idea_token in characters, also useful for has_idea, remove_idea etc.~~
 * maybe load buildings for parsing?
 * ~~deal with add_ideas, remove_ideas having multiple ideas in them~~
-* set_autonomy make it also deal with vars and pronouns for the target (outside foldcompound?)
+* ~~set_autonomy make it also deal with vars and pronouns for the target (outside foldcompound?)~~
 * deal with alias_tags
 * maybe load history/units/ for load_OOB
 * maybe load technology for has_tech
-* maybe load country_leader for traits
+* m~~aybe load country_leader for traits~~
 * handle or ignore add_ai_strategy?
 * Expand info on add_field_marshal_role ?
+* Expand info of set_building_level
 * Find cleaner solution for missing closing brackets in files
 
 ## Thanks
-* Thanks the functional programming discord community for helping me out in specific:
+* Thanks the functional programming discord community for helping me out and in specific:
     * Edmundnoble
     * skykanin سكايكانن
     * Cyrus T
