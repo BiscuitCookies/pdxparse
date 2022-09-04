@@ -766,7 +766,7 @@ scriptIconTable = HM.fromList
     ,("coastal_bunker"      , "coastal fort")
     ,("anti_air_building"   , "static aa")
     ,("synthetic_refinery"  , "synthetic")
-    ,("radar_station"       , "radar")
+    ,("radar_station"       , "radar station")
     ,("rocket_site"         , "rocket site")
     ,("nuclear_reactor"     , "reactor")
     ,("bunker"              , "land fort")
