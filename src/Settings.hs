@@ -22,7 +22,7 @@ import Data.Yaml (FromJSON (..), Value (..), decodeFileEither, (.:), (.:?))
 
 import System.Console.GetOpt (OptDescr (..), ArgDescr (..), ArgOrder (..), getOpt, usageInfo)
 import System.Directory (getHomeDirectory)
-import System.Environment (getArgs, getExecutablePath )
+import System.Environment (getArgs, getExecutablePath)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
 import qualified System.Info
