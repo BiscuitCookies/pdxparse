@@ -263,56 +263,65 @@ plainmodifiermsg _ stmt = preStatement stmt
 
 handleModifier :: forall g m. (HOI4Info g, Monad m) =>
         StatementHandler g m
-handleModifier [pdx| %_ = @scr |] = fold <$> traverse (modifierMSG False) scr
+handleModifier [pdx| %_ = @scr |] = fold <$> traverse (modifierMSG False "") scr
 handleModifier stmt = preStatement stmt
 
 modifierMSG :: forall g m. (HOI4Info g, Monad m) =>
-        Bool -> StatementHandler g m
-modifierMSG _ stmt@[pdx| $specmod = @scr|]
-    | specmod == "hidden_modifier" = fold <$> traverse (modifierMSG True) scr
+        Bool -> Text -> StatementHandler g m
+modifierMSG _ targ stmt@[pdx| $specmod = @scr|]
+    | specmod == "hidden_modifier" = fold <$> traverse (modifierMSG True targ) scr
     | otherwise = do
         --terrain <- getTerrain
         --if specmod `elem` terrain
         --then do
             termsg <- plainMsg' . (<> ":") . boldText =<< getGameL10n specmod
-            modmsg <- fold <$> indentUp (traverse (modifierMSG False) scr)
+            modmsg <- fold <$> indentUp (traverse (modifierMSG False targ) scr)
             return $ termsg : modmsg
         --else trace ("unknown modifier type: " ++ show specmod ++ " IN: " ++ show stmt) $ preStatement stmt
-modifierMSG hidden stmt@[pdx| $mod = !num|] = let lmod = T.toLower mod in case HM.lookup lmod modifiersTable of
-    Just (loc, msg) ->
+modifierMSG hidden targ stmt@[pdx| $mod = !num |] = let lmod = T.toLower mod in case HM.lookup lmod modifiersTable of
+    Just (key, msg) -> do
+        loc <- getGameL10n key
         let bonus = num :: Double
-            loc' = locprep hidden loc in
+            loc' = locprep hidden targ loc
         numericLoc loc' msg stmt
     Nothing
         | "cat_" `T.isPrefixOf` lmod -> do
             mloc <- getGameL10nIfPresent lmod
             case mloc of
                 Just loc ->
-                    let loc' = locprep hidden loc in
+                    let loc' = locprep hidden targ loc in
                     numericLoc loc' MsgModifierPcNegReduced stmt
                 Nothing -> preStatement stmt
         | ("production_speed_" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
+            ("state_production_speed_" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
             ("experience_gain_" `T.isPrefixOf` lmod && "_combat_factor" `T.isSuffixOf` lmod) ||
             ("trait_" `T.isPrefixOf` lmod && "_xp_gain_factor" `T.isSuffixOf` lmod) -> do
             mloc <- getGameL10nIfPresent ("modifier_" <> lmod)
             case mloc of
                 Just loc ->
-                    let loc' = locprep hidden loc in
+                    let loc' = locprep hidden targ loc in
                     numericLoc loc' MsgModifierPcPosReduced stmt
                 Nothing -> preStatement stmt
         | "unit_" `T.isPrefixOf` lmod && "_design_cost_factor" `T.isSuffixOf` lmod -> do
             mloc <- getGameL10nIfPresent ("modifier_" <> lmod)
             case mloc of
                 Just loc ->
-                    let loc' = locprep hidden loc in
+                    let loc' = locprep hidden targ loc in
                     numericLoc loc' MsgModifierPcNegReduced stmt
                 Nothing -> preStatement stmt
         | "modifier_army_sub_" `T.isPrefixOf` lmod -> do
             mloc <- getGameL10nIfPresent lmod
             case mloc of
                 Just loc ->
-                    let loc' = locprep hidden loc in
+                    let loc' = locprep hidden targ loc in
                     numericLoc loc' MsgModifierPcPosReduced stmt
+                Nothing -> preStatement stmt
+        | "state_resource_" `T.isPrefixOf` lmod && not ("state_resource_cost_" `T.isPrefixOf` lmod) -> do
+            mloc <- getGameL10nIfPresent lmod
+            case mloc of
+                Just loc ->
+                    let loc' = locprep hidden targ loc in
+                    numericLoc loc' MsgModifierColourPos stmt
                 Nothing -> preStatement stmt
         | lmod == "no_compliance_gain" && num == 1 -> do
             comploc <- getGameL10n "MODIFIER_NO_COMPLIANCE_GAIN"
@@ -323,49 +332,57 @@ modifierMSG hidden stmt@[pdx| $mod = !num|] = let lmod = T.toLower mod in case H
         | lmod == "cannot_use_abilities" && num == 1 -> do
             abloc <- getGameL10n "MODIFIER_CANNOT_USE_ABILITIES"
             plainMsg abloc
+        | lmod == "disable_strategic_redeployment" && num == 1 -> do
+            strloc <- getGameL10n "MODIFIER_STRATEGIC_REDEPLOYMENT_DISABLED"
+            plainMsg strloc
         | otherwise -> preStatement stmt
-modifierMSG _ stmt@[pdx| custom_modifier_tooltip = $key|] = do
+modifierMSG _ _ stmt@[pdx| custom_modifier_tooltip = $key|] = do
     loc <- getGameL10nIfPresent key
     maybe (preStatement stmt)
         (msgToPP . MsgCustomModifierTooltip)
         loc
-modifierMSG hidden stmt@[pdx| $mod = $var|] =  let lmod = T.toLower mod in case HM.lookup lmod modifiersTable of
-    Just (loc, msg) -> do
-        locced <- getGameL10n loc
-        let loc' = locprep hidden locced
+modifierMSG hidden targ stmt@[pdx| $mod = $var|] =  let lmod = T.toLower mod in case HM.lookup lmod modifiersTable of
+    Just (key, msg) -> do
+        loc <- getGameL10n key
+        let loc' = locprep hidden targ loc
         msgToPP $ MsgModifierVar loc' var
     Nothing
         | "cat_" `T.isPrefixOf` lmod -> do
             mloc <- getGameL10nIfPresent lmod
             case mloc of
                 Just loc ->
-                    let loc' = locprep hidden loc in
+                    let loc' = locprep hidden targ loc in
                     msgToPP $ MsgModifierVar loc' var
                 Nothing -> preStatement stmt
         | ("production_speed_" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
+            ("state_production_speed_" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
             ("unit_" `T.isPrefixOf` lmod && "_design_cost_factor" `T.isSuffixOf` lmod) ||
             ("experience_gain_" `T.isPrefixOf` lmod && "_combat_factor" `T.isSuffixOf` lmod) ||
             ("trait_" `T.isPrefixOf` lmod && "_xp_gain_factor" `T.isSuffixOf` lmod) -> do
             mloc <- getGameL10nIfPresent ("modifier_" <> lmod)
             case mloc of
                 Just loc ->
-                    let loc' = locprep hidden loc in
+                    let loc' = locprep hidden targ loc in
                     msgToPP $ MsgModifierVar loc' var
                 Nothing -> preStatement stmt
         | "modifier_army_sub_" `T.isPrefixOf` lmod -> do
             mloc <- getGameL10nIfPresent lmod
             case mloc of
                 Just loc ->
-                    let loc' = locprep hidden loc in
+                    let loc' = locprep hidden targ loc in
                     msgToPP $ MsgModifierVar loc' var
                 Nothing -> preStatement stmt
+        | lmod == "disable_strategic_redeployment" && var == "yes" -> do
+            strloc <- getGameL10n "MODIFIER_STRATEGIC_REDEPLOYMENT_DISABLED"
+            plainMsg strloc
         | otherwise -> preStatement stmt
-modifierMSG _ stmt = preStatement stmt
+modifierMSG _ _ stmt = preStatement stmt
 
-locprep :: Bool -> Text -> Text
-locprep hidden loc = do
+locprep :: Bool -> Text -> Text -> Text
+locprep hidden targ loc = do
     let loc' = if ": " `T.isSuffixOf` loc then T.dropEnd 2 loc else loc
-    if hidden then "(Hidden)" <> loc' else loc'
+        loctag = if T.null targ then loc' else "(" <> targ <> ")" <> loc'
+    if hidden then "(Hidden)" <> loctag else loctag
 
 handleResearchBonus :: forall g m. (HOI4Info g, Monad m) =>
         StatementHandler g m
@@ -384,13 +401,7 @@ handleTargetedModifier stmt@[pdx| %_ = @scr |] = do
         _ -> return "CHECK SCRIPT"
     fold <$> traverse (modifierTagMSG tagmsg) rest
         where
-            modifierTagMSG tagmsg stmt@[pdx| $mod = !num |] = let bonus = num :: Double in case HM.lookup (T.toLower mod) modifiersTable of
-                Just (loc, msg) -> do
-                    locced <- getGameL10n loc
-                    let locced' = if ": " `T.isSuffixOf` locced then T.dropEnd 2 locced else locced
-                    numericLoc ("(" <> tagmsg <> ")" <> locced') msg stmt
-                Nothing -> preStatement stmt
-            modifierTagMSG _ stmt = preStatement stmt
+            modifierTagMSG tagmsg stmt = modifierMSG False tagmsg stmt
 handleTargetedModifier stmt = preStatement stmt
 
 
@@ -405,14 +416,7 @@ handleEquipmentBonus stmt@[pdx| %_ = @scr |] = fold <$> traverse modifierEquipMS
                 return $ techmsg : modmsg
             modifierEquipMSG stmt = preStatement stmt
 
-            modifierEquipMSG' stmt@[pdx| $mod = !num |] = case HM.lookup (T.toLower mod) modifiersTable of
-                Just (loc, msg) -> do
-                    let bonus = num :: Double
-                    locced <- getGameL10n loc
-                    let locced' = if ": " `T.isSuffixOf` locced then T.dropEnd 2 locced else locced
-                    numericLoc locced' msg stmt
-                Nothing -> preStatement stmt
-            modifierEquipMSG' stmt = preStatement stmt
+            modifierEquipMSG' stmt = modifierMSG False "" stmt
 handleEquipmentBonus stmt = preStatement stmt
 
 
@@ -427,6 +431,7 @@ modifiersTable = HM.fromList
         ,("research_sharing_per_country_bonus_factor" , ("MODIFIER_RESEARCH_SHARING_PER_COUNTRY_BONUS_FACTOR", MsgModifierPcPosReduced))
         ,("research_speed_factor"           , ("MODIFIER_RESEARCH_SPEED_FACTOR", MsgModifierPcPosReduced))
         ,("local_resources_factor"          , ("MODIFIER_LOCAL_RESOURCES_FACTOR", MsgModifierPcPosReduced))
+        ,("surrender_limit"                 , ("MODIFIER_SURRENDER_LIMIT", MsgModifierPcPosReduced))
 
             -- Politics modifiers
         ,("min_export"                      , ("MODIFIER_MIN_EXPORT_FACTOR", MsgModifierPcReducedSign)) -- yellow
@@ -483,20 +488,19 @@ modifiersTable = HM.fromList
         ,("opinion_gain_monthly_same_ideology_factor" , ("MODIFIER_OPINION_GAIN_MONTHLY_SAME_IDEOLOGY_FACTOR", MsgModifierPcPosReduced))
         ,("request_lease_tension"           , ("MODIFIER_REQUEST_LEASE_TENSION_LIMIT", MsgModifierPcNegReduced))
         ,("annex_cost_factor"               , ("MODIFIER_ANNEX_COST_FACTOR", MsgModifierPcNegReduced))
-        ,("surrender_limit"                 , ("MODIFIER_SURRENDER_LIMIT", MsgModifierPcPosReduced))
         ,("send_volunteer_divisions_required" , ("MODIFIER_SEND_VOLUNTEER_DIVISIONS_REQUIRED", MsgModifierPcNegReduced))
         ,("send_volunteer_size"             , ("MODIFIER_SEND_VOLUNTEER_SIZE", MsgModifierColourPos))
         ,("send_volunteers_tension"         , ("MODIFIER_SEND_VOLUNTEERS_TENSION_LIMIT", MsgModifierPcNegReduced))
 
             -- autonomy
+        ,("autonomy_gain"                   , ("MODIFIER_AUTONOMY_GAIN", MsgModifierColourPos))
         ,("subjects_autonomy_gain"          , ("MODIFIER_AUTONOMY_SUBJECT_GAIN", MsgModifierColourPos))
         ,("master_ideology_drift"           , ("MODIFIER_MASTER_IDEOLOGY_DRIFT", MsgModifierColourPos))
 
             -- Governments in exile
-
         ,("dockyard_donations "             , ("MODIFIER_DOCKYARD_DONATIONS", MsgModifierColourPos))
         ,("industrial_factory_donations"    , ("MODIFIER_INDUSTRIAL_FACTORY_DONATIONS", MsgModifierColourPos))
-        ,("military_factory_donations"     , ("MODIFIER_MILITARY_FACTORY_DONATIONS", MsgModifierColourPos))
+        ,("military_factory_donations"      , ("MODIFIER_MILITARY_FACTORY_DONATIONS", MsgModifierColourPos))
         ,("exile_manpower_factor"           , ("MODIFIER_EXILED_MAPOWER_GAIN_FACTOR", MsgModifierPcPosReduced))
         ,("exiled_government_weekly_manpower" , ("MODIFIER_EXILED_GOVERNMENT_WEEKLY_MANPOWER", MsgModifierColourPos))
         ,("legitimacy_daily"                , ("MODIFIER_LEGITIMACY_DAILY", MsgModifierColourPos))
@@ -514,6 +518,7 @@ modifiersTable = HM.fromList
         ,("production_factory_efficiency_gain_factor" , ("MODIFIER_PRODUCTION_FACTORY_EFFICIENCY_GAIN_FACTOR", MsgModifierPcPosReduced))
         ,("production_factory_max_efficiency_factor" , ("MODIFIER_PRODUCTION_FACTORY_MAX_EFFICIENCY_FACTOR", MsgModifierPcPosReduced))
         ,("production_factory_start_efficiency_factor" , ("MODIFIER_PRODUCTION_FACTORY_START_EFFICIENCY_FACTOR", MsgModifierPcPosReduced))
+        ,("refit_speed"                     , ("MODIFIER_INDUSTRIAL_REFIT_SPEED_FACTOR", MsgModifierPcPosReduced))
 
             -- Military outside of combat
         ,("command_power_gain"              , ("MODIFIER_COMMAND_POWER_GAIN", MsgModifierColourPos))
@@ -544,12 +549,14 @@ modifiersTable = HM.fromList
         --,("fuel_cost"                       , ("MODIFIER_FUEL_COST", MsgModifier)) -- flat neg
         --,("fuel_gain"                       , ("MODIFIER_FUEL_GAIN_ADD", MsgModifier)) -- flat pos
         ,("fuel_gain_factor"                , ("MODIFIER_MAX_FUEL_FACTOR", MsgModifierPcPosReduced))
+        ,("fuel_gain_factor_from_states"    , ("MODIFIER_FUEL_GAIN_FACTOR_FROM_STATES", MsgModifierPcPosReduced))
         --,("max_fuel"                        , ("MODIFIER_MAX_FUEL_ADD", MsgModifier)) -- flat
         ,("max_fuel_factor"                 , ("MODIFIER_MAX_FUEL_FACTOR", MsgModifierPcPosReduced))
         ,("army_fuel_consumption_factor"    , ("MODIFIER_ARMY_FUEL_CONSUMPTION_FACTOR", MsgModifierPcNegReduced))
         ,("air_fuel_consumption_factor"     , ("MODIFIER_AIR_FUEL_CONSUMPTION_FACTOR", MsgModifierPcNegReduced))
         ,("navy_fuel_consumption_factor"    , ("MODIFIER_NAVY_FUEL_CONSUMPTION_FACTOR", MsgModifierPcNegReduced))
         ,("attrition"                       , ("MODIFIER_ATTRITION", MsgModifierPcNegReduced))
+        ,("heat_attrition"                  , ("MODIFIER_HEAT_ATTRITION", MsgModifierPcNegReduced))
         ,("heat_attrition_factor"           , ("MODIFIER_HEAT_ATTRITION_FACTOR", MsgModifierPcNegReduced))
         ,("winter_attrition_factor"         , ("MODIFIER_WINTER_ATTRITION_FACTOR", MsgModifierPcNegReduced))
         ,("supply_combat_penalties_on_core_factor" , ("supply_combat_penalties_on_core_factor", MsgModifierPcNegReduced))
@@ -563,7 +570,7 @@ modifiersTable = HM.fromList
         ,("consumer_goods_factor"           , ("MODIFIER_CONSUMER_GOODS_FACTOR", MsgModifierPcReducedSign))
         ,("conversion_cost_civ_to_mil_factor" , ("MODIFIER_CONVERSION_COST_CIV_TO_MIL_FACTOR", MsgModifierPcNegReduced))
         ,("conversion_cost_mil_to_civ_factor" , ("MODIFIER_CONVERSION_COST_MIL_TO_CIV_FACTOR", MsgModifierPcNegReduced))
-        --,("global_building_slots"           , ("MODIFIER_GLOBAL_BUILDING_SLOTS", MsgModifierPcPosReduced)) -- flat
+        ,("global_building_slots"           , ("MODIFIER_GLOBAL_BUILDING_SLOTS", MsgModifierPcPosReduced))
         ,("global_building_slots_factor"    , ("MODIFIER_GLOBAL_BUILDING_SLOTS_FACTOR", MsgModifierPcPosReduced))
         ,("industrial_capacity_dockyard"    , ("MODIFIER_INDUSTRIAL_CAPACITY_DOCKYARD_FACTOR", MsgModifierPcPosReduced))
         ,("industrial_capacity_factory"     , ("MODIFIER_INDUSTRIAL_CAPACITY_FACTOR", MsgModifierPcPosReduced))
@@ -571,6 +578,8 @@ modifiersTable = HM.fromList
         ,("line_change_production_efficiency_factor" , ("MODIFIER_LINE_CHANGE_PRODUCTION_EFFICIENCY_FACTOR", MsgModifierPcPosReduced))
         ,("production_oil_factor"           , ("MODIFIER_PRODUCTION_OIL_FACTOR", MsgModifierPcPosReduced))
         ,("production_speed_buildings_factor" , ("MODIFIER_PRODUCTION_SPEED_BUILDINGS_FACTOR", MsgModifierPcPosReduced))
+        ,("static_anti_air_damage_factor"   , ("MODIFIER_STATIC_ANTI_AIR_DAMAGE_FACTOR", MsgModifierPcPosReduced))
+        ,("static_anti_air_hit_chance_factor" , ("MODIFIER_STATIC_ANTI_AIR_HIT_CHANCE_FACTOR", MsgModifierPcPosReduced))
 
             -- resistance and compliance
         ,("occupation_cost"                 , ("MODIFIER_OCCUPATION_COST", MsgModifierColourNeg))
@@ -606,6 +615,7 @@ modifiersTable = HM.fromList
 
             -- Operatives
         ,("own_operative_detection_chance_factor" , ("MODIFIER_OWN_OPERATIVE_DETECTION_CHANCE_FACTOR", MsgModifierPcNegReduced))
+        ,("enemy_operative_capture_chance_factor" , ("MODIFIER_ENEMY_OPERATIVE_CAPTURE_CHANCE_FACTOR", MsgModifierPcNegReduced))
         ,("enemy_operative_detection_chance_factor" , ("MODIFIER_ENEMY_OPERATIVE_DETECTION_CHANCE_FACTOR", MsgModifierPcPosReduced))
         ,("operative_slot"                  , ("MODIFIER_OPERATIVE_SLOT", MsgModifierColourPos))
 
@@ -651,15 +661,20 @@ modifiersTable = HM.fromList
         ,("army_morale_factor"              , ("MODIFIER_ARMY_MORALE_FACTOR", MsgModifierPcPosReduced))
         ,("army_org"                        , ("MODIFIER_ARMY_ORG", MsgModifierColourPos))
         ,("army_org_factor"                 , ("MODIFIER_ARMY_ORG_FACTOR", MsgModifierPcPosReduced))
+        ,("army_org_regain"                 , ("MODIFIER_ARMY_ORG_REGAIN", MsgModifierPcPosReduced))
         ,("breakthrough_factor"             , ("MODIFIER_BREAKTHROUGH", MsgModifierPcPosReduced))
+        ,("cas_damage_reduction"            , ("MODIFIER_CAS_DAMAGE_REDUCTION", MsgModifierPcPosReduced))
         ,("combat_width_factor"             , ("MODIFIER_COMBAT_WIDTH_FACTOR", MsgModifierPcNegReduced))
+        ,("experience_loss_factor"          , ("MODIFIER_EXPERIENCE_LOSS_FACTOR", MsgModifierPcNegReduced))
+        ,("land_night_attack"               , ("MODIFIER_LAND_NIGHT_ATTACK", MsgModifierPcPosReduced))
         ,("max_dig_in"                      , ("MODIFIER_MAX_DIG_IN", MsgModifierColourPos))
         ,("max_dig_in_factor"               , ("MODIFIER_MAX_DIG_IN_FACTOR", MsgModifierPcPosReduced))
-        ,("land_night_attack"               , ("MODIFIER_LAND_NIGHT_ATTACK", MsgModifierPcPosReduced))
         ,("max_planning"                    , ("MODIFIER_MAX_PLANNING", MsgModifierPcPosReduced))
+        ,("pocket_penalty"                  , ("MODIFIER_POCKET_PENALTY", MsgModifierPcNegReduced))
         ,("recon_factor"                    , ("MODIFIER_RECON_FACTOR", MsgModifierPcPosReduced))
         ,("special_forces_cap"              , ("MODIFIER_SPECIAL_FORCES_CAP", MsgModifierPcPosReduced))
         ,("terrain_penalty_reduction"       , ("MODIFIER_TERRAIN_PENALTY_REDUCTION", MsgModifierPcPosReduced))
+        ,("org_loss_when_moving"            , ("MODIFIER_ORG_LOSS_WHEN_MOVING", MsgModifierPcNegReduced))
         ,("planning_speed"                  , ("MODIFIER_PLANNING_SPEED", MsgModifierPcPosReduced))
 
             -- naval invasions
@@ -668,34 +683,74 @@ modifiersTable = HM.fromList
         ,("invasion_preparation"            , ("MODIFIER_NAVAL_INVASION_PREPARATION", MsgModifierPcNegReduced))
 
             -- Naval combat
+        ,("convoy_escort_efficiency"        , ("MODIFIER_MISSION_CONVOY_ESCORT_EFFICIENCY", MsgModifierPcPosReduced))
+        ,("convoy_raiding_efficiency_factor" , ("MODIFIER_CONVOY_RAIDING_EFFICIENCY_FACTOR", MsgModifierPcPosReduced))
+        ,("critical_receive_chance"         , ("MODIFIER_NAVAL_CRITICAL_RECEIVE_CHANCE_FACTOR", MsgModifierPcNegReduced))
         ,("naval_coordination"              , ("MODIFIER_NAVAL_COORDINATION", MsgModifierPcPosReduced))
+        ,("naval_critical_effect_factor"    , ("MODIFIER_NAVAL_CRITICAL_EFFECT_FACTOR", MsgModifierPcNegReduced))
+        ,("naval_critical_score_chance_factor" , ("MODIFIER_NAVAL_CRITICAL_SCORE_CHANCE_FACTOR", MsgModifierPcPosReduced))
+        ,("naval_detection"                 , ("MODIFIER_NAVAL_DETECTION", MsgModifierPcPosReduced))
         ,("naval_hit_chance"                , ("MODIFIER_NAVAL_HIT_CHANCE", MsgModifierPcPosReduced))
+        ,("navy_org_factor"                 , ("MODIFIER_NAVY_ORG_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_max_range_factor"           , ("MODIFIER_NAVY_MAX_RANGE_FACTOR", MsgModifierPcPosReduced))
+        ,("naval_torpedo_cooldown_factor"   , ("MODIFIER_NAVAL_TORPEDO_COOLDOWN_FACTOR", MsgModifierPcNegReduced))
+        ,("naval_torpedo_hit_chance_factor" , ("MODIFIER_NAVAL_TORPEDO_HIT_CHANCE_FACTOR", MsgModifierPcPosReduced))
+        ,("naval_torpedo_screen_penetration_factor" , ("MODIFIER_NAVAL_TORPEDO_SCREEN_PENETRATION_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_capital_ship_attack_factor" , ("MODIFIER_NAVY_CAPITAL_SHIP_ATTACK_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_capital_ship_defence_factor" , ("MODIFIER_NAVY_CAPITAL_SHIP_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_screen_attack_factor"       , ("MODIFIER_NAVY_SCREEN_ATTACK_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_screen_defence_factor"      , ("MODIFIER_NAVY_SCREEN_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+        ,("naval_speed_factor"              , ("MODIFIER_NAVAL_SPEED_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_visibility"                 , ("MODIFIER_NAVAL_VISIBILITY_FACTOR", MsgModifierPcNegReduced))
+        ,("navy_submarine_attack_factor"    , ("MODIFIER_NAVY_SUBMARINE_ATTACK_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_submarine_defence_factor"   , ("MODIFIER_NAVY_SUBMARINE_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_submarine_detection_factor" , ("MODIFIERS_SUBMARINE_DETECTION_FACTOR", MsgModifierPcPosReduced))
+        ,("positioning"                     , ("MODIFIER_POSITIONING", MsgModifierPcPosReduced))
+        ,("repair_speed_factor"             , ("MODIFIER_REPAIR_SPEED_FACTOR", MsgModifierPcPosReduced))
+        ,("screening_efficiency"            , ("MODIFIER_SCREENING_EFFICIENCY", MsgModifierPcPosReduced))
+        ,("screening_without_screens"       , ("MODIFIER_SCREENING_WITHOUT_SCREENS", MsgModifierPcPosReduced))
         ,("ships_at_battle_start"           , ("MODIFIER_SHIPS_AT_BATTLE_START_FACTOR", MsgModifierPcPosReduced))
         ,("spotting_chance"                 , ("MODIFIER_SPOTTING_CHANCE", MsgModifierPcPosReduced))
 
             -- carriers and their planes
+        ,("navy_carrier_air_agility_factor" , ("MODIFIER_NAVAL_CARRIER_AIR_AGILITY_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_carrier_air_attack_factor"  , ("MODIFIER_NAVAL_CARRIER_AIR_ATTACK_FACTOR", MsgModifierPcPosReduced))
+        ,("navy_carrier_air_targetting_factor" , ("MODIFIER_NAVAL_CARRIER_AIR_TARGETTING_FACTOR", MsgModifierPcPosReduced))
         ,("sortie_efficiency"               , ("MODIFIER_STAT_CARRIER_SORTIE_EFFICIENCY", MsgModifierPcPosReduced))
+        ,("fighter_sortie_efficiency"       , ("MODIFIER_CARRIER_FIGHTER_SORTIE_EFFICIENCY_FACTOR", MsgModifierPcPosReduced))
 
             -- Air combat
         ,("air_accidents_factor"            , ("MODIFIER_AIR_ACCIDENTS_FACTOR", MsgModifierPcNegReduced))
         ,("air_ace_generation_chance_factor" , ("MODIFIER_AIR_ACE_GENERATION_CHANCE_FACTOR", MsgModifierPcPosReduced))
-        ,("air_agility"                     , ("MODIFIER_AIR_AGILITY", MsgModifierPcPosReduced))
-        ,("air_attack"                      , ("MODIFIER_AIR_ATTACK", MsgModifierPcPosReduced))
+        ,("air_agility_factor"              , ("MODIFIER_AIR_AGILITY_FACTOR", MsgModifierPcPosReduced))
         ,("air_attack_factor"               , ("MODIFIER_AIR_ATTACK_FACTOR", MsgModifierPcPosReduced))
         ,("air_defence_factor"              , ("MODIFIER_AIR_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+
         ,("air_close_air_support_agility_factor" , ("MODIFIER_CAS_AGILITY_FACTOR", MsgModifierPcPosReduced))
         ,("air_close_air_support_attack_factor" , ("MODIFIER_CAS_ATTACK_FACTOR", MsgModifierPcPosReduced))
         ,("air_close_air_support_defence_factor" , ("MODIFIER_CAS_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+        ,("air_interception_attack_factor"  , ("MODIFIER_INTERCEPTION_ATTACK_FACTOR", MsgModifierPcPosReduced))
+        ,("air_interception_defence_factor" , ("MODIFIER_INTERCEPTION_DEFENCE_FACTOR", MsgModifierPcPosReduced))
         ,("air_strategic_bomber_agility_factor" , ("MODIFIER_STRATEGIC_BOMBER_AGILITY_FACTOR", MsgModifierPcPosReduced))
         ,("air_strategic_bomber_attack_factor" , ("MODIFIER_STRATEGIC_BOMBER_ATTACK_FACTOR", MsgModifierPcPosReduced))
         ,("air_strategic_bomber_defence_factor" , ("MODIFIER_STRATEGIC_BOMBER_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+        ,("naval_strike_agility_factor"     , ("MODIFIER_NAVAL_STRIKE_AGILITY_FACTOR", MsgModifierPcPosReduced))
+        ,("naval_strike_attack_factor"      , ("MODIFIER_NAVAL_STRIKE_ATTACK_FACTOR", MsgModifierPcPosReduced))
+
+        ,("naval_strike_targetting_factor"  , ("MODIFIER_NAVAL_STRIKE_TARGETTING_FACTOR", MsgModifierPcPosReduced))
         ,("air_bombing_targetting"          , ("MODIFIER_AIR_BOMBING_TARGETTING", MsgModifierPcPosReduced))
+        ,("air_cas_efficiency"              , ("MODIFIER_AIR_CAS_EFFICIENCY", MsgModifierPcPosReduced))
         ,("air_cas_present_factor"          , ("MODIFIER_AIR_CAS_PRESENT_FACTOR", MsgModifierPcPosReduced))
+        ,("air_intercept_efficiency"        , ("MODIFIER_AIR_INTERCEPT_EFFICIENCY", MsgModifierPcPosReduced))
+        ,("air_maximum_speed_factor"        , ("MODIFIER_AIR_MAX_SPEED_FACTOR", MsgModifierPcPosReduced))
+        ,("air_mission_efficiency"          , ("MODIFIER_AIR_MISSION_EFFICIENCY", MsgModifierPcPosReduced))
         ,("air_night_penalty"               , ("MODIFIER_AIR_NIGHT_PENALTY", MsgModifierPcNegReduced))
         ,("air_range_factor"                , ("MODIFIER_AIR_RANGE_FACTOR", MsgModifierPcPosReduced))
         ,("air_strategic_bomber_bombing_factor" , ("MODIFIER_STRATEGIC_BOMBER_BOMBING_FACTOR", MsgModifierPcPosReduced))
         ,("air_weather_penalty"             , ("MODIFIER_AIR_WEATHER_PENALTY", MsgModifierPcNegReduced))
         ,("army_bonus_air_superiority_factor" , ("MODIFIER_ARMY_BONUS_AIR_SUPERIORITY_FACTOR", MsgModifierPcPosReduced))
+        ,("enemy_army_bonus_air_superiority_factor" , ("MODIFIER_ENEMY_ARMY_BONUS_AIR_SUPERIORITY_FACTOR", MsgModifierPcNegReduced))
+       ,(" mines_planting_by_air_factor"    , ("MODIFIER_MINES_PLANTING_BY_AIR_FACTOR", MsgModifierPcPosReduced))
 
             -- targeted
 
@@ -703,20 +758,27 @@ modifiersTable = HM.fromList
         ,("army_speed_factor_for_controller" , ("MODIFIER_ARMY_SPEED_FACTOR_FOR_CONTROLLER", MsgModifierPcPosReduced))
         ,("compliance_gain"                 , ("MODIFIER_COMPLIANCE_GAIN_ADD", MsgModifierPcPos))
         ,("compliance_growth"               , ("MODIFIER_COMPLIANCE_GROWTH", MsgModifierPcPosReduced))
+        ,("local_building_slots"            , ("MODIFIER_LOCAL_BUILDING_SLOTS", MsgModifierPcPos))
+        ,("local_building_slots_factor"     , ("MODIFIER_LOCAL_BUILDING_SLOTS_FACTOR", MsgModifierPcPosReduced))
         ,("local_factories"                 , ("MODIFIER_LOCAL_FACTORIES", MsgModifierPcPosReduced))
         ,("local_intel_to_enemies"          , ("MODIFIER_LOCAL_INTEL_TO_ENEMIES", MsgModifierPcNegReduced))
+        ,("local_manpower"                  , ("MODIFIER_LOCAL_MANPOWER", MsgModifierPcPosReduced))
         ,("local_non_core_manpower"         , ("MODIFIER_LOCAL_NON_CORE_MANPOWER", MsgModifierPcPosReduced))
-        ,("local_resources_factor"          , ("MODIFIER_LOCAL_RESOURCES_FACTOR", MsgModifierPcPosReduced))
-        ,("non_core_manpower"               , ("MODIFIER_GLOBAL_NON_CORE_MANPOWER", MsgModifierPcPosReduced))
+        ,("local_org_regain"                , ("MODIFIER_LOCAL_ORG_REGAIN", MsgModifierPcPosReduced))
+        ,("local_resources"                 , ("MODIFIER_LOCAL_RESOURCES", MsgModifierPcPosReduced))
+        ,("local_supplies"                  , ("MODIFIER_LOCAL_SUPPLIES", MsgModifierPcPosReduced))
         ,("mobilization_speed"              , ("MODIFIER_MOBILIZATION_SPEED", MsgModifierPcPosReduced))
         ,("non_core_manpower"               , ("MODIFIER_GLOBAL_NON_CORE_MANPOWER", MsgModifierPcPosReduced))
-        --,("recruitable_population_factor"   , ("MODIFIER_RECRUITABLE_POPULATION_FACTOR", MsgModifierPcReduced))
+        ,("non_core_manpower"               , ("MODIFIER_GLOBAL_NON_CORE_MANPOWER", MsgModifierPcPosReduced))
+        ,("recruitable_population_factor"   , ("MODIFIER_RECRUITABLE_POPULATION_FACTOR", MsgModifierPcPosReduced))
         ,("resistance_damage_to_garrison"   , ("MODIFIER_RESISTANCE_DAMAGE_TO_GARRISONS", MsgModifierPcNegReduced))
         ,("resistance_decay"                , ("MODIFIER_RESISTANCE_DECAY", MsgModifierPcPosReduced))
         ,("resistance_garrison_penetration_chance" , ("MODIFIER_RESISTANCE_GARRISON_PENETRATION_CHANCE", MsgModifierPcNegReduced))
         ,("resistance_growth"               , ("MODIFIER_RESISTANCE_GROWTH", MsgModifierPcNegReduced))
         ,("resistance_target"               , ("MODIFIER_RESISTANCE_TARGET", MsgModifierPcNegReduced))
         ,("starting_compliance"             , ("MODIFIER_COMPLIANCE_STARTING_VALUE", MsgModifierPcPosReduced))
+        ,("state_resources_factor"          , ("MODIFIER_STATE_RESOURCES_FACTOR", MsgModifierPcPosReduced))
+        ,("state_production_speed_buildings_factor" , ("MODIFIER_STATE_PRODUCTION_SPEED_BUILDINGS_FACTOR", MsgModifierPcPosReduced))
 
         -- Unit Leader Scope
         ,("army_leader_cost_factor"         , ("MODIFIER_ARMY_LEADER_COST_FACTOR", MsgModifierPcNegReduced))
@@ -728,9 +790,14 @@ modifiersTable = HM.fromList
         ,("experience_gain_factor"          , ("MODIFIER_XP_GAIN_FACTOR", MsgModifierPcPosReduced))
         ,("promote_cost_factor"             , ("MODIFIER_UNIT_LEADER_PROMOTE_COST_FACTOR", MsgModifierPcNegReduced))
         ,("reassignment_duration_factor"    , ("MODIFIER_REASSIGNMENT_DURATION_FACTOR", MsgModifierPcNegReduced))
+        ,("sickness_chance"                 , ("MODIFIER_SICKNESS_CHANCE", MsgModifierPcNegReduced))
         ,("skill_bonus_factor"              , ("MODIFIER_UNIT_LEADER_SKILL_BONUS_FACTOR", MsgModifierPcPosReduced))
         ,("wounded_chance_factor"           , ("MODIFIER_WOUNDED_CHANCE_FACTOR", MsgModifierPcNegReduced))
         ,("shore_bombardment_bonus"         , ("MODIFIER_SHORE_BOMBARDMENT", MsgModifierPcPosReduced))
+
+        -- Strategic region scope
+        ,("air_accidents"                   , ("MODIFIER_AIR_ACCIDENTS", MsgModifierPcNegReduced))
+        ,("air_detection"                   , ("MODIFIER_AIR_DETECTION", MsgModifierPcPosReduced))
 
         -- targeted
         ,("extra_trade_to_target_factor"    , ("MODIFIER_TRADE_TO_TARGET_FACTOR", MsgModifierPcPosReduced))
@@ -745,8 +812,34 @@ modifiersTable = HM.fromList
         -- equipment/stats
         ,("build_cost_ic"           , ("STAT_COMMON_BUILD_COST_IC", MsgModifierPcNegReduced))
         ,("reliability"             , ("STAT_COMMON_RELIABILITY", MsgModifierPcPosReduced))
+        ,("armor_value"             , ("STAT_COMMON_ARMOR", MsgModifierPcPosReduced))
+        ,("maximum_speed"           , ("STAT_COMMON_MAXIMUM_SPEED", MsgModifierPcPosReduced))
+        ,("fuel_consumption"        , ("STAT_COMMON_FUEL_CONSUMPTION", MsgModifierPcNegReduced))
+        ,("ap_attack"               , ("STAT_COMMON_PIERCING", MsgModifierPcPosReduced))
+
         ,("defense"                 , ("STAT_ARMY_DEFENSE", MsgModifierPcPosReduced))
         ,("breakthrough"            , ("STAT_ARMY_BREAKTHROUGH", MsgModifierPcPosReduced))
+        ,("hardness"                , ("STAT_ARMY_HARDNESS", MsgModifierPcPosReduced))
+        ,("soft_attack"             , ("STAT_ARMY_SOFT_ATTACK", MsgModifierPcPosReduced))
+        ,("hard_attack"             , ("STAT_ARMY_HARD_ATTACK", MsgModifierPcPosReduced))
+
+        ,("air_agility"             , ("STAT_AIR_AGILITY", MsgModifierPcPosReduced))
+        ,("air_attack"              , ("STAT_AIR_ATTACK", MsgModifierPcPosReduced))
+        ,("air_range"               , ("STAT_AIR_RANGE", MsgModifierPcPosReduced))
+        ,("air_defence"             , ("STAT_AIR_DEFENCE", MsgModifierPcPosReduced))
+        ,("air_ground_attack"       , ("STAT_AIR_GROUND_ATTACK", MsgModifierPcPosReduced))
+        ,("air_bombing"             , ("STAT_AIR_BOMBING", MsgModifierPcPosReduced))
+
+        ,("surface_detection"       , ("STAT_NAVY_SURFACE_DETECTION", MsgModifierPcPosReduced))
+        ,("sub_detection"           , ("STAT_NAVY_SUB_DETECTION", MsgModifierPcPosReduced))
+        ,("sub_visibility"          , ("STAT_NAVY_SUB_VISIBILITY", MsgModifierPcNegReduced))
+        ,("anti_air_attack"         , ("STAT_NAVY_ANTI_AIR_ATTACK", MsgModifierPcPosReduced))
+        ,("surface_visibility"      , ("STAT_NAVY_SURFACE_VISIBILITY", MsgModifierPcNegReduced))
+        ,("naval_speed"             , ("STAT_NAVY_MAXIMUM_SPEED", MsgModifierPcPosReduced))
+        ,("naval_range"             , ("STAT_NAVY_RANGE", MsgModifierPcPosReduced))
+        ,("lg_attack"               , ("STAT_NAVY_LG_ATTACK", MsgModifierPcPosReduced))
+        ,("hg_attack"               , ("STAT_NAVY_HG_ATTACK", MsgModifierPcPosReduced))
+        ,("carrier_size"            , ("STAT_CARRIER_SIZE", MsgModifierPcPosReduced))
         ]
 
 -------------------------------------------------
@@ -780,7 +873,7 @@ addDynamicModifier stmt@[pdx| %_ = @scr |] =
             let dynflagd = fromMaybe "<!-- check script -->" dynflag
             case mmod of
                 Just mod -> withCurrentIndent $ \i -> do
-                    effect <- fold <$> indentUp (traverse (modifierMSG False) (dmodEffects mod))
+                    effect <- fold <$> indentUp (traverse (modifierMSG False "") (dmodEffects mod))
                     trigger <- indentUp $ ppMany (dmodEnable mod)
                     let name = dmodLocName mod
                         locName = maybe ("<tt>" <> adm_modifier adm <> "</tt>") (Doc.doc2text . iquotes) name
@@ -1201,7 +1294,7 @@ getLeaderTraits trait = do
     traits <- getCountryLeaderTraits
     case HM.lookup trait traits of
         Just clt-> do
-            mod <- maybe (return []) (\t -> fold <$> indentUp (traverse (modifierMSG False) t)) (clt_modifier clt)
+            mod <- maybe (return []) (\t -> fold <$> indentUp (traverse (modifierMSG False "") t)) (clt_modifier clt)
             equipmod <- maybe (return []) (indentUp . handleEquipmentBonus) (clt_equipment_bonus clt)
             tarmod <- maybe (return []) (indentUp . fmap concat . mapM handleTargetedModifier) (clt_targeted_modifier clt)
             hidmod <- maybe (return []) (indentUp . handleModifier) (clt_hidden_modifier clt)

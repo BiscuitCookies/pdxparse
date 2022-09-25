@@ -7,6 +7,7 @@ module FileIO (
     ,   buildPath
     ,   readScript
     ,   readSpecificScript
+    ,   readScriptFromText
     ,   Feature (..)
     ,   writeFeatures
     ) where
@@ -139,6 +140,14 @@ readSpecificScript settings filepath = do
                 _ -> Ap.Done originalLeftover originalResult
             -- just pass on all other cases
             x -> x
+
+readScriptFromText :: Monad m => Text -> m GenericScript
+readScriptFromText contents = case Ap.parseOnly
+    ( skipSpace
+        *> genericScript
+    ) contents of
+    Right result -> return result
+    Left err -> return []
 
 ------------------------------
 -- Writing features to file --

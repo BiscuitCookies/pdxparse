@@ -3,7 +3,7 @@
 
 name:                pdxparse
 
-version:             0.8.1
+version:             0.8.2
 synopsis:            A parser for scripts used in Paradox Development Studios games
 description:         This program extracts script and localization files from
                      games by Paradox Development Studios to the format
@@ -119,6 +119,7 @@ executable pdxparse
                        mtl >=2.1,
                        shakespeare >=2.0,
                        regex-tdfa >= 1.2,
+                       regex-compat,
                        template-haskell >= 2.10,
                        text >=1.2,
                        th-lift >=0.7,
@@ -136,7 +137,7 @@ executable pdxparse
     hs-source-dirs:    os/unix
 
   default-language:    Haskell2010
-  ghc-options:         -fwarn-incomplete-patterns -fmax-pmcheck-models=3000000 -Werror
+  ghc-options:         -fwarn-incomplete-patterns -fmax-pmcheck-models=3000000 -Werror -j +RTS -A32m -RTS
 
 source-repository head
   type:            git

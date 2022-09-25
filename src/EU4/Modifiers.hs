@@ -208,12 +208,12 @@ pp_opinion_modifer mod = do
         , " {{#ifeq:{{{2|}}}|0|| ("
         ] ++
         intersperse " / " (
-            (modText "{{icon|opinion}} " " Opinion" (omodOpinion mod))
+            (modText "{{icon|opinion}} " " opinion" (omodOpinion mod))
             ++ (yearlyDecay (omodOpinion mod) (omodYearlyDecay mod))
-            ++ (modText "" " Min" (omodMin mod))
-            ++ (modText "" " Max" (omodMax mod))
-            ++ (modText "" " Max for vassal" (omodMaxVassal mod))
-            ++ (modText "" " Max for sender" (omodMaxInOtherDirection mod))
+            ++ (modText "" " min" (omodMin mod))
+            ++ (modText "" " max" (omodMax mod))
+            ++ (modText "" " max for vassal" (omodMaxVassal mod))
+            ++ (modText "" " max for sender" (omodMaxInOtherDirection mod))
             ++ (duration (omodMonths mod) (omodYears mod))
         ) ++
         [ ") }}"
@@ -228,14 +228,14 @@ pp_opinion_modifer mod = do
         yearlyDecay :: Maybe Double -> Maybe Double -> [Doc]
         yearlyDecay (Just op) (Just decay) = [mconcat [
                 colourNumSign True (if op < 0 then decay else -decay)
-                , Doc.strictText " Yearly decay"
+                , Doc.strictText " yearly decay"
             ]]
         yearlyDecay _ _ = []
 
         duration :: Maybe Double -> Maybe Double -> [Doc]
-        duration (Just m) Nothing | m /= 0 = [fmt "Month" m]
-        duration Nothing (Just y) | y /= 0 = [fmt "Year" y]
-        duration (Just m) (Just y) | m /= 0 || y /= 0 = [mconcat [fmt "Year" y, " and ", fmt "Month" m]]
+        duration (Just m) Nothing | m /= 0 = [fmt "month" m]
+        duration Nothing (Just y) | y /= 0 = [fmt "year" y]
+        duration (Just m) (Just y) | m /= 0 || y /= 0 = [mconcat [fmt "year" y, " and ", fmt "month" m]]
         duration _ _ = []
 
         fmt :: Text -> Double -> Doc
@@ -350,4 +350,3 @@ writeEU4ProvTrigModifiers = do
                 [ Doc.strictText hdr, PP.line
                 , stpp'd, PP.line
                 ]
-

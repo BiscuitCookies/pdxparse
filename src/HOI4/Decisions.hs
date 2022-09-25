@@ -153,7 +153,7 @@ writeHOI4DecisionCats = do
 
 -- | Present a parsed decision category.
 ppdecisioncat :: forall g m. (HOI4Info g, MonadError Text m) => HOI4Decisioncat -> HashMap Text Text -> PPT g m Doc
-ppdecisioncat decc gfx = do
+ppdecisioncat decc gfx = setCurrentFile (decc_path decc) $ do
     version <- gets (gameVersion . getSettings)
     decc_text_loc <- getGameL10nIfPresent (decc_name decc <> "_desc")
     let deccArg :: Text -> (HOI4Decisioncat -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
@@ -413,7 +413,7 @@ writeHOI4Decisions = do
 
 -- | Present a parsed decision.
 ppdecision :: forall g m. (HOI4Info g, MonadError Text m) => HOI4Decision -> HashMap Text Text -> PPT g m Doc
-ppdecision dec gfx = do
+ppdecision dec gfx = setCurrentFile (dec_path dec) $ do
     version <- gets (gameVersion . getSettings)
     dec_text_loc <- getGameL10nIfPresent (dec_name dec <> "_desc")
     let decArg :: Text -> (HOI4Decision -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]

@@ -242,7 +242,7 @@ sortName n =
     in fromMaybe ln nn
 
 ppnationalfocus :: forall g m. (HOI4Info g, Monad m) => HashMap Text Text -> HOI4NationalFocus -> PPT g m Doc
-ppnationalfocus gfx nf = do
+ppnationalfocus gfx nf = setCurrentFile (nf_path nf) $ do
     let nfArg :: (HOI4NationalFocus -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
         nfArg field fmt
             = maybe (return [])

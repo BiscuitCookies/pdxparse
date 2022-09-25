@@ -52,23 +52,27 @@ import EU4.Events (parseEU4Events, writeEU4Events
 import EU4.Extra (writeEU4Extra, writeEU4ExtraCountryScope, writeEU4ExtraProvinceScope, writeEU4ExtraModifier)
 
 -- | Temporary (?) fix for HAW and UHW both localizing to "Hawai'i'"
+-- and for horde_ideas+horde_gov_ideas both localiying to "Horde Ideas"
 -- Can be extended/removed as necessary
-fixLocalization :: Settings -> Settings
-fixLocalization s =
+fixLocalizations :: Settings -> Settings
+fixLocalizations s = foldr fixLocalization s [
+    ("UHW", "HAW", "Hawai'i (HAW)"),
+    ("horde_ideas", "horde_gov_ideas", "Horde Government Ideas")]
+fixLocalization :: (Text, Text, Text) -> Settings -> Settings
+fixLocalization (lockey1, lockey2, newLocForKey2) s =
     let
         lan  = language s
         l10n = gameL10n s
         l10nForLan = HM.lookupDefault HM.empty lan l10n
         findKey key = content $ HM.lookupDefault (LocEntry 0 key) key l10nForLan
-        hawLoc = findKey "HAW"
-        newHavLoc = hawLoc <> " (HAW)"
-        newL10n = HM.insert "HAW" (LocEntry 0 newHavLoc) l10nForLan
+        oldLocForKey2 = findKey lockey2
+        newL10n = HM.insert lockey2 (LocEntry 0 newLocForKey2) l10nForLan
     in
-        if hawLoc == findKey "UHW" then
-            (trace $ "Note: Applying localization fix for HAW/UHW: " ++ (show hawLoc) ++ " -> " ++ (show newHavLoc)) $
+        if oldLocForKey2 == findKey lockey1 then
+            trace ("Note: Applying localization fix: " ++ show oldLocForKey2 ++ " -> " ++ show newLocForKey2) $
                 s { gameL10n = HM.insert lan newL10n l10n }
         else
-            (trace "Warning: fixLocalization hack for HAW/UHW in EU4/Settings.hs no longer needed!") $ s
+            trace ("Warning: fixLocalization hack for " ++ show lockey1 ++ " " ++ show lockey2 ++ " in EU4/Settings.hs no longer needed!") s
 
 -- | EU4 game type. This is only interesting for its instances.
 data EU4 = EU4
@@ -82,7 +86,7 @@ instance IsGame EU4 where
     runWithInitState EU4 settings st =
         void (runReaderT
                 (runStateT st (EU4D $ EU4Data {
-                    eu4settings = fixLocalization settings
+                    eu4settings = fixLocalizations settings
                 ,   eu4events = HM.empty
                 ,   eu4eventScripts = HM.empty
                 ,   eu4decisions = HM.empty

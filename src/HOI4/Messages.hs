@@ -46,6 +46,7 @@ import Abstract (GenericStatement)
 import qualified Doc
 import MessageTools -- import everything
 import SettingsTypes (PPT, getLangs, GameData (..), IsGameData (..))
+import Graphics.Win32 (sC_KEYMENU)
 
 -- | Dummy type required by the Shakespeare machinery.
 data Script = Script
@@ -143,16 +144,9 @@ data ScriptMessage
     | MsgROOTSCOPEUnitLeader
     | MsgROOTSCOPECharacter
     | MsgROOTCountry
-    | MsgROOTCountryAsOther
     | MsgROOTState
-    | MsgROOTStateOwner
-    | MsgROOTStateAsOther
     | MsgROOTOperative
-    | MsgROOTOperativeOwner
-    | MsgROOTOperativeAsOther
     | MsgROOTUnitLeader
-    | MsgROOTUnitLeaderOwner
-    | MsgROOTUnitLeaderAsOther
 
     | MsgPREV
     | MsgPREVPREV
@@ -167,35 +161,18 @@ data ScriptMessage
     | MsgPREVSCOPECustom
     | MsgPREVSCOPECustom2
     | MsgPREVCharacter
-    | MsgPREVCharacterOwner
-    | MsgPREVCharacterAsOther
     | MsgPREVCountry
-    | MsgPREVCountryAsOther
     | MsgPREVState
     | MsgPREVStateOwner
-    | MsgPREVStateAsOther
     | MsgPREVOperative
-    | MsgPREVOperativeOwner
-    | MsgPREVOperativeAsOther
     | MsgPREVUnitLeader
-    | MsgPREVUnitLeaderOwner
-    | MsgPREVUnitLeaderAsOther
     | MsgPREVFROM
     | MsgPREVCustom
     | MsgTHISCharacter
-    | MsgTHISCharacterOwner
-    | MsgTHISCharacterAsOther
     | MsgTHISCountry
-    | MsgTHISCountryAsOther
     | MsgTHISState
-    | MsgTHISStateOwner
-    | MsgTHISStateAsOther
     | MsgTHISOperative
-    | MsgTHISOperativeOwner
-    | MsgTHISOperativeAsOther
     | MsgTHISUnitLeader
-    | MsgTHISUnitLeaderOwner
-    | MsgTHISUnitLeaderAsOther
     | MsgTHISCustom
 
     | MsgFROM
@@ -205,9 +182,24 @@ data ScriptMessage
 
     | MsgMISC
 
+    | MsgOverlordSCOPE
     | MsgOverlord
+    | MsgOverlordOf {scriptMessageWhat :: Text}
+    | MsgFactionLeaderSCOPE
+    | MsgFactionLeader
+    | MsgFactionLeaderOf {scriptMessageWhat :: Text}
+    | MsgOwnerSCOPE
+    | MsgOwnerStateSCOPE
+    | MsgOwnerUnitSCOPE
+    | MsgOwnerOfSCOPE {scriptMessageWhat :: Text}
+    | MsgOwnerState
+    | MsgOwnerUnit
     | MsgOwner
+    | MsgOwnerOf {scriptMessageWhat :: Text}
+    | MsgControllerSCOPE
     | MsgController
+    | MsgControllerOf {scriptMessageWhat :: Text}
+    | MsgCapitalSCOPE
     | MsgCapital
     | MsgState {scriptMessageWhere :: Text}
     | MsgSCOPEEventTarget {scriptMessageTag :: Text}
@@ -254,8 +246,10 @@ data ScriptMessage
     | MsgAddExtraStateSharedBuildingSlotsVar {scriptMessageIcon :: Text, scriptMessageAmtText :: Text}
     | MsgGainLocPC {scriptMessageIcon :: Text, scriptMessageLoc :: Text, scriptMessageAmt :: Double}
     | MsgCreateFaction {scriptMessageWhat :: Text}
+    | MsgHasDecision {scriptMessageKey :: Text, scriptMessageWhat :: Text}
     | MsgHasTech {scriptMessageWhat :: Text}
     | MsgHasTemplate {scriptMessageWhat :: Text}
+    | MsgOccupationLaw {scriptMessageWhat :: Text}
     | MsgDiplomaticRelation {scriptMessageWhat :: Text, scriptMessageWhom :: Text}
     | MsgGiveResourceRights {scriptMessageWho :: Text, scriptMessageWhat :: Text}
     | MsgTrait {scriptMessageYn :: Bool}
@@ -277,6 +271,7 @@ data ScriptMessage
     | MsgRemoveStateClaim {scriptMessageWhat :: Text}
     | MsgRemoveStateCore {scriptMessageWhat :: Text}
     | MsgSetStateController {scriptMessageWhat :: Text}
+    | MsgSetStateOwner {scriptMessageWhat :: Text}
     | MsgOwnsState {scriptMessageWhat :: Text}
     | MsgControlsState {scriptMessageWhat :: Text}
     | MsgHasFullControlOfState {scriptMessageWhat :: Text}
@@ -329,6 +324,8 @@ data ScriptMessage
     | MsgNumOfControlledStatesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNumOfCivilianFactories {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
     | MsgNumOfCivilianFactoriesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
+    | MsgNumOfAvailableCivilianFactories {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
+    | MsgNumOfAvailableCivilianFactoriesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNumOfProjectFactories {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
     | MsgNumOfProjectFactoriesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNumOfFactories {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
@@ -337,6 +334,8 @@ data ScriptMessage
     | MsgNumOfNukesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgNumOfOperatives {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
     | MsgNumOfOperativesVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
+    | MsgNumSubjects {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
+    | MsgNumSubjectsVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgOriginalResearchSlots {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
     | MsgOriginalResearchSlotsVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgStatePopulation {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
@@ -356,6 +355,7 @@ data ScriptMessage
     | MsgRelease {scriptMessageWhom :: Text}
     | MsgReleasePuppet {scriptMessageWhom :: Text}
     | MsgCountryIs {scriptMessageWho :: Text}
+    | MsgTransferStateTo {scriptMessageWho :: Text}
     | MsgHasWarWith {scriptMessageWhom :: Text}
     | MsgHasWarTogetherWith {scriptMessageWhom :: Text}
     | MsgMakeWhitePeace {scriptMessageWhom :: Text}
@@ -363,12 +363,14 @@ data ScriptMessage
     | MsgExists {scriptMessageYn :: Bool}
     | MsgIsAIControlled {scriptMessageYn :: Bool}
     | MsgHasAttache {scriptMessageYn :: Bool}
+    | MsgHasBorderWar {scriptMessageYn :: Bool}
     | MsgHasCapitulated {scriptMessageYn :: Bool}
     | MsgIsInFaction {scriptMessageYn :: Bool}
     | MsgIsInHomeArea {scriptMessageYn :: Bool}
     | MsgHasWar {scriptMessageYn :: Bool}
     | MsgIsCapital {scriptMessageYn :: Bool}
     | MsgIsCoastal {scriptMessageYn :: Bool}
+    | MsgIsCountryLeader {scriptMessageYn :: Bool}
     | MsgIsFemale {scriptMessageYn :: Bool}
     | MsgIsFemaleLeader {scriptMessageYn :: Bool}
     | MsgIsGovernmentInExile {scriptMessageYn :: Bool}
@@ -499,6 +501,7 @@ data ScriptMessage
     | MsgAddManeuver {scriptMessageAmt :: Double}
     | MsgSurrenderProgress {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
     | MsgSurrenderProgressVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
+    | MsgVariableTooltip { scriptMessageWhat :: Text}
     | MsgSetVariable { scriptMessageVar1 :: Text, scriptMessageVar2 :: Text}
     | MsgSetTempVariable { scriptMessageVar1 :: Text, scriptMessageVar2 :: Text}
     | MsgSetVariableVal { scriptMessageVar :: Text, scriptMessageAmt :: Double}
@@ -658,8 +661,9 @@ data ScriptMessage
     | MsgDamageBuilding {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmt :: Double, scriptMessageProvince :: Double}
     | MsgDamageBuildingVar {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmtText :: Text, scriptMessageProvince :: Double}
     | MsgDivisionTemplate {scriptMessageWhat :: Text}
-    | MsgDeleteUnitTemplateAndunits {scriptMessageYn :: Bool, scriptMessageWhat :: Text}
-    | MsgDeleteUnits {scriptMessageYn :: Bool, scriptMessageWhat :: Text}
+    | MsgDeleteUnitTemplateAndunits {scriptMessageYn :: Bool, scriptMessageWhat :: Text, scriptMessage_where :: Text}
+    | MsgDeleteUnits {scriptMessageYn :: Bool, scriptMessageWhat :: Text, scriptMessage_where :: Text}
+    | MsgDeleteUnit {scriptMessageYn :: Bool, scriptMessageWhat :: Text, scriptMessageWhere :: Text}
     | MsgArmyManpowerInState {scriptMessageComp :: Text, scriptMessageAmt :: Double, scriptMessageWhat :: Text, scriptMessageWhere :: Text, scriptMessage_where2 :: Text}
     | MsgDivisionsInState {scriptMessageComp :: Text, scriptMessageAmt :: Double, scriptMessageWhat :: Text, scriptMessageWhere :: Text, scriptMessage_where2 :: Text}
     | MsgDivisionsInBorderState {scriptMessageComp :: Text, scriptMessageAmt :: Double, scriptMessageWhat :: Text, scriptMessageWhere :: Text, scriptMessageWhere2 :: Text}
@@ -670,6 +674,13 @@ data ScriptMessage
     | MsgSetPolitics {scriptMessageIcon :: Text, scriptMessageWho :: Text, scriptMessageMonths :: Double}
     | MsgSetPoliticsVar {scriptMessageIcon :: Text, scriptMessageWho :: Text, scriptMessageAmtText :: Text}
     | MsgStartCivilWar {scriptMessageWhat :: Text, scriptMessageAmtText :: Text}
+    | MsgStartBorderWar {scriptMessageWhere :: Text, scriptMessageWhere2 :: Text, scriptMessageYn :: Bool}
+    | MsgBorderWin
+    | MsgBorderLoss
+    | MsgBorderCancel
+    | MsgBorderDefender
+    | MsgBorderAttacker
+    | MsgTriggerBorderEvent {scriptMessageEvttype :: Text, scriptMessageEvtid :: Text, scriptMessageName :: Text, scriptMessageWho :: Text}
     | MsgSetPartyName {scriptMessageIcon :: Text, scriptMessageWho :: Text, scriptMessageWhat :: Text}
     | MsgIsInTechSharingGroup {scriptMessageWhat :: Text}
     | MsgAddToTechSharingGroup {scriptMessageWhat :: Text}
@@ -702,6 +713,7 @@ data ScriptMessage
     | MsgSetBuildingLevelVar {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmtText :: Text, scriptMessageProv :: Text}
     | MsgRemoveBuilding {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmt :: Double}
     | MsgRemoveBuildingVar {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageAmtText :: Text}
+    | MsgAddProvinceModifier {scriptMessageYn :: Bool, scriptMessageWhat :: Text, scriptMessageProv :: Text}
     | MsgAllProvinces
     | MsgLimitToBorder
     | MsgLimitToCoastal
@@ -903,26 +915,12 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]The currently considered unit leader"
         MsgROOTCountry
             -> "our country"
-        MsgROOTCountryAsOther
-            -> "same as our country"
         MsgROOTOperative
             -> "the currently considered operative"
-        MsgROOTOperativeOwner
-            -> "the employer of the currently considered operative"
-        MsgROOTOperativeAsOther
-            -> "same as the currently considered operative"
         MsgROOTState
             -> "the currently considered state"
-        MsgROOTStateOwner
-            -> "the owner of the currently consideredstate"
-        MsgROOTStateAsOther
-            -> "same as the currently considered state"
         MsgROOTUnitLeader
             -> "the currently considered unit leader"
-        MsgROOTUnitLeaderOwner
-            -> "the employer of the  currently considered unit leader"
-        MsgROOTUnitLeaderAsOther
-            -> "same as the currently considered unit leader"
 
         MsgPREV
             -> "[SCOPE]PREV"
@@ -950,32 +948,16 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]Custom Scope<!-- check game script for where it points to -->"
         MsgPREVCharacter
             -> "the previously mentioned character"
-        MsgPREVCharacterOwner
-            -> "the employer of the previously mentioned character"
-        MsgPREVCharacterAsOther
-            -> "same as the previously mentioned character"
         MsgPREVCountry
             -> "the previously mentioned country"
-        MsgPREVCountryAsOther
-            -> "same as the previously mentioned country"
         MsgPREVState
             -> "the previously mentioned state"
         MsgPREVStateOwner
             -> "the owner of the previously mentioned state"
-        MsgPREVStateAsOther
-            -> "same as the previously mentioned state"
         MsgPREVOperative
             -> "the previously mentioned operative"
-        MsgPREVOperativeOwner
-            -> "the employer of the previously mentioned operative"
-        MsgPREVOperativeAsOther
-            -> "same as the previously mentioned operative"
         MsgPREVUnitLeader
             -> "the previously mentioned unit leader"
-        MsgPREVUnitLeaderOwner
-            -> "the employer of the previously mentioned unit leader"
-        MsgPREVUnitLeaderAsOther
-            -> "same as the previously mentioned unit leader"
         MsgPREVFROM
             -> "previously mentioned FROM scope<!-- check game script for where it points to -->"
         MsgPREVCustom
@@ -983,32 +965,14 @@ instance RenderMessage Script ScriptMessage where
 
         MsgTHISCharacter
             -> "this character"
-        MsgTHISCharacterOwner
-            -> "the employer of this character"
-        MsgTHISCharacterAsOther
-            -> "same as this character"
         MsgTHISCountry
             -> "this country"
-        MsgTHISCountryAsOther
-            -> "same as this country"
         MsgTHISState
             -> "this state"
-        MsgTHISStateOwner
-            -> "the owner of this state"
-        MsgTHISStateAsOther
-            -> "same as this state"
         MsgTHISOperative
             -> "this operative"
-        MsgTHISOperativeOwner
-            -> "the employer of this operative"
-        MsgTHISOperativeAsOther
-            -> "same as this operative"
         MsgTHISUnitLeader
             -> "this unit leader"
-        MsgTHISUnitLeaderOwner
-            -> "the employer of this unit leader"
-        MsgTHISUnitLeaderAsOther
-            -> "same as this unit leader"
         MsgTHISCustom
             -> "current custom scope<!-- check game script for where it points to -->"
 
@@ -1024,14 +988,61 @@ instance RenderMessage Script ScriptMessage where
         MsgMISC
             -> "MISC (scope of variable, event_target, array)"
 
-        MsgCapital
+        MsgCapitalSCOPE
             -> "[SCOPE]Capital state:"
-        MsgController
+        MsgCapital
+            -> "capital state"
+        MsgControllerSCOPE
             -> "[SCOPE]State controller:"
-        MsgOverlord
+        MsgController
+            -> "state controller"
+        MsgControllerOf { scriptMessageWhat = _what}
+            -> mconcat
+                [ "owner of "
+                , _what
+                ]
+        MsgOverlordSCOPE
             -> "[SCOPE]Overlord:"
-        MsgOwner
+        MsgOverlord
+            -> "overlord"
+        MsgOverlordOf { scriptMessageWhat = _what}
+            -> mconcat
+                [ "overlord of "
+                , _what
+                ]
+        MsgFactionLeaderSCOPE
+            -> "[SCOPE]Faction leader:"
+        MsgFactionLeader
+            -> "faction leader"
+        MsgFactionLeaderOf { scriptMessageWhat = _what}
+            -> mconcat
+                [ "faction leader of faction "
+                , _what
+                , " is in"
+                ]
+        MsgOwnerSCOPE
             -> "[SCOPE]State owner/Unit owner:"
+        MsgOwnerStateSCOPE
+            -> "[SCOPE]State owner:"
+        MsgOwnerUnitSCOPE
+            -> "[SCOPE]Unit owner:"
+        MsgOwnerOfSCOPE { scriptMessageWhat = _what}
+            -> mconcat
+                [ "[SCOPE]Owner of "
+                , _what
+                , ":"
+                ]
+        MsgOwnerState
+            -> "state owner"
+        MsgOwnerUnit
+            -> "unit owner"
+        MsgOwner
+            -> "state owner/unit owner"
+        MsgOwnerOf { scriptMessageWhat = _what}
+            -> mconcat
+                [ "owner of "
+                , _what
+                ]
         MsgState {scriptMessageWhere = _where}
             -> mconcat
                 [ "[Scope]"
@@ -1215,6 +1226,14 @@ instance RenderMessage Script ScriptMessage where
                 [ "Create faction called "
                 , toMessage (iquotes _what)
                 ]
+        MsgHasDecision {scriptMessageKey = _key, scriptMessageWhat = _what}
+            -> mconcat
+                [ "Has selected the decision "
+                , toMessage (iquotes _what)
+                , "<!-- "
+                , _key
+                , " -->"
+                ]
         MsgHasTech {scriptMessageWhat = _what}
             -> mconcat
                 [ "Has "
@@ -1226,6 +1245,11 @@ instance RenderMessage Script ScriptMessage where
                 [ "Has "
                 , toMessage (iquotes _what)
                 , " division template"
+                ]
+        MsgOccupationLaw {scriptMessageWhat = _what}
+            -> mconcat
+                [ "Current occupation law is "
+                , toMessage (iquotes _what)
                 ]
         MsgDiplomaticRelation {scriptMessageWhat = _what, scriptMessageWhom = _whom}
             -> mconcat
@@ -1328,6 +1352,11 @@ instance RenderMessage Script ScriptMessage where
         MsgSetStateController {scriptMessageWhat = _what}
             -> mconcat
                 [ "Becomes controller of "
+                , _what
+                ]
+        MsgSetStateOwner {scriptMessageWhat = _what}
+            -> mconcat
+                [ "Becomes owner of "
                 , _what
                 ]
         MsgOwnsState {scriptMessageWhat = _what}
@@ -1712,6 +1741,22 @@ instance RenderMessage Script ScriptMessage where
                 , typewriterText _amtT
                 , " {{icon|cic|1}}"
                 ]
+        MsgNumOfAvailableCivilianFactories {scriptMessageAmt = _amt, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , toMessage (bold (plainNum _amt))
+                , " {{icon|cic|1}} available"
+                ]
+        MsgNumOfAvailableCivilianFactoriesVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , typewriterText _amtT
+                , " {{icon|cic|1}} available"
+                ]
         MsgNumOfProjectFactories {scriptMessageAmt = _amt, scriptMessageCompare = _comp}
             -> mconcat
                 [ "Has "
@@ -1775,6 +1820,22 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , typewriterText _amtT
                 , " operatives"
+                ]
+        MsgNumSubjects {scriptMessageAmt = _amt, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , toMessage (bold (plainNum _amt))
+                , plural _amt " Subject nation" " Subject nations"
+                ]
+        MsgNumSubjectsVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , typewriterText _amtT
+                , " Subject nations"
                 ]
         MsgOriginalResearchSlots {scriptMessageAmt = _amt, scriptMessageCompare = _comp}
             -> mconcat
@@ -1884,6 +1945,11 @@ instance RenderMessage Script ScriptMessage where
                 [ "Is "
                 , _who
                 ]
+        MsgTransferStateTo {scriptMessageWho = _who}
+            -> mconcat
+                [ "Becomes owned and controlled by "
+                , _who
+                ]
         MsgHasWarWith {scriptMessageWhom = _whom}
             -> mconcat
                 [ "Is at war with "
@@ -1917,6 +1983,12 @@ instance RenderMessage Script ScriptMessage where
                 [ toMessage (ifThenElseT _yn "Has" "Has ''no''")
                 , " Attache from another country"
                 ]
+        MsgHasBorderWar {scriptMessageYn = _yn}
+            -> mconcat
+                [ "Is"
+                , toMessage (ifThenElseT _yn " " " ''not'' ")
+                , "in a border war"
+                ]
         MsgHasCapitulated {scriptMessageYn = _yn}
             -> mconcat
                 [ toMessage (ifThenElseT _yn "Has" "Has ''not''")
@@ -1949,6 +2021,12 @@ instance RenderMessage Script ScriptMessage where
                 [ "Is"
                 , toMessage (ifThenElseT _yn "" " ''not''")
                 , " a coastal state"
+                ]
+        MsgIsCountryLeader {scriptMessageYn = _yn}
+            -> mconcat
+                [ "Is"
+                , toMessage (ifThenElseT _yn "" " ''not''")
+                , " the country leader"
                 ]
         MsgIsFemale {scriptMessageYn = _yn}
             -> mconcat
@@ -2226,7 +2304,7 @@ instance RenderMessage Script ScriptMessage where
                 , "|modifiers="
                 ]
         MsgEffectBoxEnd
-            -> "}}"
+            -> "}}\n"
         MsgShowIdea {scriptMessageLoc = _loc, scriptMessageKey = _key}
             -> mconcat
                 [ _loc
@@ -2778,7 +2856,7 @@ instance RenderMessage Script ScriptMessage where
                 ]
         MsgRemoveCoreOf {scriptMessageWho = _who}
             -> mconcat
-                [ "Remove the core of"
+                [ "Remove the core of "
                 , _who
                 ]
         MsgRemoveFromFaction {scriptMessageWho = _who}
@@ -2867,6 +2945,11 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , typewriterText _amtT
                 , " surrender progress"
+                ]
+        MsgVariableTooltip { scriptMessageWhat = _what}
+            -> mconcat
+                [ "Variable Tooltip: "
+                , _what
                 ]
         MsgSetVariable { scriptMessageVar1 = _var1, scriptMessageVar2 = _var2}
             -> mconcat
@@ -3242,8 +3325,8 @@ instance RenderMessage Script ScriptMessage where
         MsgHasDefensiveWar { scriptMessageYn = _yn}
             -> mconcat
                 [ "Is "
-                , toMessage (ifThenElseT _yn "" "''not''")
-                , " in a defensive war"
+                , toMessage (ifThenElseT _yn "" "''not'' ")
+                , "in a defensive war"
                 ]
         MsgLoadFocusTree { scriptMessageWhat = _what }
             -> mconcat
@@ -4052,8 +4135,15 @@ instance RenderMessage Script ScriptMessage where
         MsgDeleteUnits {scriptMessageYn = _yn, scriptMessageWhat = _what}
             -> mconcat
                 [ ifThenElseT _yn "Disband" "Delete"
-                , " all units created from teplate"
+                , " all units created from template"
                 , toMessage (iquotes _what)
+                ]
+        MsgDeleteUnit {scriptMessageYn = _yn, scriptMessageWhat = _what, scriptMessageWhere = _where}
+            -> mconcat
+                [ ifThenElseT _yn "Disband" "Delete"
+                , " all units"
+                , ifThenElseT (T.null _what) "" (" created from template " <> toMessage (iquotes _what))
+                , ifThenElseT (T.null _where) "" (" in " <> _where)
                 ]
         MsgDivisionTemplate {scriptMessageWhat = _what}
             -> mconcat
@@ -4161,6 +4251,34 @@ instance RenderMessage Script ScriptMessage where
                 , " civil war ("
                 , _amtT
                 , " size)"
+                ]
+        MsgStartBorderWar {scriptMessageWhere = _where, scriptMessageWhere2 = _where2, scriptMessageYn = _yn}
+            -> mconcat
+                [ "Start a border war between "
+                , _where
+                , " and "
+                , _where2
+                , ifThenElseT _yn " and transferring ownership of the state to the winner" ""
+                ]
+        MsgBorderWin
+            -> "on win"
+        MsgBorderLoss
+            -> "on loss"
+        MsgBorderCancel
+            -> "on cancel"
+        MsgBorderDefender
+            -> "For the defender"
+        MsgBorderAttacker
+            -> "For the attacker"
+        MsgTriggerBorderEvent {scriptMessageEvttype = _evttype, scriptMessageEvtid = _evtid, scriptMessageName = _name, scriptMessageWho = _who}
+            -> mconcat
+                [ _who
+                , " trigger "
+                , toMessage (iquotes _name)
+                , " <!-- "
+                , _evtid
+                , " --> "
+                , _evttype
                 ]
         MsgSetPartyName {scriptMessageIcon = _icon, scriptMessageWho = _who, scriptMessageWhat = _what}
             -> mconcat
@@ -4380,6 +4498,12 @@ instance RenderMessage Script ScriptMessage where
                 , _what
                 , " by up to "
                 , typewriterText _amtT
+                ]
+        MsgAddProvinceModifier {scriptMessageYn = _yn, scriptMessageWhat = _type, scriptMessageProv = _prov}
+            -> mconcat
+                [ ifThenElseT _yn "Add the " "Remove the "
+                , _type
+                ,_prov
                 ]
         MsgAllProvinces
             -> ", on all provinces"

@@ -111,11 +111,11 @@ parseHOI4Event stmt@[pdx| %left = %right |] = case right of
         GenericLhs etype _ ->
             let mescope = case T.toLower etype of
                     "country_event" -> Just HOI4Country
-                    "unit_leader_event" -> Just HOI4UnitLeader
+                    "unit_leader_event" -> Just HOI4Country
                     "operative_leader_event" -> Just HOI4Operative
                     "state_event" -> Just HOI4ScopeState
                     "news_event" -> Just HOI4Country -- ?
-                    "event" -> Just HOI4NoScope
+                    "event" -> Just HOI4Country -- ?
                     _ -> Nothing
             in case mescope of
                 Nothing -> throwError $ "unrecognized event type " <> etype

@@ -58,6 +58,7 @@ data CLArgs
     | ProcessCountryScopeFile String
     | ProcessProvinceScopeFile String
     | ProcessModifierFile String
+    | WithLabels
     deriving (Show, Eq)
 
 -- | Choice of localization scheme.

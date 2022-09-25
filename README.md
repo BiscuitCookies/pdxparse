@@ -42,10 +42,11 @@ In addition to that, EU4 parsing supports the following additional options, each
 
     -e, --onlyextra                skip writing normal game files and only write the result of parsing
                                        the files which are specified in the following options
+    -w, --withlabels               the top level of the extra files is considered a label which gets localized, but not processed further
     -f FILE, --file=FILE           also process FILE without any special handling
     -c FILE, --countryscope=FILE   also process FILE as containing code in the counrty scope
     -s FILE, --provincescope=FILE  also process FILE as containing code in the province scope
-    -m FILE, --modifiers=FILE      also process FILE as containing modifiers
+    -m FILE, --modifiers=FILE      also process FILE as containing modifiers (if the modifiers are not on the top level of the file, --withlabels has to be used as well)
 
 
 Without command line options, pdxparse just processes everything it finds and puts

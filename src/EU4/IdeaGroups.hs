@@ -45,7 +45,8 @@ import QQ (pdx)
 import SettingsTypes ( PPT, Settings (..), Game (..)
                      , IsGame (..), IsGameData (..), IsGameState (..)
                      , getGameL10n
-                     , setCurrentFile, withCurrentFile)
+                     , setCurrentFile, withCurrentFile, getGameL10nIfPresent)
+import Data.Maybe (fromMaybe)
 
 -- | Empty idea group. Starts off Nothing everywhere, except id and name
 -- (should get filled in immediately).
@@ -222,9 +223,16 @@ ppIdeaGroup ig = fixup <$> do
             mtrigger_pp'd <- case ig_trigger ig of
                 Nothing -> return Nothing
                 Just trigger -> Just <$> (imsg2doc =<< scope EU4Country (ppMany trigger))
+            country_name <- case ig_trigger ig of
+                Just [[pdx| tag = $tag |]] -> getGameL10nIfPresent tag
+                _ -> return Nothing
             let name_loc = Doc.strictText . T.replace " Ideas" "" $ name
                 ig_id_t = ig_name ig
                 ig_id = Doc.strictText ig_id_t
+                section = maybe name_loc Doc.strictText country_name
+                name1_entry = case country_name of
+                    Nothing -> name_loc
+                    Just country_name' -> Doc.strictText(mconcat ["[[File:", country_name', ".png|28px]] [[", country_name', "]]"])
             trads <- case ig_start ig of
                 Just [trad1s, trad2s] -> do
                     trad1 <- imsg2doc . map (first (const 0)) =<< ppOne trad1s
@@ -233,11 +241,14 @@ ppIdeaGroup ig = fixup <$> do
                 Just trads -> return . Left . Just . length $ trads
                 Nothing -> return (Left Nothing)
             return . mconcat $
-                ["<section begin=", name_loc, "/>", PP.line
-                ,"{{idea group", PP.line
+                ["<section begin=", section, "/>", PP.line
+                ,case ig_category ig of
+                    Just cat -> "{{idea group"
+                    Nothing -> "{{national ideas" -- also used for group national ideas
+                , PP.line
                 ,"|version=", Doc.strictText version, PP.line
                 ,"|name2=", name_loc, PP.line
-                ,"|name=", name_loc, PP.line
+                ,"|name=", name1_entry, PP.line
                 ,case ig_category ig of
                     Nothing -> case trads of
                         Right (trad1, trad2) -> mconcat -- assume groups with no category are country ideas
@@ -282,6 +293,6 @@ ppIdeaGroup ig = fixup <$> do
                         ,PP.line]
                     Nothing -> [])
                 ++ ["}}", PP.line
-                ,"<section end=", name_loc, "/>"]
+                ,"<section end=", section, "/>"]
         (Nothing, _) -> throwError $ "Idea group " <> name <> " has no bonus"
         (_, n) -> throwError $ "Idea group " <> name <> " has non-standard number of ideas (" <> T.pack (show n) <> ")"

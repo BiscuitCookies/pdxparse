@@ -182,10 +182,10 @@ ppOpinionModifier mod = do
             if isTrade then
                 modText "" " Trade relation" (omodValue mod)
                 else
-                   modText "{{icon|opinion}} " " Opinion" (omodValue mod)
+                   modText "{{icon|opinion}} " " opinion" (omodValue mod)
             ++ monthlyDecay (omodValue mod) (omodDecay mod)
-            ++ modText "" " Min" (omodMin mod)
-            ++ modText "" " Max" (omodMax mod)
+            ++ modText "" " min" (omodMin mod)
+            ++ modText "" " max" (omodMax mod)
             ++ duration (omodDays mod) (omodMonths mod) (omodYears mod)
         ) ++
         [ ") }}"
@@ -211,10 +211,10 @@ ppOpinionModifier mod = do
         duration (Just d) Nothing Nothing   | d /= 0 = ["{{icon|time}} ", Doc.strictText $ formatDays d]
         duration Nothing (Just m) Nothing   | m /= 0 = ["{{icon|time}} ", Doc.strictText $ formatMonths m]
         duration Nothing Nothing (Just y)   | y /= 0 = ["{{icon|time}} ", Doc.strictText $ formatYears $ floor y]
-        duration (Just d) (Just m) Nothing  | d /= 0 || m /= 0 = [mconcat ["{{icon|time}} ", fmt "Month" m, " and ", fmt "Day" d]]
+        duration (Just d) (Just m) Nothing  | d /= 0 || m /= 0 = [mconcat ["{{icon|time}} ", fmt "month" m, " and ", fmt "day" d]]
         duration (Just d) Nothing (Just y)  | d /= 0 || y /= 0 = ["{{icon|time}} ", Doc.strictText $ formatDays (y*356+d)]
         duration Nothing (Just m) (Just y)  | m /= 0 || y /= 0 = ["{{icon|time}} ", Doc.strictText $ formatMonths (y*12+m)]
-        duration (Just d) (Just m) (Just y) | d /= 0 || m /= 0 || y /= 0 = [mconcat ["{{icon|time}} ", fmt "Year" y, " and ", fmt "Month" m, " and ", fmt "Day" d]]
+        duration (Just d) (Just m) (Just y) | d /= 0 || m /= 0 || y /= 0 = [mconcat ["{{icon|time}} ", fmt "year" y, " and ", fmt "month" m, " and ", fmt "day" d]]
         duration _ _ _ = []
 
         fmt :: Text -> Double -> Doc
@@ -303,7 +303,7 @@ writeHOI4DynamicModifiers = do
         pp_dynamic_modifier :: (HOI4Info g, Monad m) => HOI4DynamicModifier -> PPT g m Doc
         pp_dynamic_modifier mod = do
             req <- imsg2doc =<< ppMany (dmodEnable mod)
-            eff <- withCurrentIndent $ \_ -> do imsg2doc . fold =<< traverse (modifierMSG False) (dmodEffects mod)
+            eff <- withCurrentIndent $ \_ -> do imsg2doc . fold =<< traverse (modifierMSG False "") (dmodEffects mod)
             return $ mconcat
                 [ "|- style=\"vertical-align:top;\"", PP.line
                 , "| ", PP.line

@@ -24,9 +24,9 @@ import Control.Monad (liftM, MonadPlus (..), forM, foldM, join {- temp -}, when)
 import Control.Monad.Reader (MonadReader (..), asks)
 import Control.Monad.State (MonadState (..), gets)
 
-import Data.Char (isUpper, toUpper, toLower)
+import Data.Char (isUpper, toUpper, toLower, isDigit)
 import Data.List (foldl', intersperse)
-import Data.Maybe (isJust, fromMaybe, listToMaybe)
+import Data.Maybe (isJust, fromMaybe, listToMaybe, fromJust)
 import Data.Monoid ((<>))
 import Data.Foldable (fold)
 import Data.Void (Void)
@@ -181,10 +181,12 @@ handlersNumericCompare = Tr.fromList
         ,("num_of_controlled_factories"      , numericCompare "more than" "fewer than" MsgNumOfControlledFactories MsgNumOfControlledFactoriesVar)
         ,("num_of_controlled_states"         , numericCompare "more than" "fewer than" MsgNumOfControlledStates MsgNumOfControlledStatesVar)
         ,("num_of_civilian_factories"        , numericCompare "more than" "fewer than" MsgNumOfCivilianFactories MsgNumOfCivilianFactoriesVar)
+        ,("num_of_available_civilian_factories" , numericCompare "more than" "fewer than" MsgNumOfAvailableCivilianFactories MsgNumOfAvailableCivilianFactoriesVar)
         ,("num_of_civilian_factories_available_for_projects" , numericCompare "more than" "less than" MsgNumOfProjectFactories MsgNumOfProjectFactoriesVar)
         ,("num_of_factories"                 , numericCompare "more than" "fewer than" MsgNumOfFactories MsgNumOfFactoriesVar)
         ,("num_of_nukes"                     , numericCompare "more than" "fewer than" MsgNumOfNukes MsgNumOfNukesVar)
         ,("num_of_operatives"                , numericCompare "more than" "fewer than" MsgNumOfOperatives MsgNumOfOperativesVar)
+        ,("num_subjects"                     , numericCompare "more than" "fewer than" MsgNumSubjects MsgNumSubjectsVar)
         ,("original_research_slots"          , numericCompare "more than" "fewer than" MsgOriginalResearchSlots MsgOriginalResearchSlotsVar)
         ,("state_population"                 , numericCompare "more than" "less than" MsgStatePopulation MsgStatePopulationVar)
         ,("surrender_progress"               , numericCompare "more than" "less than" MsgSurrenderProgress MsgSurrenderProgressVar)
@@ -301,7 +303,7 @@ handlersCompound = Tr.fromList
         ,("random_occupied_country"     , scope HOI4Country     . compoundMessage MsgRandomOccupiedCountry)
         ,("random_operative"            , scope HOI4Operative   . compoundMessage MsgRandomOperative)
         ,("random_other_country"        , scope HOI4Country     . compoundMessage MsgRandomOtherCountry)
-        ,("random_owned_controlled_state", scope HOI4Country     . compoundMessage MsgRandomOwnedControlledState)
+        ,("random_owned_controlled_state", scope HOI4ScopeState     . compoundMessage MsgRandomOwnedControlledState)
         ,("random_owned_state"          , scope HOI4ScopeState  . compoundMessage MsgRandomOwnedState)
         ,("random_state"                , scope HOI4ScopeState  . compoundMessage MsgRandomState)
         ,("random_subject_country"      , scope HOI4Country     . compoundMessage MsgRandomSubjectCountry)
@@ -315,10 +317,11 @@ handlersCompound = Tr.fromList
         ,("from.from"                   , compoundMessagePronoun) -- need beter way
         ,("from.from.from"              , compoundMessagePronoun) -- need beter way
         -- no THIS, not used on LHS
-        ,("overlord"                    , scope HOI4Country   . compoundMessage MsgOverlord)
-        ,("owner"                       , scope HOI4Country   . compoundMessage MsgOwner)
-        ,("controller"                  , scope HOI4Country   . compoundMessage MsgController)
-        ,("capital_scope"               , scope HOI4ScopeState  . compoundMessage MsgCapital)
+        ,("overlord"                    , scope HOI4Country   . compoundMessage MsgOverlordSCOPE)
+        ,("faction_leader"              , scope HOI4Country   . compoundMessage MsgFactionLeaderSCOPE)
+        ,("owner"                       , compoundMessagePronoun)
+        ,("controller"                  , scope HOI4Country   . compoundMessage MsgControllerSCOPE)
+        ,("capital_scope"               , scope HOI4ScopeState  . compoundMessage MsgCapitalSCOPE)
         ,("event_target"        , compoundMessageTagged MsgSCOPEEventTarget (Just HOI4Misc)) -- Tagged blocks
         ,("var"                 , compoundMessageTagged MsgSCOPEVariable (Just HOI4Misc)) -- Tagged blocks
         -- arrays
@@ -355,9 +358,11 @@ handlersLocRhs = Tr.fromList
         ,("set_state_name"        , withLocAtom MsgSetStateName)
         ,("set_state_category"    , withLocAtom MsgSetStateCategory)
         ,("custom_effect_tooltip" , withLocAtom MsgCustomEffectTooltip)
+        ,("has_decision"          , withLocAtomKey MsgHasDecision)
         ,("has_opinion_modifier"  , withLocAtom MsgHasOpinionMod)
         ,("has_tech"              , withLocAtom MsgHasTech)
         ,("has_template"          , withLocAtom MsgHasTemplate)
+        ,("occupation_law"        , withLocAtom MsgOccupationLaw)
         ,("is_character"          , withLocAtom MsgIsCharacter)
         ,("is_on_continent"       , withLocAtom MsgIsOnContinent)
         ,("is_in_tech_sharing_group" , withLocAtomName MsgIsInTechSharingGroup)
@@ -376,6 +381,7 @@ handlersState = Tr.fromList
         ,("remove_state_claim"  , withState MsgRemoveStateClaim)
         ,("remove_state_core"   , withState MsgRemoveStateCore)
         ,("set_state_controller" , withState MsgSetStateController)
+        ,("set_state_owner"     , withState MsgSetStateOwner)
         ,("state"               , withState MsgStateId)
         ,("transfer_state"      , withState MsgTransferState)
         ]
@@ -467,6 +473,7 @@ handlersSimpleFlag = Tr.fromList
         ,("remove_from_faction"     , withFlag MsgRemoveFromFaction)
         ,("set_state_controller_to" , withFlag MsgSetStateControllerTo)
         ,("tag"                     , withFlag MsgCountryIs)
+        ,("transfer_state_to"       , withFlag MsgTransferStateTo)
         ,("has_war_with"            , withFlag MsgHasWarWith)
         ,("has_war_together_with"   , withFlag MsgHasWarTogetherWith)
         ,("original_tag"            , withFlag MsgOrignalTag)
@@ -496,6 +503,7 @@ handlersYesNo = Tr.fromList
         ,("country_lock_all_division_template" , withBool MsgLockDivision)
         ,("exists"                      , withBool MsgExists)
         ,("has_attache"                 , withBool MsgHasAttache)
+        ,("has_border_war"              , withBool MsgHasBorderWar)
         ,("has_capitulated"             , withBool MsgHasCapitulated)
         ,("has_civil_war"               , withBool MsgHasCivilWar)
         ,("has_defensive_war"           , withBool MsgHasDefensiveWar)
@@ -503,6 +511,7 @@ handlersYesNo = Tr.fromList
         ,("has_war"                     , withBool MsgHasWar)
         ,("is_capital"                  , withBool MsgIsCapital)
         ,("is_coastal"                  , withBool MsgIsCoastal)
+        ,("is_country_leader"           , withBool MsgIsCountryLeader)
         ,("is_demilitarized_zone"       , withBool MsgIsDemilitarizedZone)
         ,("is_faction_leader"           , withBool MsgIsFactionLeader)
         ,("is_female"                   , withBoolHOI4Scope MsgIsFemaleLeader MsgIsFemale)
@@ -574,6 +583,8 @@ handlersSpecialComplex :: (HOI4Info g, Monad m) => Trie (StatementHandler g m)
 handlersSpecialComplex = Tr.fromList
         [("add_building_construction"    , addBuildingConstruction)
         ,("add_doctrine_cost_reduction"  , addDoctrineCostReduction)
+        ,("add_province_modifier"        , addProvinceModifier True)
+        ,("remove_province_modifier"     , addProvinceModifier False)
         ,("add_equipment_to_stockpile"   , addEquipment)
         ,("add_named_threat"             , addNamedThreat)
         ,("add_opinion_modifier"         , opinion MsgAddOpinion MsgAddOpinionDur)
@@ -587,7 +598,7 @@ handlersSpecialComplex = Tr.fromList
         ,("create_wargoal"               , createWargoal)
         ,("create_unit"                  , createUnit)
         ,("custom_trigger_tooltip"       , customTriggerTooltip)
-        ,("country_event"                , scope HOI4Country . triggerEvent MsgCountryEvent)
+        ,("country_event"                , triggerEvent MsgCountryEvent)
         ,("declare_war_on"               , declareWarOn)
         ,("free_building_slots"          , freeBuildingSlots)
         ,("has_completed_focus"          , handleFocus MsgHasCompletedFocus)
@@ -602,7 +613,7 @@ handlersSpecialComplex = Tr.fromList
         ,("add_opinion_modifier"         , opinion MsgAddOpinion (\modid what who _years -> MsgAddOpinion modid what who))
         ,("load_focus_tree"              , loadFocusTree)
         ,("modify_building_resources"    , modifyBuildingResources)
-        ,("news_event"                   , scope HOI4Country . triggerEvent MsgNewsEvent)
+        ,("news_event"                   , triggerEvent MsgNewsEvent)
         ,("release_autonomy"             , setAutonomy MsgReleaseAutonomy)
         ,("remove_opinion_modifier"      , opinion MsgRemoveOpinionMod (\modid what who _years -> MsgRemoveOpinionMod modid what who))
         ,("set_autonomy"                 , setAutonomy MsgSetAutonomy)
@@ -610,9 +621,10 @@ handlersSpecialComplex = Tr.fromList
         ,("set_politics"                 , setPolitics)
         ,("set_party_name"               , setPartyName)
         ,("start_civil_war"              , startCivilWar)
-        ,("state_event"                  , scope HOI4ScopeState . triggerEvent MsgStateEvent)
-        ,("unit_leader_event"            , scope HOI4UnitLeader . triggerEvent MsgUnitLeaderEvent)
-        ,("operative_leader_event"       , scope HOI4Operative . triggerEvent MsgOperativeEvent)
+        ,("start_border_war"             , startBorderWar)
+        ,("state_event"                  , triggerEvent MsgStateEvent)
+        ,("unit_leader_event"            , triggerEvent MsgUnitLeaderEvent)
+        ,("operative_leader_event"       , triggerEvent MsgOperativeEvent)
         -- flags
         ,("set_character_flag"           , setFlag MsgCharacterFlag)
         ,("set_country_flag"             , setFlag MsgCountryFlag)
@@ -684,7 +696,7 @@ handlersMisc = Tr.fromList
         [("add_ace"                     , addAce)
         ,("add_ai_strategy"             , rhsIgnored MsgAddAiStrategy)
         ,("add_autonomy_ratio"          , addAutonomyRatio MsgAddAutonomyRatio MsgAddAutonomyRatioVar)
-        ,("add_autonomy_Score"          , addAutonomyRatio MsgAddAutonomyScore MsgAddAutonomyScoreVar)
+        ,("add_autonomy_score"          , addAutonomyRatio MsgAddAutonomyScore MsgAddAutonomyScoreVar)
         ,("add_field_marshal_role"      , addFieldMarshalRole MsgAddFieldMarshalRole)
         ,("create_field_marshal"        , addFieldMarshalRole MsgAddFieldMarshalRole) -- deprecated
         ,("add_corps_commander_role"    , addFieldMarshalRole MsgAddCorpsCommanderRole)
@@ -778,7 +790,23 @@ ppOne' stmt lhs rhs = case lhs of
                             lchar <- plainMsg' (chaName charid <> ":")
                             scriptMsgs <- scope HOI4ScopeCharacter $ ppMany scr
                             return (lchar : scriptMsgs)
-                        _ -> preStatement stmt
+                        _
+                            | any (`T.isSuffixOf` label) [".owner",".OWNER",".Owner"] -> withCurrentIndent $ \_ -> do -- force indent level at least 1
+                                    let labelstrip
+                                            | ".owner" `T.isSuffixOf` label = fromMaybe "<!--CHECK SCRIPT-->" (T.stripSuffix ".owner" label)
+                                            | ".Owner" `T.isSuffixOf` label = fromMaybe "<!--CHECK SCRIPT-->" (T.stripSuffix ".Owner" label)
+                                            | ".OWNER" `T.isSuffixOf` label = fromMaybe "<!--CHECK SCRIPT-->" (T.stripSuffix ".OWNER" label)
+                                            | otherwise = label
+                                    stateloc <-
+                                        if all isDigit $ T.unpack labelstrip
+                                        then getStateLoc $ read (T.unpack labelstrip)
+                                        else do
+                                            mstate <- eGetState (Left labelstrip)
+                                            return $ fromMaybe "<!--CHECK SCRIPT-->" mstate
+                                    lowner <- msgToPP' $ MsgOwnerOfSCOPE stateloc
+                                    scriptMsgs <- scope HOI4Country $ ppMany scr
+                                    return (lowner : scriptMsgs)
+                            | otherwise -> preStatement stmt
                 GenericRhs t []
                     | T.toLower t == "no"|| T.toLower t == "yes" -> do
                         scripteffect <- getScriptedEffects

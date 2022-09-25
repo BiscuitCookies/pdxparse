@@ -422,7 +422,7 @@ pp_event evt = case (eu4evt_id evt
             -- option_conditions = no (not implemented yet)
             (maybe [] (\app -> ["| after =", PP.line, app, PP.line]) after_pp'd) ++
             ["| options = ", options_pp'd, PP.line
-            ,"| collapse = yes", PP.line
+            -- ,"| collapse = yes", PP.line
             ,"}}", PP.line
             ,"<section end=", evtId, "/>", PP.line
             ]
@@ -591,6 +591,7 @@ findTriggeredEventsInOnActions hm scr = foldl' findInAction hm scr
             ,("on_five_year_pulse", "The [[list_of_event_lists#5_year_pulse|five year pulse I]]")
             ,("on_five_year_pulse_2", "The [[list_of_event_lists#5_year_pulse|five year pulse II]]")
             ,("on_five_year_pulse_3", "The [[list_of_event_lists#5_year_pulse|five year pulse III]]")
+            ,("on_five_year_pulse_4", "The [[list_of_event_lists#5_year_pulse|five year pulse IV]]")
             --,("on_flagship_captured", "")
             --,("on_flagship_destroyed", "")
             ,("on_four_year_pulse", "The [[List_of_event_lists#4_year_pulse|4 year pulse]]")

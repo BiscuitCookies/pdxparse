@@ -28,7 +28,8 @@ import SettingsTypes ( PPT, Settings (..), Game (..)
                      , getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile
                      , hoistErrors, hoistExceptions
-                     , indentUp )
+                     , indentUp, CLArgs (WithLabels) )
+import Control.Monad.State (gets)
 
 writeEU4Extra :: (EU4Info g, MonadIO m) => PPT g m ()
 writeEU4Extra = do
@@ -38,7 +39,7 @@ writeEU4Extra = do
                                            , featureId = Just $ T.pack (takeFileName f)
                                            , theFeature = Right s })
                        (HM.toList scripts)
-    writeFeatures "extra" features pp_extra
+    writeFeatures "extra" features pp_extra_with_or_without_label
 
 writeEU4ExtraCountryScope :: (EU4Info g, MonadIO m) => PPT g m ()
 writeEU4ExtraCountryScope = do
@@ -48,7 +49,7 @@ writeEU4ExtraCountryScope = do
                                            , featureId = Just $ T.pack (takeFileName f)
                                            , theFeature = Right s })
                        (HM.toList scripts)
-    writeFeatures "extraCountryScope" features (\e -> scope (EU4Country) $ pp_extra_without_label e)
+    writeFeatures "extraCountryScope" features (\e -> scope (EU4Country) $ pp_extra_with_or_without_label e)
 
 writeEU4ExtraProvinceScope :: (EU4Info g, MonadIO m) => PPT g m ()
 writeEU4ExtraProvinceScope = do
@@ -58,7 +59,7 @@ writeEU4ExtraProvinceScope = do
                                            , featureId = Just $ T.pack (takeFileName f)
                                            , theFeature = Right s })
                        (HM.toList scripts)
-    writeFeatures "extraProvinceScope" features (\e -> scope (EU4Province) $ pp_extra_without_label e)
+    writeFeatures "extraProvinceScope" features (\e -> scope (EU4Province) $ pp_extra_with_or_without_label e)
 
 writeEU4ExtraModifier :: (EU4Info g, MonadIO m) => PPT g m ()
 writeEU4ExtraModifier = do
@@ -68,7 +69,15 @@ writeEU4ExtraModifier = do
                                            , featureId = Just $ T.pack (takeFileName f)
                                            , theFeature = Right s })
                        (HM.toList scripts)
-    writeFeatures "extraModifier" features (\e -> scope (EU4Bonus) $ pp_extra_without_label e)
+    writeFeatures "extraModifier" features (\e -> scope (EU4Bonus) $ pp_extra_with_or_without_label e)
+
+pp_extra_with_or_without_label :: (EU4Info g, Monad m) => GenericScript -> PPT g m Doc
+pp_extra_with_or_without_label scr = do
+    settings <- gets getSettings
+    if WithLabels `elem` (clargs settings) then
+        pp_extra scr
+    else
+        pp_extra_without_label scr
 
 pp_extra_without_label :: (EU4Info g, Monad m) => GenericScript -> PPT g m Doc
 pp_extra_without_label scr = imsg2doc =<< ppExtraWithoutLabel scr

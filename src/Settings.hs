@@ -99,15 +99,16 @@ platform = case map toLower System.Info.os of
 -- [@-v@ or @--version@] Show version information
 programOpts :: [OptDescr CLArgs]
 programOpts =
-    [ Option ['p'] ["paths"]   (NoArg Paths)   "show location of configuration files"
-    , Option ['v'] ["version"] (NoArg Version) "show version information"
-    , Option ['h'] ["help"]    (NoArg Help) "show this message"
-    , Option ['e'] ["onlyextra"] (NoArg Onlyextra) "skip writing normal game files and only write the result of parsing the file, countryscope, provincescope and modifiers arguments"
-    , Option ['n'] ["nowait"] (NoArg Nowait) "don't wait for the user to press a key before exiting"
-    , Option ['f'] ["file"]    (ReqArg ProcessFile "FILE")  "also process FILE"
-    , Option ['c'] ["countryscope"]    (ReqArg ProcessCountryScopeFile "FILE")  "also process FILE as containing code in the counrty scope"
-    , Option ['s'] ["provincescope"]    (ReqArg ProcessProvinceScopeFile "FILE")  "also process FILE as containing code in the province scope"
-    , Option ['m'] ["modifiers"]    (ReqArg ProcessModifierFile "FILE")  "also process FILE as containing modifiers"
+    [ Option ['p'] ["paths"]         (NoArg Paths)   "show location of configuration files"
+    , Option ['v'] ["version"]       (NoArg Version) "show version information"
+    , Option ['h'] ["help"]          (NoArg Help) "show this message"
+    , Option ['n'] ["nowait"]        (NoArg Nowait) "don't wait for the user to press a key before exiting"
+    , Option ['w'] ["withlabels"]    (NoArg WithLabels)  "the top level of the extra files is considered a label which gets localized, but not processed further"
+    , Option ['e'] ["onlyextra"]     (NoArg Onlyextra) "skip writing normal game files and only write the result of parsing the file, countryscope, provincescope and modifiers arguments"
+    , Option ['f'] ["file"]          (ReqArg ProcessFile "FILE")  "also process FILE"
+    , Option ['c'] ["countryscope"]  (ReqArg ProcessCountryScopeFile "FILE")  "also process FILE as containing code in the counrty scope"
+    , Option ['s'] ["provincescope"] (ReqArg ProcessProvinceScopeFile "FILE")  "also process FILE as containing code in the province scope"
+    , Option ['m'] ["modifiers"]     (ReqArg ProcessModifierFile "FILE")  "also process FILE as containing modifiers"
     ]
 
 readCommandLineOptions :: IO ([CLArgs], [String], [String])
