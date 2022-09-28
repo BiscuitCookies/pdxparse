@@ -161,7 +161,7 @@ type GenericScript = [GenericStatement]
 -- syntax for dates.  For example, the start date of Europa Universalis IV is
 -- 11 November 1444, represented as @1444.11.11@. It is big-endian
 -- (YYYY.MM.DD).
-data Date = Date { year :: Int, month :: Int, day :: Int }
+data Date = Date { year :: Int, month :: Int, day :: Int, hour :: Int  }
     deriving (Show, Eq, Ord, Read) -- Ord works with fields in this order only
 
 -- | Class for painlessly getting the type of number we want out of a value
@@ -281,6 +281,7 @@ dateLit :: Parser Date
 dateLit = Date <$> Ap.decimal
                <*> (Ap.char '.' *> Ap.decimal)
                <*> (Ap.char '.' *> Ap.decimal)
+               <*> Ap.option 0 (Ap.char '.' *> Ap.decimal) -- Hoi4 uses a 4th number to determine hour optionally
     <?> "date literal"
 
 -- | A character within a string, possibly escaped. C escape sequences are
@@ -450,7 +451,7 @@ rhs2doc _ _ (IntRhs rhs) = PP.text (TL.pack (show rhs))
 rhs2doc _ _ (FloatRhs rhs) = Doc.ppFloat rhs
 rhs2doc customLhs customRhs (CompoundRhs rhs)
     = PP.vsep ["{", PP.indent 4 (script2doc customLhs customRhs rhs), PP.text "}"]
-rhs2doc _ _ (DateRhs (Date year month day)) =
+rhs2doc _ _ (DateRhs (Date year month day hour)) =
     mconcat . map (PP.text . TL.pack) $ [show year, ".", show month, ".", show day]
 
 -- | Display a script with no custom elements in an 80-column format.

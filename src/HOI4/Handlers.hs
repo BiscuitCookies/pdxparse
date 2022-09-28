@@ -14,6 +14,7 @@ module HOI4.Handlers (
     ,   compoundMessage
     ,   compoundMessageExtractTag
     ,   compoundMessageExtract
+    ,   compoundMessageExtractNum
     ,   compoundMessagePronoun
     ,   compoundMessageTagged
     ,   withLocAtom
@@ -633,6 +634,20 @@ compoundMessageExtract xtract header [pdx| %_ = @scr |]
         script_pp'd <- ppMany rest
         return ((i, header xtracted) : script_pp'd)
 compoundMessageExtract _ _ stmt = preStatement stmt
+
+compoundMessageExtractNum :: (HOI4Info g, Monad m) =>
+    Text
+    -> (Double -> ScriptMessage) -- ^ Message to use as the block header
+    -> StatementHandler g m
+compoundMessageExtractNum xtract header stmt@[pdx| %_ = @scr |]
+    = withCurrentIndent $ \i -> do
+        let (mxtracted, rest) = extractStmt (matchLhsText xtract) scr
+        case mxtracted of
+            Just [pdx| %_ = !num |] -> do
+                script_pp'd <- ppMany rest
+                return ((i, header num) : script_pp'd)
+            _-> preStatement stmt
+compoundMessageExtractNum _ _ stmt = preStatement stmt
 
 -- | Generic handler for a simple compound statement headed by a pronoun.
 compoundMessagePronoun :: (HOI4Info g, Monad m) => StatementHandler g m
@@ -1870,6 +1885,7 @@ hasDlc [pdx| %_ = ?dlc |]
             ,("La Resistance", "lar")
             ,("Battle for the Bosporus", "bftb")
             ,("No Step Back", "nsb")
+            ,("By Blood Alone", "bba")
             ]
         dlc_icon = maybe "" iconText mdlc_key
 hasDlc stmt = preStatement stmt
@@ -2181,13 +2197,15 @@ data HOI4AddBC = HOI4AddBC{
     , addbc_province_coastal :: Bool
     , addbc_province_naval :: Bool
     , addbc_province_border :: Bool
+    , addbc_province_border_country :: Maybe (Either Text (Text, Text))
+    , addbc_limit_to_supply_node :: Bool
     , addbc_limit_to_victory_point :: Bool
     , addbc_limit_to_victory_point_num :: Maybe Double
     , addbc_limit_to_victory_point_comp :: Text
     } deriving Show
 
 newABC :: HOI4AddBC
-newABC = HOI4AddBC "" Nothing Nothing Nothing False False False False False False Nothing ""
+newABC = HOI4AddBC "" Nothing Nothing Nothing False False False False False Nothing False False Nothing ""
 
 addBuildingConstruction :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 addBuildingConstruction stmt@[pdx| %_ = @scr |] =
@@ -2217,6 +2235,13 @@ addBuildingConstruction stmt@[pdx| %_ = @scr |] =
         addLine' abc [pdx| limit_to_border = %rhs |]
             | GenericRhs "yes" [] <- rhs = abc { addbc_province_border = True }
             | otherwise = abc
+        addLine' abc [pdx| limit_to_supply_node = %rhs |]
+            | GenericRhs "yes" [] <- rhs = abc { addbc_limit_to_supply_node = True }
+            | otherwise = abc
+        addLine' abc [pdx| limit_to_border_country = $txt |] =
+            abc { addbc_province_border_country = Just (Left txt) }
+        addLine' abc [pdx| limit_to_border_country = $vartag:$var |] =
+            abc { addbc_province_border_country = Just (Right (vartag, var)) }
         addLine' abc [pdx| id = !num |] =
             let oldprov = fromMaybe [] (addbc_province abc) in
             abc { addbc_province = Just (oldprov ++ [num :: Double]) }
@@ -2238,17 +2263,28 @@ addBuildingConstruction stmt@[pdx| %_ = @scr |] =
                 bordmsg <- if addbc_province_border abc then messageText MsgLimitToBorder else return ""
                 coastmsg <- if addbc_province_coastal abc then messageText MsgLimitToCoastal else return ""
                 navmsg <- if addbc_province_naval abc then messageText MsgLimitToNavalBase else return ""
+                navmsg <- if addbc_province_naval abc then messageText MsgLimitToNavalBase else return ""
                 let provmsg = case addbc_province abc of
                         Just id -> if length id > 1
                             then T.pack $ concat [", on the provinces (" , intercalate "), (" (map (show . round) id),")"]
                             else T.pack $ concat [", on the province (" , concatMap (show . round) id,")"]
                         _-> ""
+                bordcountmsg <- case addbc_province_border_country abc of
+                    Just (Left txt) -> do
+                        mflagloc <- eflag (Just HOI4Country) (Left txt)
+                        let flagloc = fromMaybe "<!--CHECK SCRIPT-->" mflagloc
+                        messageText $ MsgLimitToBorderCountry flagloc
+                    Just (Right (vartag,var)) ->  do
+                        mflagloc <- eflag (Just HOI4Country) (Right (vartag,var))
+                        let flagloc = fromMaybe "<!--CHECK SCRIPT-->" mflagloc
+                        messageText $ MsgLimitToBorderCountry flagloc
+                    _-> return ""
                 victmsg <- case ( addbc_limit_to_victory_point abc
                                 , addbc_limit_to_victory_point_num abc) of
                     (False, Just num) -> messageText $ MsgLimitToVictoryPoint False (addbc_limit_to_victory_point_comp abc) num
                     (True, Nothing) -> messageText $ MsgLimitToVictoryPoint True "" 0
                     _ -> return ""
-                return $ allmsg <> bordmsg <> coastmsg <> navmsg <> victmsg <> provmsg
+                return $ allmsg <> bordmsg <> coastmsg <> navmsg <> victmsg <> bordcountmsg <> provmsg
             buildloc <- getGameL10n (addbc_type abc)
             case (addbc_level abc, addbc_levelvar abc) of
                 (Just val, _)-> return $ MsgAddBuildingConstruction (addbc_instant_build abc) buildicon buildloc val prov
@@ -3428,7 +3464,7 @@ addAce stmt@[pdx| %_ = @scr |]
         addLine aa [pdx| name = ?txt |] = return aa { aa_name = txt }
         addLine aa [pdx| surname = ?txt |] = return aa { aa_surname = txt }
         addLine aa [pdx| callsign = ?txt |] = return aa { aa_callsign = txt }
-        addLine aa [pdx| type = $_ |] = return aa
+        addLine aa [pdx| type = ?_ |] = return aa
         addLine aa [pdx| is_female = ?_ |] = return aa
         addLine aa [pdx| $other = %_ |] = trace ("unknown section in add_ace: " ++ show other) $ return aa
         addLine aa stmt = trace ("unknown form in add_ace: " ++ show stmt) $ return aa

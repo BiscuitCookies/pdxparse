@@ -215,7 +215,7 @@ data ScriptMessage
     | MsgAnd
     | MsgNot
     | MsgOr
-    | MsgCountTriggers
+    | MsgCountTriggers {scriptMessageAmt :: Double}
     | MsgHiddenTriggers
     | MsgCustomTriggerTooltip
     | MsgHiddenEffect
@@ -718,6 +718,8 @@ data ScriptMessage
     | MsgLimitToBorder
     | MsgLimitToCoastal
     | MsgLimitToNavalBase
+    | MsgLimitToSupplyNode
+    | MsgLimitToBorderCountry {scriptMessageWho :: Text}
     | MsgProvinceLevel {scriptMessageComp :: Text, scriptMessageAmt :: Double}
     | MsgLimitToVictoryPoint {scriptMessageYn :: Bool,scriptMessageComp :: Text, scriptMessageAmt :: Double}
 
@@ -1106,9 +1108,12 @@ instance RenderMessage Script ScriptMessage where
         MsgOr
             -> "At least one of:"
 
-
-        MsgCountTriggers
-            -> "Count trigger:"
+        MsgCountTriggers {scriptMessageAmt = _amt}
+            -> mconcat
+                [ "At least "
+                , toMessage (bold (plainNum _amt))
+                , " triggers must be true:"
+                ]
         MsgHiddenTriggers
             -> "Hidden trigger:"
         MsgHiddenEffect
@@ -4513,6 +4518,13 @@ instance RenderMessage Script ScriptMessage where
             -> ", on a coastal province"
         MsgLimitToNavalBase
             -> ", on province with a naval base"
+        MsgLimitToSupplyNode
+            -> ", on province with a supply node"
+        MsgLimitToBorderCountry {scriptMessageWho = _who}
+            -> mconcat
+                [ ", on border with "
+                , _who
+                ]
         MsgProvinceLevel {scriptMessageComp = _comp, scriptMessageAmt = _amt}
             -> mconcat
                 [ ", if level is "

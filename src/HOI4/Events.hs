@@ -281,6 +281,7 @@ eventAddSection mevt stmt = sequence (eventAddSection' <$> mevt <*> pure stmt) w
         GenericRhs "no" [] -> return evt { hoi4evt_fire_for_sender = Just True }
         _ -> throwError "bad fire_for_sender"
     eventAddSection' evt stmt@[pdx| timeout_days = %_ |] = return evt
+    eventAddSection' evt stmt@[pdx| minor_flavor = %_ |] = return evt -- unknown effect
     eventAddSection' evt stmt@[pdx| $label = %_ |] =
         withCurrentFile $ \file ->
             throwError $ "unrecognized event section in " <> T.pack file <> ": " <> label

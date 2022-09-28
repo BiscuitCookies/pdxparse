@@ -392,6 +392,7 @@ decisionAddSection dec stmt
                 CompoundRhs scr -> dec { dec_remove_trigger = Just scr }
                 _ -> dec
             "target_non_existing" -> dec -- no clue
+            "power_balance" -> dec -- no clue, only seen in debug so far
             other -> trace ("unknown decision section: " ++ show other ++ "  " ++ show stmt) dec
         decisionAddSection' dec stmt = trace "unrecognised form for decision section" dec
 
@@ -457,9 +458,9 @@ ppdecision dec gfx = setCurrentFile (dec_path dec) $ do
     let name = dec_name dec
         nameD = Doc.strictText name
         cost_pp = case dec_cost dec of
-            Just (HOI4DecisionCostSimple num) -> T.pack $ show num
-            Just (HOI4DecisionCostVariable txt) -> txt
-            _ -> "check script"
+            Just (HOI4DecisionCostSimple num) -> Just $ T.pack $ show num
+            Just (HOI4DecisionCostVariable txt) -> Just txt
+            _ -> Nothing
         isFireOnlyOnce = dec_fire_only_once dec
         cancelIfNotVisible = dec_cancel_if_not_visible dec
         targetsDynamic = dec_targets_dynamic dec
@@ -489,7 +490,8 @@ ppdecision dec gfx = setCurrentFile (dec_path dec) $ do
         ,"| decision_id = ", nameD, PP.line
         ,"| decision_name = ", Doc.strictText name_loc, PP.line
         ,"| icon = ", Doc.strictText icon_pp'd, PP.line
-        ,"| cost = ", Doc.strictText cost_pp, PP.line
+        ,maybe mempty (\txt -> mconcat ["| cost = ", Doc.strictText txt, PP.line])
+               cost_pp
         ,maybe mempty
                (\txt -> mconcat ["| decision_text = ", Doc.strictText $ italicText $ Doc.nl2br txt, PP.line])
                dec_text_loc

@@ -333,7 +333,7 @@ handlersCompound = Tr.fromList
         ,("and"                         , compoundMessage MsgAnd) --AND
         ,("not"                         , compoundMessage MsgNot) --NOT
         ,("or"                          , compoundMessage MsgOr) --OR
-        ,("count_triggers"          ,                      compoundMessage MsgCountTriggers)
+        ,("count_triggers"          ,   compoundMessageExtractNum "amount" MsgCountTriggers)
         ,("hidden_trigger"          ,                      compoundMessage MsgHiddenTriggers)
         ,("custom_trigger_tooltip"  ,                      compoundMessage MsgCustomTriggerTooltip)
         ,("hidden_effect"           ,                      compoundMessage MsgHiddenEffect)

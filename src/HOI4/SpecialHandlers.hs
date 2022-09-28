@@ -181,9 +181,10 @@ handleIdea addIdea ide = do
     let midea = HM.lookup ide ides
     case midea of
         Just iidea -> do
-            let ideaKey = id_name iidea
+            let ideaKey = id_id iidea
+                ideaname = id_name iidea
                 ideaIcon = HM.findWithDefault "GFX_idea_unknown" (id_picture iidea) gfx
-            idea_loc <- getGameL10n ideaKey
+            idea_loc <- getGameL10n ideaname
             category <- if id_category iidea == "country" then getGameL10n "FE_COUNTRY_SPIRIT" else getGameL10n $ id_category iidea
             effectbox <- modmessage iidea idea_loc ideaKey ideaIcon
             effectboxNS <- if id_category iidea == "country" && addIdea then return $ Just effectbox else return Nothing
@@ -334,6 +335,9 @@ modifierMSG hidden targ stmt@[pdx| $mod = !num |] = let lmod = T.toLower mod in 
             plainMsg abloc
         | lmod == "disable_strategic_redeployment" && num == 1 -> do
             strloc <- getGameL10n "MODIFIER_STRATEGIC_REDEPLOYMENT_DISABLED"
+            plainMsg strloc
+         | lmod == "can_master_build_for_us" && num == 1 -> do
+            strloc <- getGameL10n "MODIFIER_CAN_MASTER_BUILD_FOR_US"
             plainMsg strloc
         | otherwise -> preStatement stmt
 modifierMSG _ _ stmt@[pdx| custom_modifier_tooltip = $key|] = do
@@ -495,7 +499,11 @@ modifiersTable = HM.fromList
             -- autonomy
         ,("autonomy_gain"                   , ("MODIFIER_AUTONOMY_GAIN", MsgModifierColourPos))
         ,("subjects_autonomy_gain"          , ("MODIFIER_AUTONOMY_SUBJECT_GAIN", MsgModifierColourPos))
+        ,("cic_to_overlord_factor"          , ("MODIFIER_CIC_TO_OVERLORD_FACTOR", MsgModifierPcPosReduced))
+        ,("mic_to_overlord_factor"          , ("MODIFIER_MIC_TO_OVERLORD_FACTOR", MsgModifierPcPosReduced))
+        ,("extra_trade_to_overlord_factor"  , ("MODIFIER_TRADE_TO_OVERLORD_FACTOR", MsgModifierPcPosReduced))
         ,("master_ideology_drift"           , ("MODIFIER_MASTER_IDEOLOGY_DRIFT", MsgModifierColourPos))
+        ,("overlord_trade_cost_factor"      , ("MODIFIER_TRADE_COST_FACTOR", MsgModifierPcNegReduced))
 
             -- Governments in exile
         ,("dockyard_donations "             , ("MODIFIER_DOCKYARD_DONATIONS", MsgModifierColourPos))
