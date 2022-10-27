@@ -364,11 +364,15 @@ readHOI4Scripts = do
                     "bop" -> "common" </> "bop"
                     _          -> category
                 sourceDir = buildPath settings sourceSubdir
-            files <- liftIO (filterM (doesFileExist . buildPath settings . (sourceSubdir </>))
+            direxist <- liftIO $ doesDirectoryExist sourceDir
+            if direxist
+            then do
+                files <- liftIO (filterM (doesFileExist . buildPath settings . (sourceSubdir </>))
                                     =<< filterM (pure . isExtensionOf ".txt")
                                      =<< getDirectoryContents sourceDir)
-            results <- forM files $ \filename -> readOneScript True category (sourceSubdir </> filename)
-            return $ foldl (flip (uncurry HM.insert)) HM.empty results
+                results <- forM files $ \filename -> readOneScript True category (sourceSubdir </> filename)
+                return $ foldl (flip (uncurry HM.insert)) HM.empty results
+            else return $ trace ("WARNING: Unable to find " ++ show sourceDir) HM.empty
 
         readHOI4SpecificScript :: String -> PPT HOI4 m (HashMap String GenericScript)
         readHOI4SpecificScript category = do

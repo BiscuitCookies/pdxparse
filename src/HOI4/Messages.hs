@@ -2673,7 +2673,7 @@ instance RenderMessage Script ScriptMessage where
         MsgAddPowerBalanceModifier {scriptMessageWho = _who, scriptMessageWhoKey = _okey, scriptMessageWhat = _what, scriptMessageWhatKey = _akey }
             -> mconcat
                 [ "Adds modifier"
-                , toMessage (iquotes _what)
+                , _what
                 , "<!--", _akey, "-->"
                 , " to "
                 , _who
