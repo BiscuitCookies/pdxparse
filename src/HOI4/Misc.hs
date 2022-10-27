@@ -12,6 +12,7 @@ module HOI4.Misc (
         ,parseHOI4Ideology
         ,parseHOI4Effects
         ,parseHOI4Triggers
+        ,parseHOI4BopRanges
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -47,7 +48,6 @@ import SettingsTypes ( PPT, Settings (..), Game (..)
                      , setCurrentFile, withCurrentFile
                      , hoistErrors, hoistExceptions)
 import HOI4.Common -- everything
-import EU4.Common (Idea(idea_name_loc))
 
 newHOI4CountryHistory :: Text -> HOI4CountryHistory
 newHOI4CountryHistory chtag = HOI4CountryHistory chtag undefined
@@ -706,3 +706,68 @@ parseHOI4Trigger stmt@[pdx| %left = %right |] = case right of
     _ -> throwError "unrecognized form for scripted trigger@content"
 parseHOI4Trigger _ = withCurrentFile $ \file ->
     throwError ("unrecognised form for scripted trigger in " <> T.pack file)
+
+------------------------------
+-- Balance of power rangers --
+------------------------------
+
+parseHOI4BopRanges :: (IsGameState (GameState g), IsGameData (GameData g), Monad m) =>
+    HashMap String GenericScript -> PPT g m (HashMap Text HOI4BopRange)
+parseHOI4BopRanges scripts = HM.unions . HM.elems <$> do
+    tryParse <- hoistExceptions $
+        HM.traverseWithKey
+            (\sourceFile scr -> setCurrentFile sourceFile $ mapM parseHOI4BopRange $ concatMap getRanges scr)
+            scripts
+    case tryParse of
+        Left err -> do
+            traceM $ "Completely failed parsing bop ranges: " ++ T.unpack err
+            return HM.empty
+        Right bopFilesOrErrors ->
+            flip HM.traverseWithKey bopFilesOrErrors $ \sourceFile ebop ->
+                fmap (mkBopMap . catMaybes) . forM ebop $ \case
+                    Left err -> do
+                        traceM $ "Error parsing bop rangess in " ++ sourceFile
+                                 ++ ": " ++ T.unpack err
+                        return Nothing
+                    Right bbop -> return bbop
+    where
+        mkBopMap :: [HOI4BopRange] -> HashMap Text HOI4BopRange
+        mkBopMap = HM.fromList . map (bop_id &&& id)
+        getRanges :: GenericStatement -> [GenericStatement]
+        getRanges = \case
+            [pdx| %_ = @scrs |] -> concatMap (\case
+                stmt@[pdx| range = @_ |] -> [stmt]
+                stmt@[pdx| side = @scr |] -> getRanges stmt
+                _ -> [])
+                scrs
+            _ -> []
+
+parseHOI4BopRange :: (IsGameState (GameState g), IsGameData (GameData g), MonadError Text m) =>
+    GenericStatement ->PPT g m (Either Text (Maybe HOI4BopRange))
+parseHOI4BopRange (StatementBare _) = throwError "bare statement at top level"
+parseHOI4BopRange stmt@[pdx| range = @scr |]
+    = withCurrentFile $ \file ->
+        let bop = foldl' addSection (HOI4BopRange {
+                bop_id = ""
+            ,   bop_on_activate = Nothing
+            ,   bop_on_deactivate = Nothing
+            ,   bop_path = file
+            }) scr in
+        return $ Right (Just bop)
+    where
+        addSection :: HOI4BopRange -> GenericStatement -> HOI4BopRange
+        addSection bop [pdx| id = $txt |] = bop { bop_id = txt }
+        addSection bop [pdx| on_activate = %rhs |] = case rhs of
+                CompoundRhs [] -> bop
+                CompoundRhs scr -> bop { bop_on_activate = Just scr }
+                _-> trace "bad bop on_activate" bop
+        addSection bop [pdx| on_deactivate = %rhs |] = case rhs of
+                CompoundRhs [] -> bop
+                CompoundRhs scr -> bop { bop_on_deactivate = Just scr }
+                _-> trace "bad bop on_activate" bop
+        addSection bop [pdx| min = %_ |] = bop
+        addSection bop [pdx| max = %_ |] = bop
+        addSection bop [pdx| modifier = %_ |] = bop
+        addSection bop stmt = trace ("Urecognized statement in bop range: " ++ show stmt) bop
+parseHOI4BopRange stmt = trace (show stmt) $ withCurrentFile $ \file ->
+    throwError ("unrecognised form for range in bop in " <> T.pack file)

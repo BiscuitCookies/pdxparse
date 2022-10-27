@@ -12,6 +12,7 @@ module HOI4.Decisions (
     ,   findActivatedDecisionsInIdeas
     ,   findActivatedDecisionsInCharacters
     ,   findActivatedDecisionsInScriptedEffects
+    ,   findActivatedDecisionsInBops
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -767,6 +768,24 @@ ppDecisionSource (HOI4DecSrcScriptedEffect id weight) =
         , iquotes't id
         , " is activated"
         ]
+ppDecisionSource (HOI4DecSrcBopOnActivate id) = do
+    loc <- getGameL10n id
+    return $ Doc.strictText $ mconcat ["When reaching the "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " balance of power range"
+        ]
+ppDecisionSource (HOI4DecSrcBopOnDeactivate id) = do
+    loc <- getGameL10n id
+    return $ Doc.strictText $ mconcat ["When leaving the "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " balance of power range"
+        ]
 
 
 findInStmt :: GenericStatement -> [(HOI4DecisionWeight, Text)]
@@ -852,3 +871,11 @@ findActivatedDecisionsInScriptedEffects hm scr = foldl' findInScriptEffect hm sc
         findInScriptEffect :: HOI4DecisionTriggers -> GenericStatement -> HOI4DecisionTriggers
         findInScriptEffect hm stmt@[pdx| $lhs = @scr |] = addDecisionTriggers hm (addDecisionSource (HOI4DecSrcScriptedEffect lhs) (findInStmts scr))
         findInScriptEffect hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm
+
+findActivatedDecisionsInBops :: HOI4DecisionTriggers -> [HOI4BopRange] -> HOI4DecisionTriggers
+findActivatedDecisionsInBops hm hBop = addDecisionTriggers hm (concatMap findInCharacter hBop)
+    where
+        findInCharacter :: HOI4BopRange -> [(Text, HOI4DecisionSource)]
+        findInCharacter hBop =
+            addDecisionSource (const (HOI4DecSrcBopOnActivate (bop_id hBop))) (maybe [] findInStmts (bop_on_activate hBop)) ++
+            addDecisionSource (const (HOI4DecSrcBopOnDeactivate (bop_id hBop))) (maybe [] findInStmts (bop_on_deactivate hBop))

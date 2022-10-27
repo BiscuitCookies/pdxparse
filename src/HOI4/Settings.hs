@@ -42,23 +42,27 @@ import HOI4.Decisions (parseHOI4Decisioncats, writeHOI4DecisionCats
                       ,findActivatedDecisionsInEvents, findActivatedDecisionsInDecisions
                       ,findActivatedDecisionsInOnActions, findActivatedDecisionsInNationalFocus
                       ,findActivatedDecisionsInIdeas, findActivatedDecisionsInCharacters
-                      ,findActivatedDecisionsInScriptedEffects)
+                      ,findActivatedDecisionsInScriptedEffects
+                      ,findActivatedDecisionsInBops)
 import HOI4.Ideas (parseHOI4Ideas
     --, writeHOI4Ideas
     )
 import HOI4.Modifiers (
                       parseHOI4OpinionModifiers, writeHOI4OpinionModifiers
-                    , parseHOI4DynamicModifiers, writeHOI4DynamicModifiers)
+                    , parseHOI4DynamicModifiers, writeHOI4DynamicModifiers
+                    , parseHOI4Modifiers)
 import HOI4.NationalFocus(parseHOI4NationalFocuses, writeHOI4NationalFocuses)
 import HOI4.Events (parseHOI4Events, writeHOI4Events
                    , findTriggeredEventsInEvents, findTriggeredEventsInDecisions
                    , findTriggeredEventsInOnActions, findTriggeredEventsInNationalFocus
-                   ,findTriggeredEventsInIdeas,findTriggeredEventsInCharacters
-                   ,findTriggeredEventsInScriptedEffects)
+                   , findTriggeredEventsInIdeas, findTriggeredEventsInCharacters
+                   , findTriggeredEventsInScriptedEffects
+                   , findTriggeredEventsInBops)
 import HOI4.Misc (parseHOI4CountryHistory, parseHOI4Interface, parseHOI4Characters
                  , parseHOI4CountryLeaderTraits, parseHOI4UnitLeaderTraits
                  , parseHOI4Terrain, parseHOI4Ideology
-                 , parseHOI4Effects, parseHOI4Triggers)
+                 , parseHOI4Effects, parseHOI4Triggers
+                 , parseHOI4BopRanges)
 
 -- | Temporary (?) fix for CHI and PRC both localizing to "China"
 -- Can be extended/removed as necessary
@@ -107,6 +111,8 @@ instance IsGame HOI4 where
                 ,   hoi4onactionsScripts = HM.empty
                 ,   hoi4dynamicmodifiers = HM.empty
                 ,   hoi4dynamicmodifierScripts = HM.empty
+                ,   hoi4modifiers = HM.empty
+                ,   hoi4modifierScripts = HM.empty
                 ,   hoi4nationalfocusScripts = HM.empty
                 ,   hoi4nationalfocus = HM.empty
                 ,   hoi4countryHistory = HM.empty
@@ -129,6 +135,8 @@ instance IsGame HOI4 where
                 ,   hoi4scriptedeffects = HM.empty
                 ,   hoi4scriptedtriggerScripts = HM.empty
                 ,   hoi4scriptedtriggers = HM.empty
+                ,   hoi4bopScripts = HM.empty
+                ,   hoi4bops = HM.empty
 
                 -- unused
                 ,   hoi4extraScripts = HM.empty
@@ -212,6 +220,12 @@ instance HOI4Info HOI4 where
     getDynamicModifiers = do
         HOI4D ed <- get
         return (hoi4dynamicmodifiers ed)
+    getModifierScripts = do
+        HOI4D ed <- get
+        return (hoi4modifierScripts ed)
+    getModifiers = do
+        HOI4D ed <- get
+        return (hoi4modifiers ed)
     getNationalFocusScripts = do
         HOI4D ed <- get
         return (hoi4nationalfocusScripts ed)
@@ -276,6 +290,12 @@ instance HOI4Info HOI4 where
     getScriptedTriggers = do
         HOI4D ed <- get
         return (hoi4scriptedtriggers ed)
+    getBopScripts = do
+        HOI4D ed <- get
+        return (hoi4bopScripts ed)
+    getBops = do
+        HOI4D ed <- get
+        return (hoi4bops ed)
 -- unused
     getExtraScripts = do
         HOI4D ed <- get
@@ -328,6 +348,7 @@ readHOI4Scripts = do
                     "opinion_modifiers" -> "common" </> "opinion_modifiers"
                     "on_actions" -> "common" </> "on_actions"
                     "dynamic_modifiers" -> "common" </> "dynamic_modifiers"
+                    "modifiers" -> "common" </> "modifiers"
                     "decisions" -> "common" </> "decisions"
                     "decisioncats" -> "common" </> "decisions" </> "categories"
                     "national_focus" -> "common" </> "national_focus"
@@ -340,6 +361,7 @@ readHOI4Scripts = do
                     "ideology" -> "common" </> "ideologies"
                     "scripted_effect" -> "common" </> "scripted_effects"
                     "scripted_trigger" -> "common" </> "scripted_triggers"
+                    "bop" -> "common" </> "bop"
                     _          -> category
                 sourceDir = buildPath settings sourceSubdir
             files <- liftIO (filterM (doesFileExist . buildPath settings . (sourceSubdir </>))
@@ -398,6 +420,7 @@ readHOI4Scripts = do
     opinion_modifiers <- readHOI4Script "opinion_modifiers"
     on_actions <- readHOI4Script "on_actions"
     dynamic_modifiers <- readHOI4Script "dynamic_modifiers"
+    modifiers <- readHOI4Script "modifiers"
     national_focus <- readHOI4Script "national_focus"
 
     country_history <- readHOI4Script "country_history"
@@ -412,6 +435,8 @@ readHOI4Scripts = do
     scripted_effects <- readHOI4Script "scripted_effect"
     scripted_triggers <- readHOI4Script "scripted_trigger"
 
+    bopscript <- readHOI4Script "bop"
+
     modify $ \(HOI4D s) -> HOI4D $ s {
             hoi4ideaScripts = ideasScripts
         ,   hoi4decisioncatScripts = decisioncats
@@ -420,6 +445,7 @@ readHOI4Scripts = do
         ,   hoi4opmodScripts = opinion_modifiers
         ,   hoi4onactionsScripts = on_actions
         ,   hoi4dynamicmodifierScripts = dynamic_modifiers
+        ,   hoi4modifierScripts = modifiers
         ,   hoi4countryHistoryScripts = country_history
 
         ,   hoi4nationalfocusScripts = national_focus
@@ -433,6 +459,8 @@ readHOI4Scripts = do
 
         ,   hoi4scriptedeffectScripts = scripted_effects
         ,   hoi4scriptedtriggerScripts = scripted_triggers
+
+        ,   hoi4bopScripts = bopscript
         }
 
 
@@ -443,6 +471,7 @@ parseHOI4Scripts = do
     ideas <- parseHOI4Ideas =<< getIdeaScripts
     opinionModifiers <- parseHOI4OpinionModifiers =<< getOpinionModifierScripts
     dynamicModifiers <- parseHOI4DynamicModifiers =<< getDynamicModifierScripts
+    modifiers <- parseHOI4Modifiers =<< getModifierScripts
     decisioncats <- parseHOI4Decisioncats =<< getDecisioncatScripts
     decisions <- parseHOI4Decisions =<< getDecisionScripts
     events <- parseHOI4Events =<< getEventScripts
@@ -458,6 +487,7 @@ parseHOI4Scripts = do
     ideology <- parseHOI4Ideology =<< getIdeologyScripts
     scriptedeffects <- parseHOI4Effects =<< getScriptedEffectScripts
     scriptedtriggers <- parseHOI4Triggers =<< getScriptedTriggerScripts
+    bops <- parseHOI4BopRanges =<< getBopScripts
 
     let te1 = findTriggeredEventsInEvents HM.empty (HM.elems events)
         te2 = findTriggeredEventsInDecisions te1 (HM.elems decisions)
@@ -466,6 +496,7 @@ parseHOI4Scripts = do
         te5 = findTriggeredEventsInIdeas te4 (HM.elems ideas)
         te6 = findTriggeredEventsInCharacters te5 (HM.elems characters)
         te7 = findTriggeredEventsInScriptedEffects te6 (HM.elems scriptedeffects)
+        te8 = findTriggeredEventsInBops te7 (HM.elems bops)
     let td1 = findActivatedDecisionsInEvents HM.empty (HM.elems events)
         td2 = findActivatedDecisionsInDecisions td1 (HM.elems decisions)
         td3 = findActivatedDecisionsInOnActions td2 (concat (HM.elems on_actions))
@@ -473,6 +504,7 @@ parseHOI4Scripts = do
         td5 = findActivatedDecisionsInIdeas td4 (HM.elems ideas)
         td6 = findActivatedDecisionsInCharacters td5 (HM.elems characters)
         td7 = findActivatedDecisionsInScriptedEffects td6 (HM.elems scriptedeffects)
+        td8 = findActivatedDecisionsInBops td7 (HM.elems bops)
     modify $ \(HOI4D s) -> HOI4D $
             s { hoi4events = events
             ,   hoi4decisioncats = decisioncats
@@ -480,9 +512,10 @@ parseHOI4Scripts = do
             ,   hoi4ideas = ideas
             ,   hoi4opmods = opinionModifiers
             ,   hoi4nationalfocus = nationalFocus
-            ,   hoi4eventTriggers = te7
-            ,   hoi4decisionTriggers = td7
+            ,   hoi4eventTriggers = te8
+            ,   hoi4decisionTriggers = td8
             ,   hoi4dynamicmodifiers = dynamicModifiers
+            ,   hoi4modifiers = modifiers
 
             ,   hoi4countryHistory = countryHistory
             ,   hoi4characters = characters
@@ -496,6 +529,8 @@ parseHOI4Scripts = do
 
             ,   hoi4scriptedeffects = scriptedeffects
             ,   hoi4scriptedtriggers = scriptedtriggers
+
+            ,   hoi4bops = bops
             }
 
 -- | Output the game data as wiki text.

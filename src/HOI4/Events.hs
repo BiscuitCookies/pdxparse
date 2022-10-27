@@ -12,6 +12,7 @@ module HOI4.Events (
     ,   findTriggeredEventsInIdeas
     ,   findTriggeredEventsInCharacters
     ,   findTriggeredEventsInScriptedEffects
+    ,   findTriggeredEventsInBops
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -717,6 +718,24 @@ ppEventSource (HOI4EvtSrcScriptedEffect id weight) =
         , iquotes't id
         , " is activated"
         ]
+ppEventSource (HOI4EvtSrcBopOnActivate id) = do
+    loc <- getGameL10n id
+    return $ Doc.strictText $ mconcat ["When reaching the "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " balance of power range"
+        ]
+ppEventSource (HOI4EvtSrcBopOnDeactivate id) = do
+    loc <- getGameL10n id
+    return $ Doc.strictText $ mconcat ["When leaving the "
+        , "<!-- "
+        , id
+        , " -->"
+        , iquotes't loc
+        , " balance of power range"
+        ]
 
 findInStmt :: GenericStatement -> [(HOI4EventWeight, Text)]
 findInStmt stmt@[pdx| $lhs = @scr |] | lhs == "country_event" || lhs == "news_event" || lhs == "unit_leader_event" || lhs == "state_event" || lhs == "operative_leader_event" =
@@ -834,3 +853,11 @@ findTriggeredEventsInScriptedEffects hm scr = foldl' findInScriptEffect hm scr -
         findInScriptEffect :: HOI4EventTriggers -> GenericStatement -> HOI4EventTriggers
         findInScriptEffect hm stmt@[pdx| $lhs = @scr |] = addEventTriggers hm (addEventSource (HOI4EvtSrcScriptedEffect lhs) (findInStmts scr))
         findInScriptEffect hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm
+
+findTriggeredEventsInBops :: HOI4EventTriggers -> [HOI4BopRange] -> HOI4EventTriggers
+findTriggeredEventsInBops hm hBop = addEventTriggers hm (concatMap findInCharacter hBop)
+    where
+        findInCharacter :: HOI4BopRange -> [(Text, HOI4EventSource)]
+        findInCharacter hBop =
+            addEventSource (const (HOI4EvtSrcBopOnActivate (bop_id hBop))) (maybe [] findInStmts (bop_on_activate hBop)) ++
+            addEventSource (const (HOI4EvtSrcBopOnDeactivate (bop_id hBop))) (maybe [] findInStmts (bop_on_deactivate hBop))

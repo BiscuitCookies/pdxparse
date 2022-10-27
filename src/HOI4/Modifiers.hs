@@ -6,6 +6,7 @@ module HOI4.Modifiers (
 --        parseHOI4Modifiers, writeHOI4Modifiers,
         parseHOI4OpinionModifiers, writeHOI4OpinionModifiers
     ,   parseHOI4DynamicModifiers, writeHOI4DynamicModifiers
+    ,   parseHOI4Modifiers
     ) where
 
 import Control.Arrow ((&&&))
@@ -170,9 +171,6 @@ ppOpinionModifier mod = do
     locName <- getGameL10n (omodName mod)
     return . mconcat $
         [ "| "
-        , Doc.strictText $ T.toLower locName
-        , PP.line
-        , "| "
         , Doc.strictText $ T.toLower (omodName mod)
         , " = "
         , iquotes locName
@@ -183,10 +181,10 @@ ppOpinionModifier mod = do
                 modText "" " Trade relation" (omodValue mod)
                 else
                    modText "{{icon|opinion}} " " opinion" (omodValue mod)
-            ++ monthlyDecay (omodValue mod) (omodDecay mod)
             ++ modText "" " min" (omodMin mod)
             ++ modText "" " max" (omodMax mod)
             ++ duration (omodDays mod) (omodMonths mod) (omodYears mod)
+            ++ monthlyDecay (omodValue mod) (omodDecay mod)
         ) ++
         [ ") }}"
         , PP.line
@@ -208,12 +206,12 @@ ppOpinionModifier mod = do
         monthlyDecay _ _ = []
 
         duration :: Maybe Double -> Maybe Double -> Maybe Double -> [Doc]
-        duration (Just d) Nothing Nothing   | d /= 0 = ["{{icon|time}} ", Doc.strictText $ formatDays d]
-        duration Nothing (Just m) Nothing   | m /= 0 = ["{{icon|time}} ", Doc.strictText $ formatMonths m]
-        duration Nothing Nothing (Just y)   | y /= 0 = ["{{icon|time}} ", Doc.strictText $ formatYears $ floor y]
+        duration (Just d) Nothing Nothing   | d /= 0 = [mconcat ["{{icon|time}} ", Doc.strictText $ formatDays d]]
+        duration Nothing (Just m) Nothing   | m /= 0 = [mconcat ["{{icon|time}} ", Doc.strictText $ formatMonths m]]
+        duration Nothing Nothing (Just y)   | y /= 0 = [mconcat ["{{icon|time}} ", Doc.strictText $ formatYears $ floor y]]
         duration (Just d) (Just m) Nothing  | d /= 0 || m /= 0 = [mconcat ["{{icon|time}} ", fmt "month" m, " and ", fmt "day" d]]
-        duration (Just d) Nothing (Just y)  | d /= 0 || y /= 0 = ["{{icon|time}} ", Doc.strictText $ formatDays (y*356+d)]
-        duration Nothing (Just m) (Just y)  | m /= 0 || y /= 0 = ["{{icon|time}} ", Doc.strictText $ formatMonths (y*12+m)]
+        duration (Just d) Nothing (Just y)  | d /= 0 || y /= 0 = [mconcat ["{{icon|time}} ", Doc.strictText $ formatDays (y*356+d)]]
+        duration Nothing (Just m) (Just y)  | m /= 0 || y /= 0 = [mconcat ["{{icon|time}} ", Doc.strictText $ formatMonths (y*12+m)]]
         duration (Just d) (Just m) (Just y) | d /= 0 || m /= 0 || y /= 0 = [mconcat ["{{icon|time}} ", fmt "year" y, " and ", fmt "month" m, " and ", fmt "day" d]]
         duration _ _ _ = []
 
@@ -314,3 +312,52 @@ writeHOI4DynamicModifiers = do
                 , "|", PP.line
                 , eff, PP.line
                 ]
+
+
+parseHOI4Modifiers :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
+    HashMap String GenericScript -> PPT g m (HashMap Text HOI4Modifier)
+parseHOI4Modifiers scripts = HM.unions . HM.elems <$> do
+    tryParse <- hoistExceptions $
+        HM.traverseWithKey
+            (\sourceFile scr ->
+                setCurrentFile sourceFile $ mapM parseHOI4Modifier scr)
+            scripts
+    case tryParse of
+        Left err -> do
+            traceM $ "Completely failed parsing modifiers: " ++ T.unpack err
+            return HM.empty
+        Right modifiersFilesOrErrors ->
+            flip HM.traverseWithKey modifiersFilesOrErrors $ \sourceFile emods ->
+                fmap (mkModMap . catMaybes) . forM emods $ \case
+                    Left err -> do
+                        traceM $ "Error parsing modifiers in " ++ sourceFile
+                                 ++ ": " ++ T.unpack err
+                        return Nothing
+                    Right mmod -> return mmod
+                where mkModMap :: [HOI4Modifier] -> HashMap Text HOI4Modifier
+                      mkModMap = HM.fromList . map (modName &&& id)
+
+parseHOI4Modifier :: (IsGameData (GameData g), IsGameState (GameState g), MonadError Text m) =>
+    GenericStatement -> PPT g m (Either Text (Maybe HOI4Modifier))
+parseHOI4Modifier [pdx| $modid = @effects |]
+    = withCurrentFile $ \file -> do
+        mlocid <- getGameL10nIfPresent modid
+        let modi = foldl' addSection (HOI4Modifier {
+                modName = modid
+            ,   modLocName = mlocid
+            ,   modPath = file
+            ,   modIcon = Nothing
+            ,   modEffects = []
+            ,   modRemoveTrigger = Nothing
+            }) effects
+        return $ Right (Just modi)
+    where
+        addSection :: HOI4Modifier -> GenericStatement -> HOI4Modifier
+        addSection modi stmt@[pdx| $lhs = @scr |] = case lhs of
+            "valid_relation_trigger" -> modi { modRemoveTrigger = Just scr }
+            _ -> trace ("Urecognized statement in modifier: " ++ show stmt) modi
+        addSection modi stmt@[pdx| icon = $txt |] = modi  { modIcon = Just txt }
+         -- Must be an effect
+        addSection modi stmt = modi { modEffects = modEffects modi ++ [stmt] }
+parseHOI4Modifier stmt = trace (show stmt) $ withCurrentFile $ \file ->
+    throwError ("unrecognised form for modifier in " <> T.pack file)

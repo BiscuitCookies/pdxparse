@@ -130,6 +130,9 @@ module HOI4.Handlers (
     ,   deleteUnits
     ,   startBorderWar
     ,   addProvinceModifier
+    ,   powerBalanceRange
+    ,   navalStrengthComparison
+    ,   unlockDecisionTooltip
     -- testing
     ,   isPronoun
     ,   flag
@@ -173,7 +176,7 @@ import Doc (Doc)
 import qualified Doc -- everything
 import HOI4.Messages -- everything
 import MessageTools (plural, iquotes, italicText, boldText
-                    , colourNumSign, plainNumSign, plainPc, colourPc, reducedNum
+                    , plainNum, colourNumSign, plainNumSign, plainPc, colourPc, reducedNum
                     , formatDays, formatHours)
 import QQ -- everything
 import SettingsTypes ( PPT, IsGameData (..), GameData (..), IsGameState (..), GameState (..)
@@ -1489,7 +1492,7 @@ textAtom _ _ _ _ stmt = preStatement stmt
 textAtomKey :: forall g m. (HOI4Info g, Monad m) =>
     Text -- ^ Label for "what" (e.g. "who")
         -> Text -- ^ Label for atom (e.g. "name")
-        -> (Text -> Text -> Text -> ScriptMessage) -- ^ Message constructor
+        -> (Text -> Text -> Text -> Text -> ScriptMessage) -- ^ Message constructor
         -> (Text -> PPT g m (Maybe Text)) -- ^ Action to localize, get icon, etc. (applied to RHS of "what")
         -> StatementHandler g m
 textAtomKey whatlabel atomlabel msg loc stmt@[pdx| %_ = @scr |]
@@ -1501,7 +1504,7 @@ textAtomKey whatlabel atomlabel msg loc stmt@[pdx| %_ = @scr |]
                 mwhat_loc <- loc what
                 atom_loc <- getGameL10n atom
                 let what_loc = fromMaybe ("<tt>" <> what <> "</tt>") mwhat_loc
-                return $ msg what_loc atom_loc atom
+                return $ msg what_loc atom_loc what atom
             _ -> return $ preMessage stmt
 textAtomKey _ _ _ _ stmt = preStatement stmt
 
@@ -3884,3 +3887,93 @@ addProvinceModifier addrem stmt@[pdx| %_ = @scr |] =
                 return $ allmsg <> bordmsg <> coastmsg <> navmsg <> victmsg <> provmsg
             return $ MsgAddProvinceModifier addrem modloc prov
 addProvinceModifier _ stmt = trace ("Not handled in addProvinceModifier: " ++ show stmt) $ preStatement stmt
+
+-------------------------------------------
+-- handler for is_power_balance_in_range --
+-------------------------------------------
+
+data PowerBalanceRange = PowerBalanceRange
+        {   pbr_id :: Text
+        ,   pbr_range :: Text
+        ,   pbr_comp :: Double
+        }
+
+newPBR :: PowerBalanceRange
+newPBR = PowerBalanceRange "<!--Check Script-->" "<!--Check Script-->" 0
+
+powerBalanceRange :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
+powerBalanceRange stmt@[pdx| %_ = @scr |]
+    = msgToPP =<< ppPBR =<< foldM addLine newPBR scr
+    where
+        addLine :: PowerBalanceRange -> GenericStatement -> PPT g m PowerBalanceRange
+        addLine pbr [pdx| id = ?txt |] = return pbr { pbr_id = txt }
+        addLine pbr [pdx| range = ?txt |] = return pbr { pbr_range = txt }
+        addLine pbr [pdx| range > ?txt |] = return pbr { pbr_range = txt, pbr_comp = 1 }--right
+        addLine pbr [pdx| range < ?txt |] = return pbr { pbr_range = txt, pbr_comp = -1 }--left
+        addLine pbr [pdx| $other = %_ |] = trace ("unknown section in powerBalanceRange: " ++ show other) $ return pbr
+        addLine pbr stmt = trace ("unknown form in powerBalanceRange: " ++ show stmt) $ return pbr
+        ppPBR :: PowerBalanceRange -> PPT g m ScriptMessage
+        ppPBR pbr = do
+            idloc <- getGameL10n (pbr_id pbr)
+            rangeloc <- getGameL10n (pbr_range pbr)
+            return $ MsgIsPowerBalanceInRange idloc rangeloc (pbr_id pbr) (pbr_range pbr) (pbr_comp pbr)
+powerBalanceRange stmt = preStatement stmt
+
+-------------------------------------------
+-- handler for is_power_balance_in_range --
+-------------------------------------------
+
+data NavalStrengthComparison = NavalStrengthComparison
+        {   nsc_other :: Text
+        ,   nsc_ratio :: Double
+        ,   nsc_comp :: Text
+        ,   nsc_sub_unit_def_weights :: [(Text,Double)]
+        }
+
+newNSC :: NavalStrengthComparison
+newNSC = NavalStrengthComparison "<!--Check Script-->" 0 "<!--Check Script-->" []
+
+navalStrengthComparison :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
+navalStrengthComparison stmt@[pdx| %_ = @scr |]
+    = msgToPP =<< ppNSC =<< foldM addLine newNSC scr
+    where
+        addLine :: NavalStrengthComparison -> GenericStatement -> PPT g m NavalStrengthComparison
+        addLine nsc [pdx| other = ?txt |] = return nsc { nsc_other = txt }
+        addLine nsc [pdx| ratio > !amt |] = return nsc { nsc_ratio = amt, nsc_comp = "more" }--right
+        addLine nsc [pdx| ratio < !amt |] = return nsc { nsc_ratio = amt, nsc_comp = "less" }--left
+        addLine nsc [pdx| sub_unit_def_weights = @scr |] = return $ foldl' addLine' nsc scr
+        addLine nsc [pdx| $other = %_ |] = trace ("unknown section in navalStrengthComparison: " ++ show other) $ return nsc
+        addLine nsc stmt = trace ("unknown form in navalStrengthComparison: " ++ show stmt) $ return nsc
+        addLine' :: NavalStrengthComparison -> GenericStatement -> NavalStrengthComparison
+        addLine' nsc [pdx| $shiptype = !weight |] = do
+            let oldweight = nsc_sub_unit_def_weights nsc
+            nsc { nsc_sub_unit_def_weights = oldweight ++ [(shiptype, weight)]}
+        addLine' nsc [pdx| $other = %_ |] = trace ("unknown section in navalStrengthComparison weights: " ++ show other) nsc
+        addLine' nsc stmt = trace ("unknown form in navalStrengthComparison weights: " ++ show stmt) nsc
+
+        ppNSC :: NavalStrengthComparison -> PPT g m ScriptMessage
+        ppNSC nsc = do
+            otherflag <- flagText (Just HOI4Country) (nsc_other nsc)
+            weighttext <- case nsc_sub_unit_def_weights nsc of
+                [] -> return ""
+                weights -> do
+                    weightype <- mapM (\wt -> do
+                        let (shiptype, weight) = wt
+                        shiploc <- getGameL10n shiptype
+                        let weighttxt = Doc.doc2text (plainNum weight)
+                        return $ weighttxt <> " for " <> shiploc)
+                        weights
+                    return $ " with weight " <> T.intercalate ", " weightype
+            return $ MsgavalStrengthComparison (nsc_ratio nsc) (nsc_comp nsc) otherflag weighttext
+navalStrengthComparison stmt = preStatement stmt
+
+-- unlock decision tooltip
+
+unlockDecisionTooltip :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
+unlockDecisionTooltip stmt@[pdx| %_ = $_ |] = locandid MsgUnlockDecisionTooltip stmt
+unlockDecisionTooltip stmt@[pdx| %_ = @scr |] = do
+    let (mname, _) = extractStmt (matchLhsText "decision") scr
+    case mname of
+        Just stmt@[pdx| %_ = ?txt |] -> locandid MsgUnlockDecisionTooltip stmt
+        _ -> preStatement stmt
+unlockDecisionTooltip stmt = preStatement stmt

@@ -14,12 +14,14 @@ module HOI4.Types (
     ,   HOI4Idea (..)
     ,   HOI4OpinionModifier (..)
     ,   HOI4DynamicModifier (..)
+    ,   HOI4Modifier (..)
     ,   HOI4NationalFocus (..)
 
     ,   HOI4CountryHistory (..)
     ,   HOI4Character (..)
     ,   HOI4CountryLeaderTrait (..)
     ,   HOI4UnitLeaderTrait (..)
+    ,   HOI4BopRange (..)
         -- * Low level types
     ,   HOI4Scope (..)
     ,   AIWillDo (..)
@@ -56,6 +58,7 @@ data HOI4Data = HOI4Data {
     ,   hoi4eventTriggers :: HOI4EventTriggers
     ,   hoi4decisionTriggers :: HOI4DecisionTriggers
     ,   hoi4dynamicmodifiers :: HashMap Text HOI4DynamicModifier
+    ,   hoi4modifiers :: HashMap Text HOI4Modifier
     ,   hoi4nationalfocusScripts :: HashMap FilePath GenericScript
     ,   hoi4nationalfocus :: HashMap Text HOI4NationalFocus
     ,   hoi4countryHistory :: HashMap Text HOI4CountryHistory
@@ -66,6 +69,7 @@ data HOI4Data = HOI4Data {
     ,   hoi4opmodScripts :: HashMap FilePath GenericScript
     ,   hoi4onactionsScripts :: HashMap FilePath GenericScript
     ,   hoi4dynamicmodifierScripts :: HashMap FilePath GenericScript
+    ,   hoi4modifierScripts :: HashMap FilePath GenericScript
 
     ,   hoi4countryHistoryScripts :: HashMap FilePath GenericScript -- Country Tag -> country tag + ideology
     ,   hoi4extraScripts :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
@@ -85,7 +89,9 @@ data HOI4Data = HOI4Data {
     ,   hoi4scriptedeffectScripts :: HashMap FilePath GenericScript
     ,   hoi4scriptedeffects :: HashMap Text GenericStatement
     ,   hoi4scriptedtriggerScripts :: HashMap FilePath GenericScript
-    ,   hoi4scriptedtriggers:: HashMap Text GenericStatement
+    ,   hoi4scriptedtriggers :: HashMap Text GenericStatement
+    ,   hoi4bopScripts :: HashMap FilePath GenericScript
+    ,   hoi4bops :: HashMap Text HOI4BopRange
 
     ,   hoi4extraScriptsCountryScope :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
     ,   hoi4extraScriptsProvinceScope :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
@@ -145,6 +151,10 @@ class (IsGame g,
     getDynamicModifierScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the parsed dynamic modifiers table (keyed on modifier ID).
     getDynamicModifiers :: Monad m => PPT g m (HashMap Text HOI4DynamicModifier)
+    -- | Get the contents of all modifier script files.
+    getModifierScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the parsed modifiers table (keyed on modifier ID).
+    getModifiers :: Monad m => PPT g m (HashMap Text HOI4Modifier)
     -- | Get the content of all national focus files
     getNationalFocusScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get extra scripts parsed from command line arguments
@@ -188,6 +198,10 @@ class (IsGame g,
     getScriptedTriggerScripts  :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the scripted triggers parsed
     getScriptedTriggers  :: Monad m => PPT g m (HashMap Text GenericStatement)
+    -- | Get balance of power script
+    getBopScripts  :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the balance of power parsed
+    getBops  :: Monad m => PPT g m (HashMap Text HOI4BopRange)
 
     -- | Get extra scripts parsed from command line arguments
     getExtraScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
@@ -279,6 +293,8 @@ data HOI4EventSource =
     | HOI4EvtSrcCharacterOnAdd Text Text            -- Effect of adding an advisor
     | HOI4EvtSrcCharacterOnRemove Text Text         -- Effect of removing an advisor
     | HOI4EvtSrcScriptedEffect Text HOI4EventWeight -- Effect of a scripted effect
+    | HOI4EvtSrcBopOnActivate Text                  -- Effect of a balance of power range activation
+    | HOI4EvtSrcBopOnDeactivate Text                -- Effect of a balance of power range deactivation
     deriving Show
 
 type HOI4EventTriggers = HashMap Text [HOI4EventSource]
@@ -300,6 +316,8 @@ data HOI4DecisionSource =
     | HOI4DecSrcCharacterOnAdd Text Text            -- Effect of adding an advisor
     | HOI4DecSrcCharacterOnRemove Text Text         -- Effect of removing an advisor
     | HOI4DecSrcScriptedEffect Text HOI4EventWeight -- Effect of a scripted effect
+    | HOI4DecSrcBopOnActivate Text                  -- Effect of a balance of power range activation
+    | HOI4DecSrcBopOnDeactivate Text                -- Effect of a balance of power range deactivation
     deriving Show
 
 type HOI4DecisionTriggers = HashMap Text [HOI4DecisionSource]
@@ -409,6 +427,15 @@ data HOI4DynamicModifier = HOI4DynamicModifier
     ,   dmodRemoveTrigger :: Maybe GenericScript        -- Whether the triggered modifier is removed
     } deriving (Show)
 
+data HOI4Modifier = HOI4Modifier
+    {   modName :: Text
+    ,   modLocName :: Maybe Text
+    ,   modPath :: FilePath
+    ,   modIcon :: Maybe Text
+    ,   modEffects :: GenericScript        -- The modifier to apply when the triggered modifier is active
+    ,   modRemoveTrigger :: Maybe GenericScript        -- Whether the triggered modifier is removed
+    } deriving (Show)
+
 data HOI4OpinionModifier = HOI4OpinionModifier
     {   omodName :: Text
     ,   omodLocName :: Maybe Text
@@ -500,7 +527,12 @@ data HOI4UnitLeaderTrait = HOI4UnitLeaderTrait
     ,   ult_coordination_skill :: Maybe Double
     } deriving (Show)
 
-
+data HOI4BopRange = HOI4BopRange
+    {   bop_id :: Text
+    ,   bop_on_activate :: Maybe GenericScript
+    ,   bop_on_deactivate :: Maybe GenericScript
+    ,   bop_path :: FilePath
+    } deriving (Show)
 ------------------------------
 -- Shared lower level types --
 ------------------------------

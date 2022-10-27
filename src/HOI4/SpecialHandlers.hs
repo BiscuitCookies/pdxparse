@@ -14,6 +14,7 @@ module HOI4.SpecialHandlers (
     ,   addDynamicModifier
     ,   removeDynamicModifier
     ,   hasDynamicModifier
+    ,   addPowerBalanceModifier
     ,   addFieldMarshalRole
     ,   addAdvisorRole
     ,   removeAdvisorRole
@@ -296,7 +297,8 @@ modifierMSG hidden targ stmt@[pdx| $mod = !num |] = let lmod = T.toLower mod in 
         | ("production_speed_" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
             ("state_production_speed_" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
             ("experience_gain_" `T.isPrefixOf` lmod && "_combat_factor" `T.isSuffixOf` lmod) ||
-            ("trait_" `T.isPrefixOf` lmod && "_xp_gain_factor" `T.isSuffixOf` lmod) -> do
+            ("trait_" `T.isPrefixOf` lmod && "_xp_gain_factor" `T.isSuffixOf` lmod) ||
+            ("repair_speed" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) -> do
             mloc <- getGameL10nIfPresent ("modifier_" <> lmod)
             case mloc of
                 Just loc ->
@@ -310,12 +312,20 @@ modifierMSG hidden targ stmt@[pdx| $mod = !num |] = let lmod = T.toLower mod in 
                     let loc' = locprep hidden targ loc in
                     numericLoc loc' MsgModifierPcNegReduced stmt
                 Nothing -> preStatement stmt
-        | "modifier_army_sub_" `T.isPrefixOf` lmod -> do
+        | "modifier_army_sub_" `T.isPrefixOf` lmod ||
+            ("operation_" `T.isPrefixOf` lmod && "_outcome" `T.isSuffixOf` lmod) -> do
             mloc <- getGameL10nIfPresent lmod
             case mloc of
                 Just loc ->
                     let loc' = locprep hidden targ loc in
                     numericLoc loc' MsgModifierPcPosReduced stmt
+                Nothing -> preStatement stmt
+        | "operation_" `T.isPrefixOf` lmod && ("_risk" `T.isSuffixOf` lmod || "_cost" `T.isSuffixOf` lmod ) -> do
+            mloc <- getGameL10nIfPresent lmod
+            case mloc of
+                Just loc ->
+                    let loc' = locprep hidden targ loc in
+                    numericLoc loc' MsgModifierPcNegReduced stmt
                 Nothing -> preStatement stmt
         | "state_resource_" `T.isPrefixOf` lmod && not ("state_resource_cost_" `T.isPrefixOf` lmod) -> do
             mloc <- getGameL10nIfPresent lmod
@@ -362,14 +372,16 @@ modifierMSG hidden targ stmt@[pdx| $mod = $var|] =  let lmod = T.toLower mod in 
             ("state_production_speed_" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
             ("unit_" `T.isPrefixOf` lmod && "_design_cost_factor" `T.isSuffixOf` lmod) ||
             ("experience_gain_" `T.isPrefixOf` lmod && "_combat_factor" `T.isSuffixOf` lmod) ||
-            ("trait_" `T.isPrefixOf` lmod && "_xp_gain_factor" `T.isSuffixOf` lmod) -> do
+            ("trait_" `T.isPrefixOf` lmod && "_xp_gain_factor" `T.isSuffixOf` lmod) ||
+            ("repair_speed" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) -> do
             mloc <- getGameL10nIfPresent ("modifier_" <> lmod)
             case mloc of
                 Just loc ->
                     let loc' = locprep hidden targ loc in
                     msgToPP $ MsgModifierVar loc' var
                 Nothing -> preStatement stmt
-        | "modifier_army_sub_" `T.isPrefixOf` lmod -> do
+        | "modifier_army_sub_" `T.isPrefixOf` lmod||
+            ("operation_" `T.isPrefixOf` lmod && "_outcome" `T.isSuffixOf` lmod) -> do
             mloc <- getGameL10nIfPresent lmod
             case mloc of
                 Just loc ->
@@ -469,6 +481,8 @@ modifiersTable = HM.fromList
         ,("war_support_weekly"              , ("MODIFIER_WAR_SUPPORT_WEEKLY", MsgModifierPcPosReduced))
         ,("war_support_weekly_factor"       , ("MODIFIER_WAR_SUPPORT_WEEKLY_FACTOR", MsgModifierPcPosReduced))
         ,("drift_defence_factor"            , ("MODIFIER_DRIFT_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+        ,("power_balance_daily"             , ("MODIFIER_POWER_BALANCE_DAILY", MsgModifierBop))
+        ,("power_balance_weekly"            , ("MODIFIER_POWER_BALANCE_WEEKLY", MsgModifierBop))
         ,("communism_drift"                 , ("communism_drift", MsgModifierColourPos))
         ,("democratic_drift"                , ("democratic_drift", MsgModifierColourPos))
         ,("fascism_drift"                   , ("fascism_drift", MsgModifierColourPos))
@@ -612,11 +626,15 @@ modifiersTable = HM.fromList
         ,("intel_network_gain"              , ("MODIFIER_INTEL_NETWORK_GAIN", MsgModifierColourPos))
         ,("intel_network_gain_factor"       , ("MODIFIER_INTEL_NETWORK_GAIN_FACTOR", MsgModifierPcPosReduced))
         ,("subversive_activites_upkeep"     , ("MODIFIER_SUBVERSIVE_ACTIVITES_UPKEEP", MsgModifierPcNegReduced))
+        ,("target_sabotage_risk"            , ("target_sabotage_risk", MsgModifierPcNegReduced))
+        ,("target_sabotage_cost"            , ("target_sabotage_cost", MsgModifierPcNegReduced))
         ,("diplomatic_pressure_mission_factor" , ("MODIFIER_DIPLOMATIC_PRESSURE_MISSION_FACTOR", MsgModifierPcPosReduced))
         ,("control_trade_mission_factor"    , ("MODIFIER_CONTROL_TRADE_MISSION_FACTOR", MsgModifierPcPosReduced))
         ,("boost_ideology_mission_factor"   , ("MODIFIER_BOOST_IDEOLOGY_MISSION_FACTOR", MsgModifierPcPosReduced))
         ,("propaganda_mission_factor"       , ("MODIFIER_PROPAGANDA_MISSION_FACTOR", MsgModifierPcPosReduced))
+        ,("target_sabotage_factor"          , ("MODIFIER_TARGET_SABOTAGE_FACTOR", MsgModifierPcPosReduced))
         ,("crypto_strength"                 , ("MODIFIER_CRYPTO_STRENGTH", MsgModifierColourPos))
+        ,("decryption_power"         , ("MODIFIER_DECRYPTION_POWER_FACTOR", MsgModifierColourPos))
         ,("decryption_power_factor"         , ("MODIFIER_DECRYPTION_POWER_FACTOR", MsgModifierPcPosReduced))
         ,("civilian_intel_to_others"        , ("MODIFIER_CIVILIAN_INTEL_TO_OTHERS", MsgModifierPcNeg))
         ,("foreign_subversive_activites"    , ("MODIFIER_FOREIGN_SUBVERSIVE_ACTIVITIES", MsgModifierPcNegReduced))
@@ -810,6 +828,7 @@ modifiersTable = HM.fromList
         -- targeted
         ,("extra_trade_to_target_factor"    , ("MODIFIER_TRADE_TO_TARGET_FACTOR", MsgModifierPcPosReduced))
         ,("trade_cost_for_target_factor"    , ("MODIFIER_TRADE_COST_TO_TARGET_FACTOR", MsgModifierPcNegReduced))
+        ,("generate_wargoal_tension_against" , ("MODIFIER_GENERATE_WARGOAL_TENSION_LIMIT_AGAINST_COUNTRY",  MsgModifierPcReducedSign))
         ,("attack_bonus_against"            , ("MODIFIER_ATTACK_BONUS_AGAINST_A_COUNTRY", MsgModifierPcPosReduced))
         ,("attack_bonus_against_cores"      , ("MODIFIER_ATTACK_BONUS_AGAINST_A_COUNTRY_ON_ITS_CORES", MsgModifierPcPosReduced))
         ,("cic_to_target_factor"            , ("MODIFIER_CIC_TO_TARGET_FACTOR", MsgModifierPcNegReduced))
@@ -907,6 +926,31 @@ hasDynamicModifier stmt@[pdx| %_ = @dyn |] = if length dyn == 2
         [stmtd@[pdx| %_ = $txt |]] ->  withLocAtom MsgHasDynamicMod stmtd
         _-> preStatement stmt
 hasDynamicModifier stmt = preStatement stmt
+
+--------------------------------------------
+-- Handler for add_power_balance_modifier --
+--------------------------------------------
+
+addPowerBalanceModifier :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
+addPowerBalanceModifier stmt@[pdx| %_ = @scr |] =
+    pp_ta (parseTA "id" "modifier" scr)
+    where
+        pp_ta :: TextAtom -> PPT g m IndentedMessages
+        pp_ta ta = case (ta_what ta, ta_atom ta) of
+            (Just idpob, Just modi) -> do
+                mmod <- HM.lookup modi <$> getModifiers
+                midpob_loc <- getGameL10nIfPresent idpob
+                let idpob_loc = fromMaybe ("<tt>" <> idpob <> "</tt>") midpob_loc
+                case mmod of
+                    Just mod -> withCurrentIndent $ \i -> do
+                        effect <- fold <$> indentUp (traverse (modifierMSG False "") (modEffects mod))
+                        let name = modLocName mod
+                            locName = maybe ("<tt>" <> modi <> "</tt>") (Doc.doc2text . iquotes) name
+                        return ((i, MsgAddPowerBalanceModifier idpob_loc idpob locName modi) : effect)
+                    _ -> trace ("add_power_balance_modifier: Modifier " ++ T.unpack modi ++ " not found") $ preStatement stmt
+            _-> preStatement stmt
+addPowerBalanceModifier stmt = trace ("Not handled in addPowerBalanceModifier: " ++ show stmt) $ preStatement stmt
+
 
 ----------------
 -- characters --
