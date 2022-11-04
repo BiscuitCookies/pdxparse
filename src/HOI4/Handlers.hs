@@ -175,7 +175,7 @@ import Abstract -- everything
 import Doc (Doc)
 import qualified Doc -- everything
 import HOI4.Messages -- everything
-import MessageTools (plural, iquotes, italicText, boldText
+import MessageTools (plural, iquotes, italicText, boldText, typewriterText
                     , plainNum, colourNumSign, plainNumSign, plainPc, colourPc, reducedNum
                     , formatDays, formatHours)
 import QQ -- everything
@@ -352,6 +352,9 @@ pronoun expectedScope name = withCurrentFile $ \f -> case T.toLower name of
             Just HOI4ScopeCharacter
                 | expectedScope `matchScope` HOI4ScopeCharacter -> message MsgPREVCharacter
                 | otherwise                             -> return "PREV"
+            Just HOI4Division
+                | expectedScope `matchScope` HOI4Division -> message MsgPREVDivision
+                | otherwise                             -> return "PREV"
             Just HOI4From -> message MsgPREVFROM
             Just HOI4Misc -> message MsgMISC
             Just HOI4Custom -> message MsgPREVCustom
@@ -371,6 +374,9 @@ pronoun expectedScope name = withCurrentFile $ \f -> case T.toLower name of
             | otherwise                             -> return "THIS"
         Just HOI4ScopeCharacter
             | expectedScope `matchScope` HOI4ScopeCharacter -> message MsgTHISCharacter
+            | otherwise                             -> return "THIS"
+        Just HOI4Division
+            | expectedScope `matchScope` HOI4Division -> message MsgTHISDivision
             | otherwise                             -> return "THIS"
         Just HOI4Misc -> message MsgMISC
         Just HOI4Custom -> message MsgPREVCustom
@@ -3331,11 +3337,14 @@ isMonth month
 setTechnology :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 setTechnology stmt@[pdx| %_ = @scr |] =
         let (_, rest) = extractStmt (matchLhsText "popup") scr in
-        case rest of
-            [[pdx| $tech = !addrm |]] -> do
-                techloc <- getGameL10n tech
-                msgToPP $ MsgSetTechnology addrm techloc
-            _ -> preStatement stmt
+        mapM (\case
+            stmt2@[pdx| $tech = !addrm |] -> do
+                mtechloc <- getGameL10nIfPresent tech
+                case mtechloc of
+                    Just techloc -> msgToPP' $ MsgSetTechnology addrm techloc
+                    _ -> msgToPP' $ MsgSetTechnology addrm (typewriterText tech)
+            unknowntechformat -> msgToPP' $ preMessage unknowntechformat)
+            rest
 setTechnology stmt = preStatement stmt
 
 setCapital :: forall g m. (HOI4Info g, Monad m) =>

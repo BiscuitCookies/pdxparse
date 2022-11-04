@@ -480,6 +480,9 @@ modifiersTable = HM.fromList
         ,("war_support_factor"              , ("MODIFIER_WAR_SUPPORT_FACTOR", MsgModifierPcPosReduced))
         ,("war_support_weekly"              , ("MODIFIER_WAR_SUPPORT_WEEKLY", MsgModifierPcPosReduced))
         ,("war_support_weekly_factor"       , ("MODIFIER_WAR_SUPPORT_WEEKLY_FACTOR", MsgModifierPcPosReduced))
+        ,("weekly_casualties_war_support"   , ("MODIFIER_WEEKLY_CASUALTIES_WAR_SUPPORT", MsgModifierPcPosReduced))
+        ,("weekly_convoys_war_support"      , ("MODIFIER_WEEKLY_CONVOYS_WAR_SUPPORT", MsgModifierPcPosReduced))
+        ,("weekly_bombing_war_support"      , ("MODIFIER_WEEKLY_BOMBING_WAR_SUPPORT", MsgModifierPcPosReduced))
         ,("drift_defence_factor"            , ("MODIFIER_DRIFT_DEFENCE_FACTOR", MsgModifierPcPosReduced))
         ,("power_balance_daily"             , ("MODIFIER_POWER_BALANCE_DAILY", MsgModifierBop))
         ,("power_balance_weekly"            , ("MODIFIER_POWER_BALANCE_WEEKLY", MsgModifierBop))
@@ -494,7 +497,7 @@ modifiersTable = HM.fromList
 
             -- Diplomacy
         ,("enemy_justify_war_goal_time"     , ("MODIFIER_ENEMY_JUSTIFY_WAR_GOAL_TIME", MsgModifierPcPosReduced))
-        ,("generate_wargoal_tension"        , ("MODIFIER_GENERATE_WARGOAL_TENSION_LIMIT", MsgModifierPcReduced)) -- yellow
+        ,("generate_wargoal_tension"        , ("MODIFIER_GENERATE_WARGOAL_TENSION_LIMIT", MsgModifierPcReducedSign)) -- yellow
         ,("guarantee_cost"                  , ("MODIFIER_GUARANTEE_COST", MsgModifierPcNegReduced))
         ,("guarantee_tension"               , ("MODIFIER_GUARANTEE_TENSION_LIMIT", MsgModifierPcNegReduced))
         ,("join_faction_tension"            , ("MODIFIER_JOIN_FACTION_TENSION_LIMIT", MsgModifierPcNegReduced))
@@ -646,7 +649,8 @@ modifiersTable = HM.fromList
         ,("operative_slot"                  , ("MODIFIER_OPERATIVE_SLOT", MsgModifierColourPos))
 
             -- AI
-        ,("ai_badass_factor"                , ("MODIFIER_AI_BADASS_FACTOR", MsgModifierPcReduced))
+        ,("ai_badass_factor"                , ("MODIFIER_AI_BADASS_FACTOR", MsgModifierPcReducedSign))
+        ,("ai_desired_divisions_factor"     , ("MODIFIER_AI_DESIRED_DIVISIONS_FACTOR", MsgModifierPcReducedSign))
         ,("ai_join_ally_desire_factor"      , ("MODIFIER_AI_JOIN_ALLY_DESIRE_FACTOR", MsgModifierSign))
         ,("ai_focus_aggressive_factor"      , ("MODIFIER_AI_FOCUS_AGGRESSIVE_FACTOR", MsgModifierPcReducedSign))
         ,("ai_focus_defense_factor"         , ("MODIFIER_AI_FOCUS_DEFENSE_FACTOR", MsgModifierPcReducedSign))

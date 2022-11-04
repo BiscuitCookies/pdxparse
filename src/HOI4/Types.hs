@@ -545,6 +545,7 @@ data HOI4Scope
     | HOI4UnitLeader
     | HOI4Operative
     | HOI4ScopeCharacter
+    | HOI4Division
     | HOI4From -- ^ Usually country or state, varies by context
     | HOI4Misc -- ^ custom for the parser, is used for var and event_target,
                --   because the scope depends on what is loaded into the var

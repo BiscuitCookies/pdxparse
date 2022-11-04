@@ -85,6 +85,8 @@ data ScriptMessage
     | MsgAnyControlledState
     | MsgAnyCoreState
     | MsgAnyCountry
+    | MsgAnyCountryDivision
+    | MsgAnyCountryWithCore
     | MsgAnyCountryWithOriginalTag {scriptMessageWho :: Text}
     | MsgAnyEnemyCountry
     | MsgAnyGuaranteedCountry
@@ -97,6 +99,7 @@ data ScriptMessage
     | MsgAnyOtherCountry
     | MsgAnyOwnedState
     | MsgAnyState
+    | MsgAnyStateDivision
     | MsgAnySubjectCountry
     | MsgAnyUnitLeader
     -- effect scope messages
@@ -105,6 +108,7 @@ data ScriptMessage
     | MsgEveryControlledState
     | MsgEveryCoreState
     | MsgEveryCountry
+    | MsgEveryCountryDivision
     | MsgEveryCountryWithOriginalTag {scriptMessageWho :: Text}
     | MsgEveryEnemyCountry
     | MsgEveryNavyLeader
@@ -114,7 +118,9 @@ data ScriptMessage
     | MsgEveryOperative
     | MsgEveryOtherCountry
     | MsgEveryOwnedState
+    | MsgEveryPossibleCountry
     | MsgEveryState
+    | MsgEveryStateDivision
     | MsgEverySubjectCountry
     | MsgEveryUnitLeader
     | MsgGlobalEveryArmyLeader
@@ -123,6 +129,7 @@ data ScriptMessage
     | MsgRandomControlledState
     | MsgRandomCoreState
     | MsgRandomCountry
+    | MsgRandomCountryDivision
     | MsgRandomCountryWithOriginalTag {scriptMessageWho :: Text}
     | MsgRandomEnemyCountry
     | MsgRandomNavyLeader
@@ -134,6 +141,7 @@ data ScriptMessage
     | MsgRandomOwnedControlledState
     | MsgRandomOwnedState
     | MsgRandomState
+    | MsgRandomStateDivision
     | MsgRandomSubjectCountry
     | MsgRandomUnitLeader
     -- dual scope messages
@@ -162,6 +170,7 @@ data ScriptMessage
     | MsgPREVSCOPECustom2
     | MsgPREVCharacter
     | MsgPREVCountry
+    | MsgPREVDivision
     | MsgPREVState
     | MsgPREVStateOwner
     | MsgPREVOperative
@@ -170,6 +179,7 @@ data ScriptMessage
     | MsgPREVCustom
     | MsgTHISCharacter
     | MsgTHISCountry
+    | MsgTHISDivision
     | MsgTHISState
     | MsgTHISOperative
     | MsgTHISUnitLeader
@@ -295,6 +305,12 @@ data ScriptMessage
     | MsgHasAirExperienceVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgHasArmyExperience {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
     | MsgHasArmyExperienceVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
+    | MsgHasBombingWarSupport {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
+    | MsgHasBombingWarSupportVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
+    | MsgHasCasualtiesWarSupport {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
+    | MsgHasCasualtiesWarSupportVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
+    | MsgHasConvoysWarSupport {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
+    | MsgHasConvoysWarSupportVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text}
     | MsgHasEquipment {scriptMessageAmt :: Double, scriptMessageCompare :: Text, scriptMessageWhat :: Text}
     | MsgHasEquipmentVar {scriptMessageAmtText :: Text, scriptMessageCompare :: Text, scriptMessageWhat :: Text}
     | MsgHasNavyExperience {scriptMessageAmt :: Double, scriptMessageCompare :: Text}
@@ -760,7 +776,7 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]All countries in the world:"
         MsgAllCountryWithOriginalTag {scriptMessageWho = _who}
             -> mconcat
-                ["[SCOPE]All countries in the world which are or originally were "
+                ["[SCOPE]All countries with the same original tag as "
                 , _who
                 , ":"
                 ]
@@ -800,9 +816,13 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]Any core state:"
         MsgAnyCountry
             -> "[SCOPE]Any country in the world:"
+        MsgAnyCountryDivision
+            -> "[SCOPE]Any division owned:"
+        MsgAnyCountryWithCore
+            -> "[SCOPE]Any country with core on state:"
         MsgAnyCountryWithOriginalTag {scriptMessageWho = _who}
             -> mconcat
-                ["[SCOPE]Any country in the world which is or originally was "
+                ["[SCOPE]Any country with the same original tag as "
                 , _who
                 , ":"
                 ]
@@ -828,6 +848,8 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]Any owned state:"
         MsgAnyState
             -> "[SCOPE]Any state:"
+        MsgAnyStateDivision
+            -> "[SCOPE]Any Division in the state:"
         MsgAnySubjectCountry
             -> "[SCOPE]Any subject country:"
         MsgAnyUnitLeader
@@ -843,6 +865,8 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]Every core state:"
         MsgEveryCountry
             -> "[SCOPE]Every country in the world:"
+        MsgEveryCountryDivision
+            -> "[SCOPE]Every division owned:"
         MsgEveryCountryWithOriginalTag  {scriptMessageWho = _who}
             -> mconcat
                 ["[SCOPE]Every country in the world which is or originally was "
@@ -865,8 +889,12 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]Every other country:"
         MsgEveryOwnedState
             -> "[SCOPE]Every owned state:"
+        MsgEveryPossibleCountry
+            -> "[SCOPE]Every country that exist and could exist:"
         MsgEveryState
             -> "[SCOPE]Every state:"
+        MsgEveryStateDivision
+            -> "[SCOPE]Every division in state:"
         MsgEverySubjectCountry
             -> "[SCOPE]Every subject country:"
         MsgEveryUnitLeader
@@ -883,6 +911,8 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]One random core state:"
         MsgRandomCountry
             -> "[SCOPE]One random country in the world:"
+        MsgRandomCountryDivision
+            -> "[SCOPE]One random owned division:"
         MsgRandomCountryWithOriginalTag  {scriptMessageWho = _who}
             -> mconcat
                 ["[SCOPE]One random country in the world which is or originally was "
@@ -909,6 +939,8 @@ instance RenderMessage Script ScriptMessage where
             -> "[SCOPE]One random owned state:"
         MsgRandomState
             -> "[SCOPE]One random state:"
+        MsgRandomStateDivision
+            -> "[SCOPE]One random division in state:"
         MsgRandomSubjectCountry
             -> "[SCOPE]One random subject country:"
         MsgRandomUnitLeader
@@ -963,6 +995,8 @@ instance RenderMessage Script ScriptMessage where
             -> "the previously mentioned character"
         MsgPREVCountry
             -> "the previously mentioned country"
+        MsgPREVDivision
+            -> "the previously mentioned division"
         MsgPREVState
             -> "the previously mentioned state"
         MsgPREVStateOwner
@@ -980,6 +1014,8 @@ instance RenderMessage Script ScriptMessage where
             -> "this character"
         MsgTHISCountry
             -> "this country"
+        MsgTHISDivision
+            -> "this division"
         MsgTHISState
             -> "this state"
         MsgTHISOperative
@@ -1519,6 +1555,54 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , typewriterText _amtT
                 , " {{icon|army exp|1}}"
+                ]
+        MsgHasBombingWarSupport {scriptMessageAmt = _amt, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , toMessage (bold (plainNum _amt))
+                , " {{icon|war support|1}} malus from bombing"
+                ]
+        MsgHasBombingWarSupportVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , typewriterText _amtT
+                , " {{icon|war support|1}} malus from bombing"
+                ]
+        MsgHasCasualtiesWarSupport {scriptMessageAmt = _amt, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , toMessage (bold (plainNum _amt))
+                , " {{icon|war support|1}} malus from casualties"
+                ]
+        MsgHasCasualtiesWarSupportVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , typewriterText _amtT
+                , " {{icon|war support|1}} malus from casualties"
+                ]
+        MsgHasConvoysWarSupport {scriptMessageAmt = _amt, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , toMessage (bold (plainNum _amt))
+                , " {{icon|war support|1}} malus from sunk convoys"
+                ]
+        MsgHasConvoysWarSupportVar {scriptMessageAmtText = _amtT, scriptMessageCompare = _comp}
+            -> mconcat
+                [ "Has "
+                , _comp
+                , " "
+                , typewriterText _amtT
+                , " {{icon|war support|1}} malus from sunk convoys"
                 ]
         MsgHasEquipment {scriptMessageCompare = _comp, scriptMessageAmt = _amt, scriptMessageWhat = _what}
             -> mconcat
@@ -3503,7 +3587,7 @@ instance RenderMessage Script ScriptMessage where
                 ]
         MsgOrignalTag {scriptMessageWhom = _whom}
             -> mconcat
-                [ "The country was previously or is "
+                [ "Original country is "
                 , _whom
                 ]
         MsgHasGovernment {scriptMessageIcon = _icon, scriptMessageWhat = _what}
