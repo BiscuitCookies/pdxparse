@@ -376,6 +376,7 @@ handlersLocRhs = Tr.fromList
         ,("has_country_leader_with_trait" , withLocAtom MsgHasCountryLeaderWithTrait)
         ,("has_decision"          , withLocAtomKey MsgHasDecision)
         ,("has_opinion_modifier"  , withLocAtom MsgHasOpinionMod)
+        ,("has_power_balance"     , withLocAtomCompound MsgHasPowerBalance)
         ,("has_tech"              , withLocAtom MsgHasTech)
         ,("has_template"          , withLocAtom MsgHasTemplate)
         ,("occupation_law"        , withLocAtom MsgOccupationLaw)
@@ -383,6 +384,7 @@ handlersLocRhs = Tr.fromList
         ,("is_on_continent"       , withLocAtom MsgIsOnContinent)
         ,("is_in_tech_sharing_group" , withLocAtomName MsgIsInTechSharingGroup)
         ,("add_to_tech_sharing_group" , withLocAtomName MsgAddToTechSharingGroup)
+        ,("remove_power_balance"  , withLocAtomCompound MsgRemovePowerBalance)
         ,("tooltip"               , withLocAtom MsgTooltip)
         ]
 
@@ -452,7 +454,6 @@ handlersSimpleFlag = Tr.fromList
         ,("add_nationality"         , withFlag MsgAddNationality)
         ,("add_to_faction"          , withFlag MsgAddToFaction)
         ,("change_tag_from"         , withFlag MsgChangeTagFrom)
-        ,("is_controlled_by"        , withFlag MsgIsControlledBy)
         ,("country_exists"          , withFlag MsgCountryExists)
         ,("has_defensive_war_with"  , withFlag MsgHasDefensiveWarWith)
         ,("give_guarantee"          , withFlag MsgGiveGuarantee)
@@ -467,6 +468,7 @@ handlersSimpleFlag = Tr.fromList
         ,("occupied_country_tag"    , withFlag MsgOccupiedCountryTag)
         ,("inherit_technology"      , withFlag MsgInheritTechnology)
         ,("is_ally_with"            , withFlag MsgIsAllyWith)
+        ,("is_controlled_by"        , withFlag MsgIsControlledBy)
         ,("is_exiled_in"            , withFlag MsgIsExiledIn)
         ,("is_fully_controlled_by"  , withFlag MsgIsFullyControlledBy)
         ,("is_guaranteed_by"        , withFlag MsgIsGuaranteedBy)
@@ -492,7 +494,7 @@ handlersSimpleFlag = Tr.fromList
         ,("transfer_state_to"       , withFlag MsgTransferStateTo)
         ,("has_war_with"            , withFlag MsgHasWarWith)
         ,("has_war_together_with"   , withFlag MsgHasWarTogetherWith)
-        ,("original_tag"            , withFlag MsgOrignalTag)
+        ,("original_tag"            , withFlagAndTag MsgOrignalTag)
         ,("white_peace"             , withFlag MsgMakeWhitePeace)
         ]
 
@@ -523,6 +525,7 @@ handlersYesNo = Tr.fromList
         ,("has_capitulated"             , withBool MsgHasCapitulated)
         ,("has_civil_war"               , withBool MsgHasCivilWar)
         ,("has_defensive_war"           , withBool MsgHasDefensiveWar)
+        ,("has_intelligence_agency"     , withBool MsgHasIntelligenceAgency)
         ,("has_offensive_war"           , withBool MsgHasOffensiveWar)
         ,("has_war"                     , withBool MsgHasWar)
         ,("is_capital"                  , withBool MsgIsCapital)
@@ -573,6 +576,7 @@ handlersTextValue = Tr.fromList
         ,("core_resistance"             , textValueCompare "occupied_country_tag" "value" "more than" "less than" MsgCoreResistance MsgCoreResistanceVar flagTextMaybe)
         ,("has_volunteers_amount_from"  , textValueCompare "tag" "count" "more than" "less than" MsgHasVolunteersAmountFrom MsgHasVolunteersAmountFromVar flagTextMaybe)
         ,("modify_tech_sharing_bonus"   , textValue "id" "bonus" MsgModifyTechSharingBonus MsgModifyTechSharingBonusVar tryLocMaybe) --icon ignored
+        ,("power_balance_value"         , textValueCompare "id" "value" "more than" "less than" MsgPowerBalanceValue MsgPowerBalanceValueVar tryLocMaybe)
         ,("set_province_name"           , textValue "name" "id" MsgSetProvinceName MsgSetProvinceNameVar tryLocMaybe)
         ,("set_victory_points"          , valueValue "province" "value" MsgSetVictoryPoints MsgSetVictoryPointsVar)
         ,("add_victory_points"          , valueValue "province" "value" MsgAddVictoryPoints MsgAddVictoryPointsVar)
@@ -623,6 +627,7 @@ handlersSpecialComplex = Tr.fromList
         ,("unlock_national_focus"        , handleFocus MsgUnlockNationalFocus)
         ,("focus"                        , handleFocus MsgFocus) -- used in pre-requisite for focuses
         ,("focus_progress"               , focusProgress MsgFocusProgress)
+        ,("uncomplete_national_focus"    , focusUncomplete MsgUncompleteNationalFocus)
         ,("has_army_size"                , hasArmySize)
         ,("has_navy_size"                , hasNavySize)
         ,("has_opinion"                  , hasOpinion MsgHasOpinion)

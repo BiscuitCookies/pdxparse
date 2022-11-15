@@ -2,9 +2,9 @@
 module MessageTools (
     -- * Numbers
     -- ** Plain formatting
-        plainNum, roundNum, plainNumSign
+        plainNum, plainNumMin, roundNum, plainNumSign
     ,   roundNumNoSpace
-    ,   plainPc, roundPc, plainPcSign
+    ,   plainPc, plainPcMin, roundPc, plainPcSign
     -- ** Coloured formatting
     -- | These functions take an additional 'Bool' argument that specifies
     -- whether a positive quantity is good (@True@) or bad (@False@). It
@@ -117,19 +117,27 @@ instance PPSep Double where
 
 -- | Format a number as is, except add thousands separators.
 plainNum :: Double -> Doc
-plainNum = ppNum False False False False
+plainNum = ppNum False False False False False
+
+-- | Format a number as is, except add thousands separators, and keep the minus sign.
+plainNumMin :: Double -> Doc
+plainNumMin = ppNum False False False False True
 
 -- | Format a number as is, except add thousands separators and a sign.
 plainNumSign :: Double -> Doc
-plainNumSign = ppNum False False False True
+plainNumSign = ppNum False False False True False
 
 -- | Format a number as a percentage. Add thousands separators.
 plainPc :: Double -> Doc
-plainPc = ppNum False True False False
+plainPc = ppNum False True False False False
+
+-- | Format a number as a percentage, except add thousands separators, and keep the minus sign.
+plainPcMin :: Double -> Doc
+plainPcMin = ppNum False True False False True
 
 -- | Format a number as is, except add thousands separators, a sign and a percent sign.
 plainPcSign :: Double -> Doc
-plainPcSign = ppNum False True False True
+plainPcSign = ppNum False True False True False
 
 -- | Front end to 'ppNum' for uncoloured numbers.
 roundNum' :: Bool -- ^ Whether to treat this number as a percentage
@@ -138,7 +146,7 @@ roundNum' :: Bool -- ^ Whether to treat this number as a percentage
 roundNum' is_pc pos_plus n =
     let rounded :: Int
         rounded = round n
-    in ppNum False is_pc True pos_plus rounded
+    in ppNum False is_pc True pos_plus False rounded
 
 -- | Format a number, but make sure it's an integer by rounding it off. Add
 -- thousands separators.
@@ -157,21 +165,21 @@ roundPc = roundNum' True False
 
 -- | Format a number in an appropriate colour with thousands separators.
 colourNum :: Bool -> Double -> Doc
-colourNum good = ppNum True False good False
+colourNum good = ppNum True False good False False
 
 -- | Format a number as a percentage, in an appropriate colour, with thousands separators.
 colourPc :: Bool -> Double -> Doc
-colourPc good = ppNum True True good False
+colourPc good = ppNum True True good False False
 
 -- | Format a number in an appropriate colour with thousands separators, adding
 -- a @+@ at the start if positive.
 colourNumSign :: Bool -> Double -> Doc
-colourNumSign good = ppNum True False good True
+colourNumSign good = ppNum True False good True False
 
 -- | Format a number as a percentage in an appropriate colour with thousands
 -- separators, adding a @+@ at the start if positive.
 colourPcSign :: Bool -> Double -> Doc
-colourPcSign good = ppNum True True good True
+colourPcSign good = ppNum True True good True False
 
 -- | Format a number using the given function, but multiply it by 100 first.
 reducedNum :: PPSep n => (n -> Doc) -> n -> Doc
@@ -192,9 +200,12 @@ ppNum :: (Ord n, PPSep n) => Bool -- ^ Whether to apply a colour template (red
                                   --   argument is False.
                           -> Bool -- ^ Whether to add a + to positive numbers,
                                   --   or strip the - from negative ones.
+                          -> Bool -- ^ Whether to keep the - from negative numbers.
                           -> n -> Doc
-ppNum colour is_pc pos pos_plus n =
-    let n_pp'd = (if pos_plus then Doc.ppSigned else Doc.ppNosigned)
+ppNum colour is_pc pos pos_plus kp_min n =
+    let n_pp'd = (if kp_min
+                then id
+                else (if pos_plus then Doc.ppSigned else Doc.ppNosigned))
                  ppNumSep n <> if is_pc then "%" else ""
     in (if not colour then id else
         case (if pos then n else negate n) `compare` 0 of

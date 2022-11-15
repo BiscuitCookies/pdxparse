@@ -40,6 +40,7 @@ module HOI4.Handlers (
     ,   numericOrTagIcon
     ,   numericIconChange
     ,   withFlag
+    ,   withFlagAndTag
     ,   withBool
     ,   withBoolHOI4Scope
     ,   withFlagOrBool
@@ -72,6 +73,7 @@ module HOI4.Handlers (
     ,   withFlagOrState
     ,   customTriggerTooltip
     ,   handleFocus
+    ,   focusUncomplete
     ,   focusProgress
     ,   setVariable
     ,   clampVariable
@@ -881,6 +883,9 @@ scriptIconTable = HM.fromList
     ,("supply_node"         , "supply hub")
     ,("rail_way"            , "railway")
     ,("fuel_silo"           , "fuel silo")
+    -- autonomy
+    ,("autonomy_dominion"   , "dominion")
+    ,("autonomy_satellite"  , "satellite")
     ]
 
 -- | Table of script atom -> file. For things that don't have icons and should instead just
@@ -1102,6 +1107,19 @@ withFlag msg [pdx| %_ = $who |] = do
     whoflag <- flag (Just HOI4Country) who
     msgToPP . msg . Doc.doc2text $ whoflag
 withFlag _ stmt = preStatement stmt
+
+-- | Handler for a statement referring to a country. Use a flag.
+withFlagAndTag :: (HOI4Info g, Monad m) =>
+    (Text -> Text -> ScriptMessage) -> StatementHandler g m
+withFlagAndTag msg stmt@[pdx| %_ = $vartag:$var |] = do
+    mwhoflag <- eflag (Just HOI4Country) (Right (vartag, var))
+    case mwhoflag of
+        Just whoflag -> msgToPP $ msg whoflag ""
+        Nothing -> preStatement stmt
+withFlagAndTag msg [pdx| %_ = $who |] = do
+    whoflag <- flagText (Just HOI4Country) who
+    msgToPP $ msg whoflag  who
+withFlagAndTag _ stmt = preStatement stmt
 
 -- | Handler for yes-or-no statements.
 withBool :: (HOI4Info g, Monad m) =>
@@ -1971,6 +1989,43 @@ handleFocus msg stmt@[pdx| $lhs = $nf |] = do
             msgToPP (msg nfIcon nfKey nf_loc)
 handleFocus _ stmt = preStatement stmt
 
+
+
+data UncFoc = UncFoc
+        {   uf_focus :: Text
+        ,   uf_uncomplete_children :: Bool
+        }
+newUF :: UncFoc
+newUF = UncFoc "<!-- Check Game Script -->" False
+
+focusUncomplete :: (HOI4Info g, Monad m) =>
+    (Text -> Text -> Text -> Bool -> ScriptMessage)
+        -> StatementHandler g m
+focusUncomplete msg stmt@[pdx| $lhs = @scr |] = do
+    msgToPP =<< ppuf (foldl' addLine newUF scr)
+    where
+        addLine :: UncFoc -> GenericStatement -> UncFoc
+        addLine uf [pdx| focus = ?what |] = uf { uf_focus =  what }
+        addLine uf [pdx| uncomplete_children = %rhs |]
+            | GenericRhs "yes" [] <- rhs = uf { uf_uncomplete_children = True }
+            | GenericRhs "no"  [] <- rhs = uf { uf_uncomplete_children = False }
+        addLine uf [pdx| refund_political_power = %_ |] = uf
+        addLine uf scr = trace ("uncompleteFocus: Ignoring " ++ show scr) uf
+
+        ppuf uf = do
+            let nf = uf_focus uf
+            nfs <- getNationalFocus
+            gfx <- getInterfaceGFX
+            let mnf = HM.lookup nf nfs
+            case mnf of
+                Nothing -> return $ preMessage stmt -- unknown national focus
+                Just nnf -> do
+                    let nfKey = nf_id nnf
+                        nfIcon = HM.findWithDefault "GFX_goal_unknown" (nf_icon nnf) gfx
+                    nf_loc <- getGameL10n nfKey
+                    return $ msg nfIcon nfKey nf_loc (uf_uncomplete_children uf)
+focusUncomplete _ stmt = preStatement stmt
+
 ------------------------------
 -- Handler for xxx_variable --
 ------------------------------
@@ -2836,9 +2891,8 @@ foldCompound "setPartyName" "SetPartyName" "spn"
         let long_name = fromMaybe "" _long_name
         ideo_loc <- getGameL10n _ideology
         long_loc <- getGameL10n long_name
-        let long_loc' = T.stripEnd (T.takeWhile (/='§') long_loc)
         short_loc <- getGameL10n _name
-        return $ MsgSetPartyName ideo_loc short_loc long_loc'
+        return $ MsgSetPartyName ideo_loc short_loc long_loc
     |]
 
 ---------------------------------

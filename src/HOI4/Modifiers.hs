@@ -150,9 +150,9 @@ writeHOI4OpinionModifiers = do
 ppOpinionModifiers :: (HOI4Info g, Monad m) => [HOI4OpinionModifier] -> PPT g m Doc
 ppOpinionModifiers modifiers = do
     version <- gets (gameVersion . getSettings)
-    modifiers_pp'd <- mapM ppOpinionModifier (sortOn omodName modifiers)
+    modifiers_pp'd <- mapM ppOpinionModifier (sortOn (T.toCaseFold . omodName) modifiers)
     return . mconcat $ ["<includeonly>{{#switch:{{ lc:{{{1}}} }}", PP.line
-        ,"| #default = <span style=\"color: red; font-size: 11px;\">(unrecognized string \"{{{1}}}\" for [[Template:Opinion_modifier]])</span>[[Category:Pages with unrecognized opinion modifier strings]]", PP.line]
+        ,"| #default = <span style=\"color: red; font-size: 11px;\">(unrecognized string \"{{{1}}}\" for [[Template:Opinion]])</span>[[Category:Pages with unrecognized opinion modifier strings]]", PP.line]
         ++ modifiers_pp'd ++
         ["}}</includeonly><noinclude>{{Version|", Doc.strictText version, "}}"
         , PP.line
