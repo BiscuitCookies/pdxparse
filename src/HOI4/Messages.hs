@@ -2748,7 +2748,7 @@ instance RenderMessage Script ScriptMessage where
                 , _icon
                 , ".png|x36px|alt="
                 , _loc
-                ,"link=#"
+                ,"|link=#"
                 , _loc
                 , "]]"
                 , " <!-- "

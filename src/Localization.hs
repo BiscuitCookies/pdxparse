@@ -8,6 +8,7 @@ module Localization (
     ) where
 
 import Control.Monad (liftM, filterM, forM, when)
+import Control.Monad.Trans (MonadIO (..), liftIO)
 
 import Data.List (isInfixOf, foldl')
 import Data.HashMap.Strict (HashMap)
@@ -25,12 +26,12 @@ import qualified Data.Yaml as Y
 import Data.Attoparsec.Text (Parser)
 import qualified Data.Attoparsec.Text as Ap
 
-import System.Directory (doesFileExist, getDirectoryContents, doesDirectoryExist)
+import System.Directory (doesFileExist, getDirectoryContents, doesDirectoryExist, listDirectory)
 import System.FilePath ((</>))
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 
-import SettingsTypes (Settings (..), L10nScheme (..))
+import SettingsTypes (Settings (..), L10nScheme (..), concatMapM)
 import Yaml (L10n, LocEntry (..), parseLocFile, mergeLangs, mergeLangList)
 
 -- | Read and parse localization files for the current game.
@@ -48,15 +49,23 @@ readL10n settings = do
                         </> "localisation"
                         </> "replace"
                         </> justLanguage settings
+        dirifYAMLmodr  = gameModPath settings
+                        </> "localisation"
+                        </> "replace"
+    modexist <- doesDirectoryExist dirmod
+    dirmodsub <- if modexist then getAllFolders dirmod else return []
     replaceexist <- doesDirectoryExist dirifYAMLmod
-    let dirs = addlistdir
+    replaceexistr <- doesDirectoryExist dirifYAMLmodr
+    let dirmod'       = dirmod : dirmodsub
+        dirifYAMLmod' = if replaceexist then dirifYAMLmod else dirifYAMLmodr
+        dirs = addlistdir
                 [dir]
                 (gameFolder settings /= gameOrModFolder settings)
-                [dirmod]
-                (gameFolder settings /= gameOrModFolder settings && l10nScheme settings == L10nQYAML && replaceexist)
-                [dirifYAMLmod]
+                dirmod'
+                (gameFolder settings /= gameOrModFolder settings && l10nScheme settings == L10nQYAML && (replaceexist || replaceexistr))
+                [dirifYAMLmod']
 
-    files <- mconcat (map (readL10nDirs settings) dirs)
+    files <- concatMapM (readL10nDirs settings) dirs
     case l10nScheme settings of
         L10nCSV ->
             let csvField :: Parser Text
@@ -113,3 +122,8 @@ addlistdir dirgame checkmod dirmod checkmodreplace dirmodreplace =
         (True, True) -> dirmodreplace ++ dirmod ++ dirgame
         (True, False) -> dirmod ++ dirgame
         _ -> dirgame
+
+getAllFolders :: FilePath -> IO [FilePath]
+getAllFolders path = do
+    allsubs <- getDirectoryContents path >>= filterM (doesDirectoryExist . (path </>))
+    return $ map (path </>) allsubs

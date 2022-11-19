@@ -2266,10 +2266,12 @@ data HOI4AddBC = HOI4AddBC{
     , addbc_limit_to_victory_point :: Bool
     , addbc_limit_to_victory_point_num :: Maybe Double
     , addbc_limit_to_victory_point_comp :: Text
+    , addbc_province_comp :: Text
+    , addbc_province_level :: Maybe Double
     } deriving Show
 
 newABC :: HOI4AddBC
-newABC = HOI4AddBC "" Nothing Nothing Nothing False False False False False Nothing False False Nothing ""
+newABC = HOI4AddBC "" Nothing Nothing Nothing False False False False False Nothing False False Nothing "" "" Nothing
 
 addBuildingConstruction :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 addBuildingConstruction stmt@[pdx| %_ = @scr |] =
@@ -2316,6 +2318,8 @@ addBuildingConstruction stmt@[pdx| %_ = @scr |] =
         addLine' abc [pdx| limit_to_victory_point = %rhs |]
             | GenericRhs "yes" [] <- rhs = abc { addbc_limit_to_victory_point = True }
             | otherwise = abc
+        addLine' abc [pdx| level > !num |] = abc { addbc_province_comp = "higher than", addbc_province_level = Just num }
+        addLine' abc [pdx| level < !num |] = abc { addbc_province_comp = "lower than", addbc_province_level = Just num }
         addLine' abc [pdx| $other = %_ |] = trace ("unknown section in add_building_construction@province: " ++ show other) abc
         addLine' abc stmt = trace ("Unknown form in add_building_construction@province: " ++ show stmt) abc
 
@@ -2333,6 +2337,9 @@ addBuildingConstruction stmt@[pdx| %_ = @scr |] =
                             then T.pack $ concat [", on the provinces (" , intercalate "), (" (map (show . round) id),")"]
                             else T.pack $ concat [", on the province (" , concatMap (show . round) id,")"]
                         _-> ""
+                levelmsg <- case addbc_province_level abc of
+                    Just level -> messageText $ MsgProvinceLevel (addbc_province_comp abc) level
+                    _-> return ""
                 bordcountmsg <- case addbc_province_border_country abc of
                     Just (Left txt) -> do
                         mflagloc <- eflag (Just HOI4Country) (Left txt)
@@ -2348,7 +2355,7 @@ addBuildingConstruction stmt@[pdx| %_ = @scr |] =
                     (False, Just num) -> messageText $ MsgLimitToVictoryPoint False (addbc_limit_to_victory_point_comp abc) num
                     (True, Nothing) -> messageText $ MsgLimitToVictoryPoint True "" 0
                     _ -> return ""
-                return $ allmsg <> bordmsg <> coastmsg <> navmsg <> victmsg <> bordcountmsg <> provmsg
+                return $ allmsg <> bordmsg <> coastmsg <> navmsg <> victmsg <> bordcountmsg <> provmsg <> levelmsg
             buildloc <- getGameL10n (addbc_type abc)
             case (addbc_level abc, addbc_levelvar abc) of
                 (Just val, _)-> return $ MsgAddBuildingConstruction (addbc_instant_build abc) buildicon buildloc val prov

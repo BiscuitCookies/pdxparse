@@ -302,7 +302,7 @@ ppNationalFocus gfx nf = setCurrentFile (nf_path nf) $ do
     selectEffect_pp <- setIsInEffect True $ nfArgExtra "select" nf_select_effect ppScript
     return . mconcat $
         [ "|- id = \"", Doc.strictText (nf_name_loc nf),"\"" , PP.line
-        , "|[[File:", Doc.strictText icon_pp, ".png|70px]] ", PP.line --style=\"text-align:center\"|   center|bottom|
+        , "| [[File:", Doc.strictText icon_pp, ".png|70px]] ", PP.line --style=\"text-align:center\"|   center|bottom|
         , "| ", Doc.strictText (nf_name_loc nf) , " <!-- ", Doc.strictText (nf_id nf), " -->", PP.line
         , "| ", PP.line]++
         allowBranch_pp ++
