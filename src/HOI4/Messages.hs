@@ -4074,7 +4074,7 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ gainOrLose _amt
                 , " "
-                , toMessage $ bold (reducedNum plainPcSign _amt)
+                , toMessage $ bold (reducedNum plainPc _amt)
                 , " "
                 , _icon
                 , " "

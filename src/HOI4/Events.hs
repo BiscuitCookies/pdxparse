@@ -303,8 +303,10 @@ optionAddStatement opt stmt@[pdx| name = ?name |]
     = return $ opt { hoi4opt_name = Just name }
 optionAddStatement opt stmt@[pdx| ai_chance = @ai_chance |]
     = return $ opt { hoi4opt_ai_chance = Just (aiWillDo ai_chance) } -- hope can re-use the aiWilldo script
-optionAddStatement opt stmt@[pdx| trigger = @trigger_script |]
-    = return $ opt { hoi4opt_trigger = Just trigger_script }
+optionAddStatement opt stmt@[pdx| trigger = %rhs |] = case rhs of
+    CompoundRhs [] -> return opt
+    CompoundRhs trigger_script -> return $ opt { hoi4opt_trigger = Just trigger_script }
+    _ -> return opt
 optionAddStatement opt stmt = do
     -- Not a GenericLhs - presumably an effect.
     effects_pp'd <- setIsInEffect True (optionAddEffect (hoi4opt_effects opt) stmt)
