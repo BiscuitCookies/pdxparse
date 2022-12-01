@@ -207,7 +207,7 @@ showIdea stmt@[pdx| $lhs = $idea |] = do
         Just iidea -> do
             modifier <- maybe (return []) (indentUp . ppOne) (id_modifier iidea)
             targeted_modifier <-
-                maybe (return []) (indentUp . fmap concat . mapM handleTargetedModifier) (id_targeted_modifier iidea)
+                maybe (return []) (indentUp . concatMapM handleTargetedModifier) (id_targeted_modifier iidea)
             research_bonus <- maybe (return []) (indentUp . ppOne) (id_research_bonus iidea)
             equipment_bonus <- maybe (return []) (indentUp . ppOne) (id_equipment_bonus iidea)
             let ideamods = modifier ++ targeted_modifier ++ research_bonus ++ equipment_bonus
@@ -240,10 +240,10 @@ modmessage iidea idea_loc ideaKey ideaIcon = do
                 _ -> return ""
             modifier <- maybe (return []) ppOne (id_modifier iidea)
             targeted_modifier <-
-                maybe (return []) (fmap concat . mapM handleTargetedModifier) (id_targeted_modifier iidea)
+                maybe (return []) (concatMapM handleTargetedModifier) (id_targeted_modifier iidea)
             research_bonus <- maybe (return []) ppOne (id_research_bonus iidea)
             equipment_bonus <- maybe (return []) ppOne (id_equipment_bonus iidea)
-            let boxend = [(0, MsgEffectBoxEnd)]
+            let boxend = [(0, MsgEffectBoxEnd curindent)]
             withCurrentIndentCustom curindent $ \_ -> do
                 let ideamods = modifier ++ targeted_modifier ++ research_bonus ++ equipment_bonus ++ boxend
                 return $ (0, MsgEffectBox idea_loc ideaKey ideaIcon ideaDesc) : ideamods
@@ -1367,7 +1367,7 @@ getLeaderTraits trait = do
         Just clt-> do
             mod <- maybe (return []) (\t -> fold <$> indentUp (traverse (modifierMSG False "") t)) (clt_modifier clt)
             equipmod <- maybe (return []) (indentUp . handleEquipmentBonus) (clt_equipment_bonus clt)
-            tarmod <- maybe (return []) (indentUp . fmap concat . mapM handleTargetedModifier) (clt_targeted_modifier clt)
+            tarmod <- maybe (return []) (indentUp . concatMapM handleTargetedModifier) (clt_targeted_modifier clt)
             hidmod <- maybe (return []) (indentUp . handleModifier) (clt_hidden_modifier clt)
             return ( mod ++ tarmod ++ equipmod ++ hidmod)
         Nothing -> getUnitTraits trait

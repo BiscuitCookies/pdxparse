@@ -467,7 +467,7 @@ data ScriptMessage
     | MsgModifyIdea {scriptMessageCategory :: Text, scriptMessageIcon :: Text, scriptMessageKey :: Text, scriptMessageLoc :: Text, scriptMessageCategory2 :: Text, scriptMessageIcon2 :: Text, scriptMessageKey2 :: Text, scriptMessageLoc2 :: Text}
     | MsgReplaceIdea {scriptMessageCategory :: Text, scriptMessageIcon :: Text, scriptMessageKey :: Text, scriptMessageLoc :: Text, scriptMessageCategory2 :: Text, scriptMessageIcon2 :: Text, scriptMessageKey2 :: Text, scriptMessageLoc2 :: Text}
     | MsgEffectBox {scriptMessageLoc :: Text, scriptMessageKey :: Text, scriptMessageIcon :: Text, scriptMessageDesc :: Text}
-    | MsgEffectBoxEnd
+    | MsgEffectBoxEnd  {scriptMessageIndent :: Int}
     | MsgShowIdea {scriptMessageLoc :: Text, scriptMessageKey :: Text}
     | MsgHasOpinion {scriptMessageAmtText :: Text, scriptMessageWhom :: Text, scriptMessageCompare :: Text }
     | MsgSetRule {scriptMessageAmt :: Double}
@@ -2580,8 +2580,12 @@ instance RenderMessage Script ScriptMessage where
                 , "\n"
                 , "|modifiers="
                 ]
-        MsgEffectBoxEnd
-            -> "}}\n"
+        MsgEffectBoxEnd { scriptMessageIndent = _indent}
+            -> mconcat
+                [ "|indent = "
+                , T.pack $ show _indent
+                , "}}\n"
+                ]
         MsgShowIdea {scriptMessageLoc = _loc, scriptMessageKey = _key}
             -> mconcat
                 [ _loc

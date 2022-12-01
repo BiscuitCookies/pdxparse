@@ -778,26 +778,33 @@ withLocAtom2 _ _ stmt = preStatement stmt
 withLocAtomAndIcon :: (HOI4Info g, Monad m) =>
     Text -- ^ icon name - see
          -- <https://www.hoi4wiki.com/Template:Icon Template:Icon> on the wiki
+        -> Bool
         -> (Text -> Text -> ScriptMessage)
         -> StatementHandler g m
-withLocAtomAndIcon iconkey msg stmt@[pdx| %_ = $vartag:$var |] = do
+withLocAtomAndIcon iconkey _ msg stmt@[pdx| %_ = $vartag:$var |] = do
     mtagloc <- tagged vartag var
     case mtagloc of
         Just tagloc -> msgToPP $ msg (iconText iconkey) tagloc
         Nothing -> preStatement stmt
-withLocAtomAndIcon iconkey msg [pdx| %_ = ?key |]
+withLocAtomAndIcon iconkey lockey msg [pdx| %_ = ?key |]
     = do what <- Doc.doc2text <$> allowPronoun Nothing (fmap Doc.strictText . getGameL10n) key
-         msgToPP $ msg (iconText iconkey) what
-withLocAtomAndIcon _ _ stmt = preStatement stmt
+         lociconkey <- if lockey then do
+             loc <- getGameL10n iconkey
+             return $ T.toLower loc
+            else
+             return iconkey
+         msgToPP $ msg (iconText lociconkey) what
+withLocAtomAndIcon _ _ _ stmt = preStatement stmt
 
 -- | Generic handler for a statement whose RHS is a localizable atom that
 -- corresponds to an icon.
 withLocAtomIcon :: (HOI4Info g, Monad m) =>
     (Text -> Text -> ScriptMessage)
+        -> Bool
         -> StatementHandler g m
-withLocAtomIcon msg stmt@[pdx| %_ = ?key |]
-    = withLocAtomAndIcon key msg stmt
-withLocAtomIcon _ stmt = preStatement stmt
+withLocAtomIcon msg lockey stmt@[pdx| %_ = ?key |]
+    = withLocAtomAndIcon key lockey msg stmt
+withLocAtomIcon _ _ stmt = preStatement stmt
 
 -- | Generic handler for a statement that needs both an atom and an icon, whose
 -- meaning changes depending on which scope it's in.
@@ -808,8 +815,8 @@ withLocAtomIconHOI4Scope :: (HOI4Info g, Monad m) =>
 withLocAtomIconHOI4Scope countrymsg statemsg stmt = do
     thescope <- getCurrentScope
     case thescope of
-        Just HOI4Country -> withLocAtomIcon countrymsg stmt
-        Just HOI4ScopeState -> withLocAtomIcon statemsg stmt
+        Just HOI4Country -> withLocAtomIcon countrymsg False stmt
+        Just HOI4ScopeState -> withLocAtomIcon statemsg False stmt
         _ -> preStatement stmt -- others don't make sense
 
 -- | Generic handler for a statement where the RHS is a localizable atom, but
@@ -822,7 +829,7 @@ locAtomTagOrState :: (HOI4Info g, Monad m) =>
 locAtomTagOrState atomMsg synMsg stmt@[pdx| %_ = $val |] =
     if isTag val || isPronoun val
        then tagOrStateIcon synMsg synMsg stmt
-       else withLocAtomIcon atomMsg stmt
+       else withLocAtomIcon atomMsg False stmt
 locAtomTagOrState atomMsg synMsg stmt@[pdx| %_ = $vartag:$var |] = do
     mtagloc <- tagged vartag var
     case mtagloc of

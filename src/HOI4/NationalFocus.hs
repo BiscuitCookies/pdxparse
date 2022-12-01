@@ -255,11 +255,9 @@ ppNationalFocuses gfx nfs = do
     return . mconcat $
         [ "{{Version|", Doc.strictText version, "}}", PP.line
         , "{| class=\"mildtable\" {{buffer}}", PP.line
-        , "!", PP.line
-        , "! style=\"width: 15%;\" | Focus", PP.line
-        , "! style=\"width: 30%;\" | Prerequisites", PP.line
-        , "! style=\"width: 30%;\" | Effects", PP.line
-        , "! class=\"nomobile\" | Description", PP.line
+        , "! style=\"width: 30%;\" | Focus", PP.line
+        , "! style=\"width: 40%;\" | Prerequisites", PP.line
+        , "! style=\"width: 40%;\" | Effects", PP.line
         ] ++ nfDoc ++
         [ "|}", PP.line
         ]
@@ -302,8 +300,9 @@ ppNationalFocus gfx nf = setCurrentFile (nf_path nf) $ do
     selectEffect_pp <- setIsInEffect True $ nfArgExtra "select" nf_select_effect ppScript
     return . mconcat $
         [ "|- id = \"", Doc.strictText (nf_name_loc nf),"\"" , PP.line
-        , "| [[File:", Doc.strictText icon_pp, ".png|70px]] ", PP.line --style=\"text-align:center\"|   center|bottom|
-        , "| ", Doc.strictText (nf_name_loc nf) , " <!-- ", Doc.strictText (nf_id nf), " -->", PP.line
+        , "| {{iconbox|image=", Doc.strictText icon_pp, ".png ", PP.line
+        , "| ", Doc.strictText (nf_name_loc nf) , "<!-- ", Doc.strictText (nf_id nf), " -->", PP.line
+        , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (nf_name_desc nf), PP.line , "}}", PP.line
         , "| ", PP.line]++
         allowBranch_pp ++
         prerequisite_pp ++
@@ -312,10 +311,7 @@ ppNationalFocus gfx nf = setCurrentFile (nf_path nf) $ do
         bypass_pp ++
         [ "| ", PP.line]++
         completionReward_pp ++
-        selectEffect_pp ++
-        [ "| class=\"nomobile\" | "
-        , maybe mempty (Doc.strictText . italicText . Doc.nl2br)  (nf_name_desc nf), PP.line
-        ]
+        selectEffect_pp
 
 ppPrereq :: (HOI4Info g, Monad m) => [GenericScript] -> PPT g m [Doc]
 ppPrereq [] = return [""]

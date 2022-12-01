@@ -238,6 +238,7 @@ eventAddSection mevt stmt = sequence (eventAddSection' <$> mevt <*> pure stmt) w
 --        _ -> throwError "bad picture"
     eventAddSection' evt stmt@[pdx| goto = %rhs |] = return evt
     eventAddSection' evt stmt@[pdx| trigger = %rhs |] = case rhs of
+        CompoundRhs [] -> return evt
         CompoundRhs trigger_script -> case trigger_script of
             [] -> return evt -- empty, treat as if it wasn't there
             _ -> return evt { hoi4evt_trigger = Just trigger_script }
@@ -248,9 +249,11 @@ eventAddSection mevt stmt = sequence (eventAddSection' <$> mevt <*> pure stmt) w
         GenericRhs "no" [] -> return evt { hoi4evt_is_triggered_only = Just False }
         _ -> throwError "bad trigger"
     eventAddSection' evt stmt@[pdx| mean_time_to_happen = %rhs |] = case rhs of
+        CompoundRhs [] -> return evt
         CompoundRhs mtth -> return evt { hoi4evt_mean_time_to_happen = Just mtth }
         _ -> throwError "bad MTTH"
     eventAddSection' evt stmt@[pdx| immediate = %rhs |] = case rhs of
+        CompoundRhs [] -> return evt
         CompoundRhs immediate -> return evt { hoi4evt_immediate = Just immediate }
         _ -> throwError "bad immediate section"
     eventAddSection' evt stmt@[pdx| option = %rhs |] =  case rhs of

@@ -442,8 +442,8 @@ handlersTypewriter = Tr.fromList
 -- | Handlers for simple statements with icon
 handlersSimpleIcon :: (HOI4Info g, Monad m) => Trie (StatementHandler g m)
 handlersSimpleIcon = Tr.fromList
-        [("has_autonomy_state"      , withLocAtomIcon MsgHasAutonomyState)
-        ,("has_government"          , withLocAtomIcon MsgHasGovernment)
+        [("has_autonomy_state"      , withLocAtomIcon MsgHasAutonomyState True)
+        ,("has_government"          , withLocAtomIcon MsgHasGovernment False)
         ]
 
 -- | Handlers for simple statements with a flag or pronoun
