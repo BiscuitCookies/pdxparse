@@ -294,10 +294,10 @@ ppNationalFocus gfx nf = setCurrentFile (nf_path nf) $ do
     prerequisite_pp <- ppPrereq $ catMaybes $ nf_prerequisite nf
     allowBranch_pp <- ppAllowBranch $ nf_allow_branch nf
     mutuallyExclusive_pp <- ppMutuallyExclusive $ nf_mutually_exclusive nf
-    available_pp <- setIsInEffect False $ nfArg nf_available ppScript
-    bypass_pp <- setIsInEffect False $ nfArgExtra "bypass" nf_bypass ppScript
+    available_pp <- nfArg nf_available ppScript
+    bypass_pp <- nfArgExtra "bypass" nf_bypass ppScript
     completionReward_pp <- setIsInEffect True $ nfArg nf_completion_reward ppScript
-    selectEffect_pp <- setIsInEffect True $ nfArg nf_select_effect ppScript
+    selectEffect_pp <- setIsInEffect True $ nfArgExtra "select" nf_select_effect ppScript
     return . mconcat $
         [ "|- id = \"", Doc.strictText (nf_name_loc nf),"\"" , PP.line
         , "| {{iconbox|image=", Doc.strictText icon_pp, ".png ", PP.line
@@ -309,14 +309,9 @@ ppNationalFocus gfx nf = setCurrentFile (nf_path nf) $ do
         mutuallyExclusive_pp ++
         available_pp ++
         bypass_pp ++
-        [ "| ", PP.line] ++
-        (if null selectEffect_pp then []
-         else ["'''Immediate effect upon focus start''':", PP.line]) ++
-        selectEffect_pp ++
-        (if not (null selectEffect_pp) && not (null completionReward_pp) then
-         [PP.line, PP.line, "'''Effects upon focus completion''':", PP.line]
-         else []) ++
-        completionReward_pp
+        [ "| ", PP.line]++
+        completionReward_pp ++
+        selectEffect_pp
 
 ppPrereq :: (HOI4Info g, Monad m) => [GenericScript] -> PPT g m [Doc]
 ppPrereq [] = return [""]
