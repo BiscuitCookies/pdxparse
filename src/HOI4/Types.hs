@@ -502,6 +502,7 @@ data HOI4Character = HOI4Character
 
 data HOI4CountryLeaderTrait = HOI4CountryLeaderTrait
     {   clt_id :: Text
+    ,   clt_name :: Text
     ,   clt_loc_name :: Maybe Text
     ,   clt_path :: FilePath
     ,   clt_targeted_modifier :: Maybe GenericScript

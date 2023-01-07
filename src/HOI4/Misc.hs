@@ -382,6 +382,7 @@ parseHOI4CountryLeaderTrait [pdx| $id = @effects |]
         mlocid <- getGameL10nIfPresent id
         let cclt = foldl' addSection (HOI4CountryLeaderTrait {
                 clt_id = id
+            ,   clt_name = id
             ,   clt_loc_name = mlocid
             ,   clt_path = file
             ,   clt_targeted_modifier = Nothing
@@ -403,6 +404,8 @@ parseHOI4CountryLeaderTrait [pdx| $id = @effects |]
             _ -> trace ("Urecognized statement in country_leader: " ++ show stmt) clt
          -- Must be an effect
         addSection clt stmt@[pdx| random = %_ |] = clt
+        addSection clt stmt@[pdx| command_cap = %_ |] = clt
+        addSection clt stmt@[pdx| name = $txt |] = clt { clt_name = txt }
         addSection clt stmt =
             let oldmod = fromMaybe [] (clt_modifier clt) in
             clt { clt_modifier = Just (oldmod ++ [stmt]) }

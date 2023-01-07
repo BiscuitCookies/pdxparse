@@ -3104,8 +3104,7 @@ freeBuildingSlots stmt@[pdx| %_ = @scr |]
     where
         addLine :: FreeBuildingSlots -> GenericStatement -> PPT g m FreeBuildingSlots
         addLine fbs [pdx| building = $txt |] = do
-            txtd <- getGameL10n txt
-            return fbs { fbs_building = txtd }
+            return fbs { fbs_building = txt }
         addLine fbs [pdx| size < !amt |] =
             let comp = "less than" in
             return fbs { fbs_comp = comp, fbs_size = amt }
@@ -3117,7 +3116,10 @@ freeBuildingSlots stmt@[pdx| %_ = @scr |]
         addLine fbs stmt
             = trace ("unknown section in free_building_slots: " ++ show stmt) $ return fbs
         pp_fbs fbs = do
-            return $ MsgFreeBuildingSlots (fbs_comp fbs) (fbs_size fbs) (fbs_building fbs) (fbs_include_locked fbs)
+            buildloc <- getGameL10n $ fbs_building fbs
+            let buildicon = iconText $ fbs_building fbs
+                buildiconloc = buildicon <> " " <> buildloc
+            return $ MsgFreeBuildingSlots (fbs_comp fbs) (fbs_size fbs)  buildiconloc (fbs_include_locked fbs)
 freeBuildingSlots stmt = preStatement stmt
 
 addAutonomyRatio :: forall g m. (HOI4Info g, Monad m) =>

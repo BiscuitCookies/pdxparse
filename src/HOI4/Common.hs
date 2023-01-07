@@ -437,6 +437,8 @@ handlersTypewriter = Tr.fromList
         ,("save_global_event_target_as", withNonlocAtom MsgSaveGlobalEventTargetAs)
         ,("set_cosmetic_tag"    , withNonlocAtom MsgSetCosmeticTag)
         ,("has_cosmetic_tag"    , withNonlocAtom MsgHasCosmeticTag)
+
+        ,("has_opinion_modifier"  , withNonlocAtom MsgHasOpinionMod)
         ]
 
 -- | Handlers for simple statements with icon
