@@ -27,6 +27,7 @@ import Data.Attoparsec.Text (Parser)
 import qualified Data.Attoparsec.Text as Ap
 
 import System.Directory (doesFileExist, getDirectoryContents, doesDirectoryExist, listDirectory)
+import System.Directory.Recursive (getSubdirsRecursive)
 import System.FilePath ((</>))
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
@@ -53,7 +54,7 @@ readL10n settings = do
                         </> "localisation"
                         </> "replace"
     modexist <- doesDirectoryExist dirmod
-    dirmodsub <- if modexist then getAllFolders dirmod else return []
+    dirmodsub <- if modexist then getSubdirsRecursive dirmod else return []
     replaceexist <- doesDirectoryExist dirifYAMLmod
     replaceexistr <- doesDirectoryExist dirifYAMLmodr
     let dirmod'       = dirmod : dirmodsub
@@ -122,8 +123,3 @@ addlistdir dirgame checkmod dirmod checkmodreplace dirmodreplace =
         (True, True) -> dirmodreplace ++ dirmod ++ dirgame
         (True, False) -> dirmod ++ dirgame
         _ -> dirgame
-
-getAllFolders :: FilePath -> IO [FilePath]
-getAllFolders path = do
-    allsubs <- getDirectoryContents path >>= filterM (doesDirectoryExist . (path </>))
-    return $ map (path </>) allsubs
