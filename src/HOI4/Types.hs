@@ -302,15 +302,15 @@ type HOI4EventTriggers = HashMap Text [HOI4EventSource]
 type HOI4DecisionWeight = Maybe (Integer, Integer) -- Rational reduces the number, which we don't want
 
 data HOI4DecisionSource =
-      HOI4DecSrcImmediate Text                       -- Immediate effect of an decision (arg is decision ID)
-    | HOI4DecSrcOption Text Text                     -- Effect of choosing an decision option (args are decision ID and option ID)
-    | HOI4DecSrcDecComplete Text Text                -- Effect of completing a decision (args are id and localized decision text)
-    | HOI4DecSrcDecRemove Text Text                  -- Effect of taking a timed decision and letting it finish (args are id and localized decision text)
-    | HOI4DecSrcDecCancel Text Text                  -- Effect of taking a decision and it being canceled (args are id and localized decision text)
-    | HOI4DecSrcDecTimeout Text Text                 -- Effect of taking a decision/mission and letting it timeout (args are id and localized decision text)
-    | HOI4DecSrcOnAction Text HOI4DecisionWeight     -- An effect from on_actions (args are the trigger and weight)
-    | HOI4DecSrcNFComplete Text Text                -- Effect of completing a national focus
-    | HOI4DecSrcNFSelect Text Text                  -- Effect of selecting a national focus
+      HOI4DecSrcImmediate Text                      -- Immediate effect of an decision (arg is decision ID)
+    | HOI4DecSrcOption Text Text                    -- Effect of choosing an decision option (args are decision ID and option ID)
+    | HOI4DecSrcDecComplete Text Text               -- Effect of completing a decision (args are id and localized decision text)
+    | HOI4DecSrcDecRemove Text Text                 -- Effect of taking a timed decision and letting it finish (args are id and localized decision text)
+    | HOI4DecSrcDecCancel Text Text                 -- Effect of taking a decision and it being canceled (args are id and localized decision text)
+    | HOI4DecSrcDecTimeout Text Text                -- Effect of taking a decision/mission and letting it timeout (args are id and localized decision text)
+    | HOI4DecSrcOnAction Text HOI4DecisionWeight    -- An effect from on_actions (args are the trigger and weight)
+    | HOI4DecSrcNFComplete Text Text Text           -- Effect of completing a national focus
+    | HOI4DecSrcNFSelect Text Text Text             -- Effect of selecting a national focus
     | HOI4DecSrcIdeaOnAdd Text Text Text Text       -- Effect of adding an idea
     | HOI4DecSrcIdeaOnRemove Text Text Text Text    -- Effect of removing an idea
     | HOI4DecSrcCharacterOnAdd Text Text            -- Effect of adding an advisor
@@ -351,7 +351,7 @@ data HOI4Decisioncat = HOI4Decisioncat
     {   decc_name :: Text -- ^ Decision category ID
     ,   decc_name_loc :: Maybe Text -- ^ Localized decision category name
     ,   decc_desc_loc :: Maybe Text
-    ,   decc_icon :: Maybe Text
+    ,   decc_icon :: Text
     ,   decc_picture :: Maybe Text
     ,   decc_custom_icon :: Maybe GenericScript
     ,   decc_visible :: Maybe GenericScript

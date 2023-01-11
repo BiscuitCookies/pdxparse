@@ -4,6 +4,11 @@ A parser for scripts used in Paradox Development Studios games, written in Haske
 Currently only Europa Universalis IV and Hearts of Iron IV are supported,
 but there are plans for other games as well.
 
+This script read the game files and outputs text formatted into wiki tables and templates
+Examples of what it currently outputs on the HoI4 wiki
+https://hoi4.paradoxwikis.com/Ethiopian_national_focus_tree/scriptoutput for national focuses
+https://hoi4.paradoxwikis.com/Swiss_events/scriptoutput for events
+
 ## Building
 
 The easiest way to get it running is to use

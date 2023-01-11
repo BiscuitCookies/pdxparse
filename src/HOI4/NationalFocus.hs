@@ -290,7 +290,7 @@ ppNationalFocus gfx nf = setCurrentFile (nf_path nf) $ do
                         ,"}}"
                         ,PP.line])
             (field nf)
-        icon_pp = HM.findWithDefault "GFX_goal_unknown" (nf_icon nf) gfx
+        icon_pp = HM.findWithDefault "goal_unknown" (nf_icon nf) gfx
     prerequisite_pp <- ppPrereq $ catMaybes $ nf_prerequisite nf
     allowBranch_pp <- ppAllowBranch $ nf_allow_branch nf
     mutuallyExclusive_pp <- ppMutuallyExclusive $ nf_mutually_exclusive nf

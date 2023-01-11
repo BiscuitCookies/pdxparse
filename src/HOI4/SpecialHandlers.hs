@@ -184,7 +184,7 @@ handleIdea addIdea ide = do
         Just iidea -> do
             let ideaKey = id_id iidea
                 ideaname = id_name iidea
-                ideaIcon = HM.findWithDefault "GFX_idea_unknown" (id_picture iidea) gfx
+                ideaIcon = HM.findWithDefault "idea_unknown" (id_picture iidea) gfx
             idea_loc <- getGameL10n ideaname
             category <- if id_category iidea == "country" then getGameL10n "FE_COUNTRY_SPIRIT" else getGameL10n $ id_category iidea
             effectbox <- modmessage iidea idea_loc ideaKey ideaIcon

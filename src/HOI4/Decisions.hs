@@ -52,7 +52,7 @@ import HOI4.Common -- everything
 -- | Empty decision category. Starts off Nothing/empty everywhere, except id and name
 -- (which should get filled in immediately).
 newDecisionCat :: Text -> Maybe Text -> Maybe Text -> FilePath -> HOI4Decisioncat
-newDecisionCat id locid locdesc = HOI4Decisioncat id locid locdesc Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+newDecisionCat id locid locdesc = HOI4Decisioncat id locid locdesc "decision_category_generic" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 -- | Take the decisions categories scripts from game data and parse them into decision
 -- data structures.
@@ -112,7 +112,7 @@ decisioncatAddSection ddeccat stmt
     = return $ (`decisioncatAddSection'` stmt) <$> ddeccat
     where
         decisioncatAddSection' decc stmt = case stmt of
-            [pdx| icon           = $txt  |] -> decc { decc_icon = Just txt }
+            [pdx| icon           = $txt  |] -> decc { decc_icon = txt }
             [pdx| visible        = %rhs  |] -> case rhs of
                 CompoundRhs [] -> decc -- empty, treat as if it wasn't there
                 CompoundRhs scr -> decc { decc_visible = Just scr } -- can check from and root if target_root_trigger is true (or allowed if it's not present)
@@ -174,14 +174,13 @@ ppdecisioncat decc gfx = setCurrentFile (decc_path decc) $ do
     let name = decc_name decc
         nameD = Doc.strictText name
     name_loc <- getGameL10n name
-    let picture = decc_picture decc
-    picture_pp <- maybe (return "")
-            (\pict ->
-                let pictc = if not $ "GFX_decision_cat_" `T.isPrefixOf` pict then "GFX_decision_cat_" <> pict else pict in
-                return $ HM.findWithDefault pictc pictc gfx)
-            picture
+    let icon = decc_icon decc
+    icon_pp <- (\iconc ->
+                let iconcat = if not $ "GFX_decision_category_" `T.isPrefixOf` iconc then "GFX_decision_category_" <> iconc else iconc in
+                return $ HM.findWithDefault "decision_category_generic" iconcat gfx)
+            icon
     return . mconcat $
-        ["== ", Doc.strictText picture_pp , "<!-- ", nameD, " --> ", Doc.strictText name_loc," ==", PP.line
+        ["== [[File:", Doc.strictText icon_pp, ".png]]" , "<!-- ", nameD, " --> ", Doc.strictText name_loc," ==", PP.line
         ," version = ", Doc.strictText version, PP.line
         ,maybe mempty
                (\txt -> mconcat [ Doc.strictText $ italicText $ Doc.nl2br txt, PP.line])
@@ -478,7 +477,7 @@ ppdecision dec gfx = setCurrentFile (dec_path dec) $ do
     icon_pp'd <- case dec_icon dec of
             Just (HOI4DecisionIconSimple txt) ->
                 let icond = if not $ "GFX_decision_" `T.isPrefixOf` txt then "GFX_decision_" <> txt else txt in
-                return $ HM.findWithDefault icond icond gfx
+                return $ HM.findWithDefault "decision_generic_decision" icond gfx
             _ -> return "Check script"
     let days_remove = dec_days_remove dec
         days_re_enable = dec_days_re_enable dec
@@ -699,26 +698,34 @@ ppDecisionSource (HOI4DecSrcOnAction act weight) = do
             ,("on_wargoal_expire","<!-- on_wargoal_expire -->On wargoal expired")
             ,("on_weekly","<!-- on_weekly -->On every week")
             ]
-ppDecisionSource (HOI4DecSrcNFComplete id loc) = do
-    nfloc <- getGameL10n loc
+ppDecisionSource (HOI4DecSrcNFComplete id loc icon) = do
+    gfx <- getInterfaceGFX
+    iconnf <-
+        let iconname = HM.findWithDefault "goal_unknown" icon gfx in
+        return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Completing the national focus "
-        , "<!-- "
+        , iconnf
+        , " <!-- "
         , id
         , " -->"
-        , iquotes't nfloc
+        , iquotes't loc
         ]
-ppDecisionSource (HOI4DecSrcNFSelect id loc) = do
-    nfloc <- getGameL10n loc
+ppDecisionSource (HOI4DecSrcNFSelect id loc icon) =  do
+    gfx <- getInterfaceGFX
+    iconnf <-
+        let iconname = HM.findWithDefault "goal_unknown" icon gfx in
+        return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Selecting the national focus "
-        , "<!-- "
+        , iconnf
+        , " <!-- "
         , id
         , " -->"
-        , iquotes't nfloc
+        , iquotes't loc
         ]
 ppDecisionSource (HOI4DecSrcIdeaOnAdd id loc icon categ) = do
     gfx <- getInterfaceGFX
     iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
+        let iconname = HM.findWithDefault "idea_unknown" icon gfx in
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -734,7 +741,7 @@ ppDecisionSource (HOI4DecSrcIdeaOnAdd id loc icon categ) = do
 ppDecisionSource (HOI4DecSrcIdeaOnRemove id loc icon categ) = do
     gfx <- getInterfaceGFX
     iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
+        let iconname = HM.findWithDefault "idea_unknown" icon gfx in
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -846,8 +853,8 @@ findActivatedDecisionsInNationalFocus hm nf = addDecisionTriggers hm (concatMap 
     where
         findInFocus :: HOI4NationalFocus -> [(Text, HOI4DecisionSource)]
         findInFocus f =
-            addDecisionSource (const (HOI4DecSrcNFComplete (nf_id f) (nf_name_loc f))) (maybe [] findInStmts (nf_completion_reward f)) ++
-            addDecisionSource (const (HOI4DecSrcNFSelect (nf_id f) (nf_name_loc f))) (maybe [] findInStmts (nf_select_effect f))
+            addDecisionSource (const (HOI4DecSrcNFComplete (nf_id f) (nf_name_loc f) (nf_icon f))) (maybe [] findInStmts (nf_completion_reward f)) ++
+            addDecisionSource (const (HOI4DecSrcNFSelect (nf_id f) (nf_name_loc f) (nf_icon f))) (maybe [] findInStmts (nf_select_effect f))
 
 findActivatedDecisionsInIdeas :: HOI4DecisionTriggers -> [HOI4Idea] -> HOI4DecisionTriggers
 findActivatedDecisionsInIdeas hm idea = addDecisionTriggers hm (concatMap findInIdea idea)

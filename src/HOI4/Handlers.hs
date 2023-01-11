@@ -1963,7 +1963,7 @@ focusProgress msg stmt@[pdx| $lhs = @compa |] = do
         Nothing -> preStatement stmt -- unknown national focus
         Just nnf -> do
             let nfKey = nf_id nnf
-                nfIcon = HM.findWithDefault "GFX_goal_unknown" (nf_icon nnf) gfx
+                nfIcon = HM.findWithDefault "goal_unknown" (nf_icon nnf) gfx
             nf_loc <- getGameL10n nfKey
             msgToPP (msg nfIcon nfKey nf_loc compare)
     where
@@ -1991,7 +1991,7 @@ handleFocus msg stmt@[pdx| $lhs = $nf |] = do
         Nothing -> preStatement stmt -- unknown national focus
         Just nnf -> do
             let nfKey = nf_id nnf
-                nfIcon = HM.findWithDefault "GFX_goal_unknown" (nf_icon nnf) gfx
+                nfIcon = HM.findWithDefault "goal_unknown" (nf_icon nnf) gfx
             nf_loc <- getGameL10n nfKey
             msgToPP (msg nfIcon nfKey nf_loc)
 handleFocus _ stmt = preStatement stmt
@@ -2028,7 +2028,7 @@ focusUncomplete msg stmt@[pdx| $lhs = @scr |] = do
                 Nothing -> return $ preMessage stmt -- unknown national focus
                 Just nnf -> do
                     let nfKey = nf_id nnf
-                        nfIcon = HM.findWithDefault "GFX_goal_unknown" (nf_icon nnf) gfx
+                        nfIcon = HM.findWithDefault "goal_unknown" (nf_icon nnf) gfx
                     nf_loc <- getGameL10n nfKey
                     return $ msg nfIcon nfKey nf_loc (uf_uncomplete_children uf)
 focusUncomplete _ stmt = preStatement stmt

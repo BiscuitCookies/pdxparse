@@ -649,7 +649,7 @@ ppEventSource (HOI4EvtSrcOnAction act weight) = do
 ppEventSource (HOI4EvtSrcNFComplete id loc icon) = do
     gfx <- getInterfaceGFX
     iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
+        let iconname = HM.findWithDefault "goal_unknown" icon gfx in
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Completing the national focus "
         , iconnf
@@ -661,7 +661,7 @@ ppEventSource (HOI4EvtSrcNFComplete id loc icon) = do
 ppEventSource (HOI4EvtSrcNFSelect id loc icon) = do
     gfx <- getInterfaceGFX
     iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
+        let iconname = HM.findWithDefault "goal_unknown" icon gfx in
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Selecting the national focus "
         , iconnf
@@ -673,7 +673,7 @@ ppEventSource (HOI4EvtSrcNFSelect id loc icon) = do
 ppEventSource (HOI4EvtSrcIdeaOnAdd id loc icon categ) = do
     gfx <- getInterfaceGFX
     iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
+        let iconname = HM.findWithDefault "idea_unknown" icon gfx in
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -689,7 +689,7 @@ ppEventSource (HOI4EvtSrcIdeaOnAdd id loc icon categ) = do
 ppEventSource (HOI4EvtSrcIdeaOnRemove id loc icon categ) = do
     gfx <- getInterfaceGFX
     iconnf <-
-        let iconname = HM.findWithDefault icon icon gfx in
+        let iconname = HM.findWithDefault "idea_unknown" icon gfx in
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
