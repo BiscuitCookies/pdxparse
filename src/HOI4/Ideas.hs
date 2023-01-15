@@ -5,7 +5,7 @@ Description : Feature handler for Hearts of Iron IV idea groups
 module HOI4.Ideas (
         HOI4Idea (..)
     ,   parseHOI4Ideas
---    ,   writeHOI4Ideas
+    ,   writeHOI4Ideas
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -278,8 +278,13 @@ ppIdea gfx id = setCurrentFile (id_path id) $ do
                         ,PP.line])
             (field id)
         icon_pp = HM.findWithDefault "idea_unknown" (id_picture id) gfx
+    name_pp <- getGameL10n $ id_name id
     prerequisite_pp <- nfArg id_available ppScript
-    allowBranch_pp <- ppAllowBranch $ id_allow_branch id
+    allowBranch_pp <- ppAllowBranch $ id_allowed id
+    mod <- nfArg id_modifier ppScript
+    equipmod <- nfArg id_equipment_bonus ppScript
+    tarmod <- nfArg id_targeted_modifier ppScript
+    hidmod <- nfArg id_hidden_modifier ppScript
     mutuallyExclusive_pp <- ppMutuallyExclusive $ id_mutually_exclusive id
     available_pp <- nfArg id_available ppScript
     completionReward_pp <- setIsInEffect True $ nfArg id_completion_reward ppScript
@@ -287,7 +292,7 @@ ppIdea gfx id = setCurrentFile (id_path id) $ do
     return . mconcat $
         [ "|- id = \"", Doc.strictText (id_name_loc id),"\"" , PP.line
         , "| [[File:", Doc.strictText icon_pp, ".png]]", PP.line
-        , "| ", Doc.strictText (id_name_loc id) , "<!-- ", Doc.strictText (id_id id), " -->", PP.line
+        , "| ", Doc.strictText name_pp, "<!-- ", Doc.strictText (id_id id), " -->", PP.line
         , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (id_name_desc id), PP.line , "}}", PP.line
         , "| ", PP.line]++
         allowBranch_pp ++

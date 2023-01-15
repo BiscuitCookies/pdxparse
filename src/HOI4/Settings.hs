@@ -45,7 +45,7 @@ import HOI4.Decisions (parseHOI4Decisioncats, writeHOI4DecisionCats
                       ,findActivatedDecisionsInScriptedEffects
                       ,findActivatedDecisionsInBops)
 import HOI4.Ideas (parseHOI4Ideas
-    --, writeHOI4Ideas
+    , writeHOI4Ideas
     )
 import HOI4.Modifiers (
                       parseHOI4OpinionModifiers, writeHOI4OpinionModifiers
