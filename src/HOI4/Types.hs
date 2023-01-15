@@ -344,6 +344,8 @@ data HOI4Idea = HOI4Idea
     ,   id_allowed_civil_war :: Maybe GenericScript
     ,   id_category :: Text
     ,   id_path :: FilePath -- ^ Source file
+    ,   id_cost :: Maybe Double
+    ,   id_traits :: Maybe GenericScript
     } deriving (Show)
 
 -- | Decision data.

@@ -27,7 +27,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Text.PrettyPrint.Leijen.Text (Doc)
 import qualified Text.PrettyPrint.Leijen.Text as PP
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeBaseName)
 
 import Abstract -- everything
 import qualified Doc
@@ -86,7 +86,7 @@ parseHOI4IdeaGroup _ = withCurrentFile $ \file ->
 -- | Empty idea. Starts off Nothing everywhere, except id and name
 -- (should get filled in immediately).
 newIdea :: HOI4Idea
-newIdea = HOI4Idea undefined undefined "<!-- Check Script -->" undefined "GFX_idea_unknown" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined undefined
+newIdea = HOI4Idea undefined undefined "<!-- Check Script -->" undefined "GFX_idea_unknown" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined undefined Nothing Nothing
 
 -- | Parse one idea script into a idea data structure.
 parseHOI4Idea :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
@@ -188,10 +188,147 @@ ideaAddSection iidea stmt
             "removal_cost"      -> iidea
             "level"             -> iidea
             "allowed_to_remove" -> iidea
-            "cost"              -> iidea
-            "traits"            -> iidea
+            "cost"              -> case rhs of
+                FloatRhs num -> iidea { id_cost = Just num }
+                _-> trace "bad idea cost" iidea
+            "traits"            -> case rhs of
+                CompoundRhs [] -> iidea
+                CompoundRhs scr -> iidea { id_traits = Just scr }
+                _-> trace "bad idea traits" iidea
             "ledger"            -> iidea
             "default"           -> iidea
             other               -> trace ("unknown idea section: " ++ T.unpack other) iidea
         ideaAddSection' iidea _
             = trace "unrecognised form for idea section" iidea
+
+writeHOI4Ideas :: (HOI4Info g, MonadIO m) => PPT g m ()
+writeHOI4Ideas = do
+    ideas <- getIdeaScripts
+    interface <- getInterfaceGFX
+    pathIDS <- parseHOI4IdeasPath ideas
+    let pathedIdea :: [Feature [HOI4Idea]]
+        pathedIdea = map (\ids -> Feature {
+                                        featurePath = Just $ id_path $ head ids
+                                    ,   featureId = Just (T.pack $ takeBaseName $ id_path $ head ids) <> Just ".txt"
+                                    ,   theFeature = Right ids })
+                              (HM.elems pathIDS)
+    writeFeatures "ideas"
+                  pathedIdea
+                  (ppIdeas interface)
+
+parseHOI4IdeasPath :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
+    HashMap String GenericScript -> PPT g m (HashMap FilePath [HOI4Idea])
+parseHOI4IdeasPath scripts = do
+    tryParse <- hoistExceptions $
+        HM.traverseWithKey
+            (\sourceFile scr ->
+                setCurrentFile sourceFile $ concat <$> mapM parseHOI4IdeaGroup (case scr of
+                    [[pdx| ideas = @mods |]] -> mods
+                    _ -> []))
+            scripts
+    case tryParse of
+        Left err -> do
+            traceM $ "Completely failed parsing national focus: " ++ T.unpack err
+            return HM.empty
+        Right nfFilesOrErrors ->
+            return $ HM.filter (not . null) $ flip HM.mapWithKey nfFilesOrErrors $ \sourceFile enfs ->
+                mapMaybe (\case
+                    Left err -> do
+                        traceM $ "Error parsing national focus in " ++ sourceFile
+                                 ++ ": " ++ T.unpack err
+                        Nothing
+                    Right nfocus -> nfocus)
+                    enfs
+
+ppIdeas :: forall g m. (HOI4Info g, Monad m) => HashMap Text Text -> [HOI4Idea] -> PPT g m Doc
+ppIdeas gfx nfs = do
+    version <- gets (gameVersion . getSettings)
+    nfDoc <- mapM (scope HOI4Country . ppIdea gfx) nfs -- Better to leave unsorted? (sortOn (sortName . nf_name_loc) nfs)
+    return . mconcat $
+        [ "{{Version|", Doc.strictText version, "}}", PP.line
+        , "{| class=\"mildtable\" ", PP.line
+        , "! style=\"width: 30%;\" | Category", PP.line
+        , "! style=\"width: 30%;\" | Focus", PP.line
+        , "! style=\"width: 40%;\" | Prerequisites", PP.line
+        , "! style=\"width: 40%;\" | Effects", PP.line
+        ] ++ nfDoc ++
+        [ "|}", PP.line
+        ]
+
+ppIdea :: forall g m. (HOI4Info g, Monad m) => HashMap Text Text -> HOI4Idea -> PPT g m Doc
+ppIdea gfx id = setCurrentFile (id_path id) $ do
+    let nfArg :: (HOI4Idea -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
+        nfArg field fmt
+            = maybe (return [])
+                (\field_content -> do
+                    content_pp'd <- fmt field_content
+                    return
+                        [content_pp'd
+                        ,PP.line])
+            (field id)
+    let nfArgExtra :: Doc -> (HOI4Idea -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
+        nfArgExtra extra field fmt
+            = maybe (return [])
+                (\field_content -> do
+                    content_pp'd <- fmt field_content
+                    return
+                        ["{{",extra,"|",PP.line
+                        ,content_pp'd
+                        ,"}}"
+                        ,PP.line])
+            (field id)
+        icon_pp = HM.findWithDefault "idea_unknown" (id_picture id) gfx
+    prerequisite_pp <- nfArg id_available ppScript
+    allowBranch_pp <- ppAllowBranch $ id_allow_branch id
+    mutuallyExclusive_pp <- ppMutuallyExclusive $ id_mutually_exclusive id
+    available_pp <- nfArg id_available ppScript
+    completionReward_pp <- setIsInEffect True $ nfArg id_completion_reward ppScript
+    selectEffect_pp <- setIsInEffect True $ nfArgExtra "select" id_select_effect ppScript
+    return . mconcat $
+        [ "|- id = \"", Doc.strictText (id_name_loc id),"\"" , PP.line
+        , "| [[File:", Doc.strictText icon_pp, ".png]]", PP.line
+        , "| ", Doc.strictText (id_name_loc id) , "<!-- ", Doc.strictText (id_id id), " -->", PP.line
+        , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (id_name_desc id), PP.line , "}}", PP.line
+        , "| ", PP.line]++
+        allowBranch_pp ++
+        prerequisite_pp ++
+        mutuallyExclusive_pp ++
+        available_pp ++
+        bypass_pp ++
+        [ "| ", PP.line]++
+        completionReward_pp ++
+        selectEffect_pp
+
+ppPrereq :: (HOI4Info g, Monad m) => [GenericScript] -> PPT g m [Doc]
+ppPrereq [] = return [""]
+ppPrereq prereqs = mapM ppTitle prereqs
+    where
+        ppTitle prereq = do
+            let reqfol = if length prereq == 1 then
+                    [Doc.strictText "* Requires the following:", PP.line]
+                else
+                    [Doc.strictText "* Requires ''one'' of the following:", PP.line]
+            reqs <- sequenceA
+                [indentUp (ppScript prereq), pure PP.line
+                ]
+            return . mconcat $ reqfol ++ reqs
+
+ppMutuallyExclusive :: (HOI4Info g, Monad m) => Maybe GenericScript -> PPT g m [Doc]
+ppMutuallyExclusive Nothing = return [""]
+ppMutuallyExclusive (Just mex) = ppTitle mex
+    where
+        ppTitle mexc = do
+            let mexfol = mconcat [Doc.strictText "* {{icon|ExclusiveM}} Mutually exclusive with:", PP.line]
+            mexcpp <- indentUp (ppScript mexc)
+            let excl = [mexfol, mexcpp, PP.line]
+            return excl
+
+ppAllowBranch :: (HOI4Info g, Monad m) => Maybe GenericScript -> PPT g m [Doc]
+ppAllowBranch Nothing = return [""]
+ppAllowBranch (Just abr) = ppTitle abr
+    where
+        ppTitle awbr = do
+            let awbrfol = mconcat [Doc.strictText "* Allow Branch if:", PP.line]
+            awbrpp <- indentUp (ppScript awbr)
+            let allwbr = [awbrfol, awbrpp, PP.line]
+            return allwbr

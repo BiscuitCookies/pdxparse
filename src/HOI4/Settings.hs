@@ -542,15 +542,17 @@ writeHOI4Scripts :: (HOI4Info g, MonadIO m) => PPT g m ()
 writeHOI4Scripts = do
 --        liftIO $ putStrLn "Writing ideas."
 --        writeHOI4Ideas
-        liftIO $ putStrLn "Writing events."
-        writeHOI4Events
-        liftIO $ putStrLn "Writing decision categories."
-        writeHOI4DecisionCats
-        liftIO $ putStrLn "Writing decisions."
-        writeHOI4Decisions
-        liftIO $ putStrLn "Writing national focuses."
-        writeHOI4NationalFocuses
-        liftIO $ putStrLn "Writing opinion modifiers."
-        writeHOI4OpinionModifiers
-        liftIO $ putStrLn "Writing dynamic modifiers."
-        writeHOI4DynamicModifiers
+--        liftIO $ putStrLn "Writing events."
+--        writeHOI4Events
+--        liftIO $ putStrLn "Writing decision categories."
+--        writeHOI4DecisionCats
+--        liftIO $ putStrLn "Writing decisions."
+--        writeHOI4Decisions
+--        liftIO $ putStrLn "Writing national focuses."
+--        writeHOI4NationalFocuses
+--        liftIO $ putStrLn "Writing opinion modifiers."
+--        writeHOI4OpinionModifiers
+--        liftIO $ putStrLn "Writing dynamic modifiers."
+--        writeHOI4DynamicModifiers
+        liftIO $ putStrLn "Writing ideas."
+        writeHOI4Ideas
