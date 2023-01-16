@@ -345,7 +345,7 @@ data HOI4Idea = HOI4Idea
     ,   id_category :: Text
     ,   id_path :: FilePath -- ^ Source file
     ,   id_cost :: Maybe Double
-    ,   id_traits :: Maybe GenericScript
+    ,   id_traits :: Maybe GenericStatement
     } deriving (Show)
 
 -- | Decision data.

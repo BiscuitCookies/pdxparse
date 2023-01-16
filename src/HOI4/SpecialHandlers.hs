@@ -29,6 +29,8 @@ module HOI4.SpecialHandlers (
     ,   addRemoveUnitTrait
     ,   addTimedTrait
     ,   swapLeaderTrait
+    ,   getLeaderTraits
+    ,   getbaretraits
     ) where
 
 import Data.Char (toUpper, toLower, isUpper)

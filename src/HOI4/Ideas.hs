@@ -33,15 +33,19 @@ import Abstract -- everything
 import qualified Doc
 import FileIO (Feature (..), writeFeatures)
 import HOI4.Messages -- everything
-import MessageTools (iquotes)
+-- everything
+import MessageTools (iquotes, plainNum)
 import HOI4.Handlers (flagText, getStateLoc, plainMsg')
+import HOI4.SpecialHandlers (getLeaderTraits, getbaretraits)
 import QQ (pdx)
 import SettingsTypes ( PPT, Settings (..), Game (..)
                      , IsGame (..), IsGameData (..), IsGameState (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile, withCurrentIndent
-                     , hoistErrors, hoistExceptions)
+                     , hoistErrors, hoistExceptions
+                     , concatMapM)
 import HOI4.Common -- everything
+import GHC.RTS.Flags (RTSFlags(costCentreFlags))
 
 -- | Take the idea group scripts from game data and parse them into idea group
 -- data structures.
@@ -189,11 +193,11 @@ ideaAddSection iidea stmt
             "level"             -> iidea
             "allowed_to_remove" -> iidea
             "cost"              -> case rhs of
-                FloatRhs num -> iidea { id_cost = Just num }
+                (floatRhs -> Just num) -> iidea { id_cost = Just num }
                 _-> trace "bad idea cost" iidea
             "traits"            -> case rhs of
                 CompoundRhs [] -> iidea
-                CompoundRhs scr -> iidea { id_traits = Just scr }
+                CompoundRhs scr -> iidea { id_traits = Just stmt }
                 _-> trace "bad idea traits" iidea
             "ledger"            -> iidea
             "default"           -> iidea
@@ -248,9 +252,12 @@ ppIdeas gfx nfs = do
         [ "{{Version|", Doc.strictText version, "}}", PP.line
         , "{| class=\"mildtable\" ", PP.line
         , "! style=\"width: 30%;\" | Category", PP.line
-        , "! style=\"width: 30%;\" | Focus", PP.line
+        , "! style=\"width: 30%;\" | idea", PP.line
+        , "! style=\"width: 30%;\" | image", PP.line
+        , "! style=\"width: 30%;\" | desc", PP.line
         , "! style=\"width: 40%;\" | Prerequisites", PP.line
         , "! style=\"width: 40%;\" | Effects", PP.line
+        , "! style=\"width: 40%;\" | costs", PP.line
         ] ++ nfDoc ++
         [ "|}", PP.line
         ]
@@ -280,60 +287,33 @@ ppIdea gfx id = setCurrentFile (id_path id) $ do
         icon_pp = HM.findWithDefault "idea_unknown" (id_picture id) gfx
     name_pp <- getGameL10n $ id_name id
     prerequisite_pp <- nfArg id_available ppScript
-    allowBranch_pp <- ppAllowBranch $ id_allowed id
-    mod <- nfArg id_modifier ppScript
-    equipmod <- nfArg id_equipment_bonus ppScript
+    allowBranch_pp <- nfArg id_allowed ppScript
+    visible_pp <- nfArg id_visible ppScript
+    mod <- nfArg id_modifier ppStatement
+    equipmod <- nfArg id_equipment_bonus ppStatement
+    resmod <- nfArg id_research_bonus ppStatement
     tarmod <- nfArg id_targeted_modifier ppScript
-    hidmod <- nfArg id_hidden_modifier ppScript
-    mutuallyExclusive_pp <- ppMutuallyExclusive $ id_mutually_exclusive id
     available_pp <- nfArg id_available ppScript
-    completionReward_pp <- setIsInEffect True $ nfArg id_completion_reward ppScript
-    selectEffect_pp <- setIsInEffect True $ nfArgExtra "select" id_select_effect ppScript
+    traitmsg <- case id_traits id of
+        Just [pdx| %_ = @arr |] -> do
+            let traitbare = mapMaybe getbaretraits arr
+            concatMapM getLeaderTraits traitbare
+        _-> return []
+    traitmsg_pp <- imsg2doc traitmsg
     return . mconcat $
-        [ "|- id = \"", Doc.strictText (id_name_loc id),"\"" , PP.line
+        [ "|- ", PP.line
+        , "| ", Doc.strictText $ id_category id, PP.line
         , "| [[File:", Doc.strictText icon_pp, ".png]]", PP.line
         , "| ", Doc.strictText name_pp, "<!-- ", Doc.strictText (id_id id), " -->", PP.line
-        , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (id_name_desc id), PP.line , "}}", PP.line
-        , "| ", PP.line]++
+        , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (id_desc_loc id), PP.line
+        , "| ",PP.line]++
         allowBranch_pp ++
         prerequisite_pp ++
-        mutuallyExclusive_pp ++
         available_pp ++
-        bypass_pp ++
-        [ "| ", PP.line]++
-        completionReward_pp ++
-        selectEffect_pp
-
-ppPrereq :: (HOI4Info g, Monad m) => [GenericScript] -> PPT g m [Doc]
-ppPrereq [] = return [""]
-ppPrereq prereqs = mapM ppTitle prereqs
-    where
-        ppTitle prereq = do
-            let reqfol = if length prereq == 1 then
-                    [Doc.strictText "* Requires the following:", PP.line]
-                else
-                    [Doc.strictText "* Requires ''one'' of the following:", PP.line]
-            reqs <- sequenceA
-                [indentUp (ppScript prereq), pure PP.line
-                ]
-            return . mconcat $ reqfol ++ reqs
-
-ppMutuallyExclusive :: (HOI4Info g, Monad m) => Maybe GenericScript -> PPT g m [Doc]
-ppMutuallyExclusive Nothing = return [""]
-ppMutuallyExclusive (Just mex) = ppTitle mex
-    where
-        ppTitle mexc = do
-            let mexfol = mconcat [Doc.strictText "* {{icon|ExclusiveM}} Mutually exclusive with:", PP.line]
-            mexcpp <- indentUp (ppScript mexc)
-            let excl = [mexfol, mexcpp, PP.line]
-            return excl
-
-ppAllowBranch :: (HOI4Info g, Monad m) => Maybe GenericScript -> PPT g m [Doc]
-ppAllowBranch Nothing = return [""]
-ppAllowBranch (Just abr) = ppTitle abr
-    where
-        ppTitle awbr = do
-            let awbrfol = mconcat [Doc.strictText "* Allow Branch if:", PP.line]
-            awbrpp <- indentUp (ppScript awbr)
-            let allwbr = [awbrfol, awbrpp, PP.line]
-            return allwbr
+        [ "| ",PP.line]++
+        mod ++
+        equipmod ++
+        tarmod ++
+        resmod ++
+        [traitmsg_pp, PP.line
+        , "| ", if id_category id == "country" then mempty else maybe "150" plainNum (id_cost id), PP.line]
