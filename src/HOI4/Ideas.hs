@@ -299,6 +299,13 @@ ppIdea gfx id = setCurrentFile (id_path id) $ do
             let traitbare = mapMaybe getbaretraits arr
             concatMapM getLeaderTraits traitbare
         _-> return []
+    traitids <- case id_traits id of
+        Just [pdx| %_ = @arr |] -> do
+            let traitbare = mapMaybe getbaretraits arr
+                traitlist = intersperse ", " traitbare
+                traitids = map Doc.strictText traitlist
+            return $ ["traitids: "] ++ traitids ++ ["\n\n"]
+        _-> return []
     traitmsg_pp <- imsg2doc traitmsg
     return . mconcat $
         [ "|- ", PP.line
@@ -315,5 +322,6 @@ ppIdea gfx id = setCurrentFile (id_path id) $ do
         equipmod ++
         tarmod ++
         resmod ++
+        traitids ++
         [traitmsg_pp, PP.line
         , "| ", if id_category id == "country" then mempty else maybe "150" plainNum (id_cost id), PP.line]
