@@ -279,6 +279,15 @@ data Settings = Settings {
 setGameL10n :: Settings -> L10n -> [Text] -> HashMap Text Text -> Settings
 setGameL10n settings l10n l10nkeys interface = settings { gameL10n = l10n, gameL10nKeys = l10nkeys, gameInterface = interface}
 
+data FormattedTextFragment
+  = PlainText Text -- ^ unformatted text and text that isn't handled
+  | ColoredText Text Text -- ^ contains the color key and text that is formatted using §
+  | IconText Text -- ^ key to text icon using £
+  | KeyText Text -- ^ contains text enclosed by $ for EU4 it's scalar identifiers for HOI4 it's another localization key,
+                 --   $$ is for the actual dollar sign being displayed
+
+type FormatText = [FormattedTextFragment]
+
 -- | Output monad.
 type PP g = StateT (GameData g) (Reader (GameState g)) -- equal to PPT g Identity a
 -- | Transformer version of 'PP'. All statement handlers should be in it.
@@ -371,16 +380,6 @@ alsoIndent' x = withCurrentIndent $ \i -> return (i,x)
 getCurrentLang :: (IsGameData (GameData g), Monad m) => PPT g m L10nLang
 getCurrentLang = gets (HM.findWithDefault HM.empty . language . getSettings) <*> gets (gameL10n . getSettings)
 
-
-
-data FormattedTextFragment
-  = PlainText Text -- ^ unformatted text and text that isn't handled
-  | ColoredText Text Text -- ^ contains the color key and text that is formatted using §
-  | IconText Text -- ^ key to text icon using £
-  | KeyText Text -- ^ contains text enclosed by $ for EU4 it's scalar identifiers for HOI4 it's another localization key,
-                 --   $$ is for the actual dollar sign being displayed
-
-type FormatText = [FormattedTextFragment]
 -- | remove or handle formatting markers from a localisation text
 -- currently only simple formattings (§ followed by one character) are handled
 -- For EU4 and HOI4 £ and § are both used for text icons and colors respectively
@@ -393,10 +392,9 @@ handleLocFormat text = do
 handleGameFormat :: (IsGameData (GameData g), Monad m) => Text -> Text -> PPT g m Text
 handleGameFormat g t
     | g == "HOI4" = do
-        gfx <- gets (gameInterface . getSettings)
         case parseFormat t of
             Left err -> return $ trace ("parse failed on: " ++ err) t
-            Right clean -> concatMapM unpackTextfragment clean
+            Right tformat -> mconcat $ map unpackTextfragment tformat
     | g == "EU4" =
         case removeFormat t of
             Left err -> return t
@@ -407,10 +405,16 @@ unpackTextfragment :: (IsGameData (GameData g), Monad m) => FormattedTextFragmen
 unpackTextfragment = \case
     PlainText t -> return t
     ColoredText k t -> return t
-    IconText k ->  case getGameInterfaceIfPresent k of
-        Just f -> return $ "[File:" <> f <> ".png]"
-        Nothing -> return $ "£" <> k
-    KeyText  k -> return $ "$" <> k <> "$"
+    IconText k -> do
+        gfx <- getGameInterfaceIfPresent k
+        case gfx of
+            Just f -> return $ "[File:" <> f <> ".png]"
+            Nothing -> return $ "£" <> k
+    KeyText k -> do
+        mloc <- getGameL10nIfPresent k
+        case mloc of
+            Just t -> return t
+            Nothing -> return $ "$" <> k <> "$"
 
 parseFormat :: Text -> Either String FormatText
 parseFormat = Ap.parseOnly parseFormat'
