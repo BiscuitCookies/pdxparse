@@ -41,9 +41,10 @@ import Control.Monad.State (StateT (..), gets)
 import Control.Applicative (Alternative (..))
 
 import Data.Foldable (fold)
-import Data.Maybe (isNothing, fromJust, listToMaybe)
+import Data.Maybe (isNothing, fromJust, listToMaybe, fromMaybe)
 
 import Data.Text (Text)
+import qualified Data.Text as T
 import Text.Shakespeare.I18N (Lang)
 --import qualified Text.PrettyPrint.Leijen.Text as PP
 
@@ -53,7 +54,7 @@ import qualified Data.HashMap.Strict as HM
 import Data.Attoparsec.Text (Parser, (<?>))
 import qualified Data.Attoparsec.Text as Ap
 import Data.Functor (($>))
-import Data.Char (isAlpha)
+import Data.Char (isAlpha, isSpace)
 
 import Abstract () -- everything
 import Yaml (L10n, L10nLang,LocEntry (..))
@@ -394,7 +395,7 @@ handleGameFormat g t
     | g == "HOI4" = do
         case parseFormat t of
             Left err -> return $ trace ("parse failed on: " ++ err) t
-            Right tformat -> mconcat $ map unpackTextfragment tformat
+            Right tformat -> mconcat <$> traverse unpackTextfragment tformat
     | g == "EU4" =
         case removeFormat t of
             Left err -> return t
@@ -406,7 +407,8 @@ unpackTextfragment = \case
     PlainText t -> return t
     ColoredText k t -> return t
     IconText k -> do
-        gfx <- getGameInterfaceIfPresent k
+        let kpref = if "GFX_" `T.isPrefixOf` k then k else "GFX_" <> k
+        gfx <- getGameInterfaceIfPresent kpref
         case gfx of
             Just f -> return $ "[File:" <> f <> ".png]"
             Nothing -> return $ "£" <> k
@@ -437,7 +439,8 @@ keyText :: Parser Text
 keyText = "$" *> Ap.takeWhile1 (Ap.inClass "a-zA-Z._0-9-") <* Ap.char '$'
 
 iconText :: Parser Text
-iconText = "£" *> Ap.takeWhile1 (Ap.inClass "a-zA-Z._0-9|-") <* Ap.satisfy (not . isAlpha)
+iconText = "£" *> Ap.takeWhile1 (Ap.inClass "a-zA-Z._0-9|-")
+    <* Ap.option 'e' (Ap.satisfy (not . \c -> isAlpha c || Ap.isHorizontalSpace c)) -- can be end of line or a special character directly after the key
 
 removeFormat :: Text -> Either String Text
 removeFormat = Ap.parseOnly removeCol

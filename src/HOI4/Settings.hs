@@ -333,15 +333,15 @@ instance IsGameState (GameState HOI4) where
 readHOI4Scripts :: forall m. MonadIO m => PPT HOI4 m ()
 readHOI4Scripts = do
     settings <- gets getSettings
-    let readOneScript :: Bool -> String -> PPT HOI4 m (String, GenericScript)
-        readOneScript specific target = do
-            content <- if specific then liftIO $ readScript settings target else liftIO $ readSpecificScript target
+    let readOneScript :: String -> PPT HOI4 m (String, GenericScript)
+        readOneScript target = do
+            content <- liftIO $ readScript settings target
             --traceM (show target)
-            --when (null content) $
-                --liftIO $ hPutStrLn stderr $
-                    --"Warning: " ++ target
-                       -- ++ " contains no scripts - failed parse? Expected feature type "
-                       -- ++ category
+            when (null content) $
+                liftIO $ hPutStrLn stderr $
+                    "Warning: " ++ target
+                        ++ " contains no scripts - failed parse? Expected feature type "
+                        ++ category
             return (target, content)
 
         readHOI4Script :: String -> PPT HOI4 m (HashMap String GenericScript)
@@ -376,7 +376,7 @@ readHOI4Scripts = do
                 results <- forM files $ \filename -> readOneScript True (sourceSubdir </> filename)
                 return $ foldl (flip (uncurry HM.insert)) HM.empty results
             else return $ trace ("WARNING: Unable to find " ++ show sourceDir) HM.empty
-
+        {-
         readHOI4SpecificScript :: String -> PPT HOI4 m (HashMap String GenericScript)
         readHOI4SpecificScript category = do
             settings <- gets getSettings
@@ -419,7 +419,7 @@ readHOI4Scripts = do
         buildCompletePath path = liftIO (filterM (doesFileExist . (path </>))
                                     =<< filterM (pure . isExtensionOf ".gfx")
                                      =<< getDirectoryContents path)
-
+        -}
     ideasScripts <- readHOI4Script "ideas"
     decisioncats <- readHOI4Script "decisioncats"
     decisions <- readHOI4Script "decisions"
