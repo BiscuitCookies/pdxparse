@@ -6,7 +6,7 @@ module FileIO (
         readFileRetry
     ,   buildPath
     ,   readScript
-    ,   readSpecificScript
+    ,   readPathScript
     ,   readScriptFromText
     ,   Feature (..)
     ,   writeFeatures
@@ -81,6 +81,9 @@ buildPath settings path =
 readScript :: Settings -> FilePath -> IO GenericScript
 readScript settings file = do
     let filepath = buildPath settings file
+    readPathScript filepath
+readPathScript :: FilePath -> IO GenericScript
+readPathScript filepath = do
     contents <- readFileRetry filepath
     case runparserAndAddClosingCurlyBrackets filepath contents of
         -- this case probably can't happen with our parser

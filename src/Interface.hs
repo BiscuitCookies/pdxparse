@@ -29,7 +29,7 @@ import SettingsTypes ( Settings (..)
 
                      , concatMapM)
 import QQ (pdx)
-import FileIO (readSpecificScript)
+import FileIO (readPathScript)
 
 -- | Read and parse localization files for the current game.
 --
@@ -47,7 +47,7 @@ readInterface settings = do
     let dirmod'       = dirmod : dirmodsub
         dirs = dirmod'++ [dir]
     files <- concatMapM readInterfaceDirs dirs
-    scripts <- forM files $ \filename -> liftIO $ readSpecificScript filename
+    scripts <- forM files $ \filename -> liftIO $ readPathScript filename
     let tryParse = map (map processInterface . concatMap (\case
                     [pdx| $spriteTypes = @spr |] | T.toLower spriteTypes == "spritetypes" -> spr
                     _ -> []))

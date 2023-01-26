@@ -405,17 +405,17 @@ handleGameFormat g t
 unpackTextfragment :: (IsGameData (GameData g), Monad m) => FormattedTextFragment -> PPT g m Text
 unpackTextfragment = \case
     PlainText t -> return t
-    ColoredText k t -> return t
+    ColoredText k t -> return $ "{{color|" <> k <> "|" <> t <> "}}"
     IconText k -> do
         let kpref = if "GFX_" `T.isPrefixOf` k then k else "GFX_" <> k
         gfx <- getGameInterfaceIfPresent kpref
         case gfx of
-            Just f -> return $ "[File:" <> f <> ".png]"
+            Just f -> return $ "[[File:" <> f <> ".png]]"
             Nothing -> return $ "£" <> k
     KeyText k -> do
         mloc <- getGameL10nIfPresent k
         case mloc of
-            Just t -> return t
+            Just t -> return $ "<!--Localisation key:" <> k <> "-->" <> t
             Nothing -> return $ "$" <> k <> "$"
 
 parseFormat :: Text -> Either String FormatText
