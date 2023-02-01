@@ -20,6 +20,8 @@ module SettingsTypes (
     ,   getGameL10n
     ,   getGameL10nDefault
     ,   getGameL10nIfPresent
+    ,   getGameInterface
+    ,   getGameInterfaceIfPresent
     ,   setCurrentFile, withCurrentFile
     ,   getLangs
     ,   unfoldM, concatMapM
@@ -27,25 +29,35 @@ module SettingsTypes (
     ,   unsnoc, safeLast, safeIndex
     ) where
 
-import Control.Monad (liftM, join, void)
+import Debug.Trace (trace, traceM)
+
+import Control.Monad (void)
 import Control.Monad.Trans (MonadIO)
 import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.Identity (Identity (..))
-import Control.Monad.Reader (Reader (..), ReaderT (..), MonadReader (..), asks)
-import Control.Monad.State (StateT (..), MonadState (..), execStateT, gets)
+import Control.Monad.Reader (Reader, ReaderT (..), MonadReader (..), asks)
+import Control.Monad.State (StateT (..), gets)
+
+import Control.Applicative (Alternative (..))
 
 import Data.Foldable (fold)
-import Data.Maybe (isNothing, fromJust, listToMaybe)
+import Data.Maybe (isNothing, fromJust, listToMaybe, fromMaybe)
 
 import Data.Text (Text)
+import qualified Data.Text as T
 import Text.Shakespeare.I18N (Lang)
-import Text.PrettyPrint.Leijen.Text (Doc)
 --import qualified Text.PrettyPrint.Leijen.Text as PP
 
+import Data.HashMap.Strict(HashMap)
 import qualified Data.HashMap.Strict as HM
 
+import Data.Attoparsec.Text (Parser, (<?>))
+import qualified Data.Attoparsec.Text as Ap
+import Data.Functor (($>))
+import Data.Char (isAlpha, isSpace)
+
 import Abstract () -- everything
-import Yaml (L10n, L10nLang, LocEntry (..))
+import Yaml (L10n, L10nLang,LocEntry (..))
 
 -- | Command line arguments.
 data CLArgs
@@ -240,6 +252,7 @@ data Settings = Settings {
                                 --   usually @Steam/steamapps/common@
     ,   l10nScheme  :: L10nScheme -- ^ Localization scheme being used
     ,   game        :: Game     -- ^ Game-specific actions.
+    ,   gameString  :: Text     -- ^ Game as string for comparison.
     ,   gameFolder  :: String   -- ^ Folder under apps directory containing the
                                 --   game files.  Usually the same as the
                                 --   game's name, e.g. "Hearts of Iron IV".
@@ -252,8 +265,10 @@ data Settings = Settings {
     ,   languageS   :: String   -- ^ Output language code, as String for easy
                                 --   manipulation of FilePaths.
     ,   gameVersion :: Text     -- ^ Version of the game (e.g. \"1.22\")
+    ,   gameInterface :: HashMap Text Text     -- ^ Image name hashmap for pairing imagecodenames to actual imagenames
     ,   gameL10n    :: L10n     -- ^ Game localization table. See "Yaml" for
                                 --   the definition of this type.
+    ,   gameL10nKeys :: [Text]
     ,   langs       :: [Lang]   -- ^ Preferential list of output languages.
                                 --   Currently only \"en\" is supported.
     ,   settingsFile :: FilePath -- ^ Path to @settings.yaml@.
@@ -262,8 +277,17 @@ data Settings = Settings {
     }
 
 -- | Set the game localization table. Used by "Settings".
-setGameL10n :: Settings -> L10n -> Settings
-setGameL10n settings l10n = settings { gameL10n = l10n }
+setGameL10n :: Settings -> L10n -> [Text] -> HashMap Text Text -> Settings
+setGameL10n settings l10n l10nkeys interface = settings { gameL10n = l10n, gameL10nKeys = l10nkeys, gameInterface = interface}
+
+data FormattedTextFragment
+  = PlainText Text -- ^ unformatted text and text that isn't handled
+  | ColoredText Text FormatText -- ^ contains the color key and text that is formatted using §
+  | IconText Text -- ^ key to text icon using £
+  | KeyText Text -- ^ contains text enclosed by $ for EU4 it's scalar identifiers for HOI4 it's another localization key,
+                 --   $$ is for the actual dollar sign being displayed
+
+type FormatText = [FormattedTextFragment]
 
 -- | Output monad.
 type PP g = StateT (GameData g) (Reader (GameState g)) -- equal to PPT g Identity a
@@ -357,19 +381,98 @@ alsoIndent' x = withCurrentIndent $ \i -> return (i,x)
 getCurrentLang :: (IsGameData (GameData g), Monad m) => PPT g m L10nLang
 getCurrentLang = gets (HM.findWithDefault HM.empty . language . getSettings) <*> gets (gameL10n . getSettings)
 
+-- | remove or handle formatting markers from a localisation text
+-- currently only simple formattings (§ followed by one character) are handled
+-- For EU4 and HOI4 £ and § are both used for text icons and colors respectively
+-- $ is used for nested strings and in EU4 for keys
+handleLocFormat :: (IsGameData (GameData g), Monad m) => Text -> PPT g m Text
+handleLocFormat text = do
+    game <- gets (gameString . getSettings)
+    handleGameFormat game text
+
+handleGameFormat :: (IsGameData (GameData g), Monad m) => Text -> Text -> PPT g m Text
+handleGameFormat g t
+    | g == "HOI4" = do
+        case parseFormat t of
+            Left err -> return $ trace ("parse failed on: " ++ err) t
+            Right tformat -> mconcat <$> traverse unpackTextfragment tformat
+    | g == "EU4" =
+        case removeFormat t of
+            Left err -> return t
+            Right clean -> return clean
+    | otherwise = return t
+
+unpackTextfragment :: (IsGameData (GameData g), Monad m) => FormattedTextFragment -> PPT g m Text
+unpackTextfragment = \case
+    PlainText t -> return t
+    ColoredText k t -> do
+        thandled <- mconcat <$> traverse unpackTextfragment t
+        return $ "{{color|" <> k <> "|" <> thandled <> "}}"
+    IconText k -> do
+        let kpref = if "GFX_" `T.isPrefixOf` k then k else "GFX_" <> k
+        gfx <- getGameInterfaceIfPresent kpref
+        case gfx of
+            Just f -> return $ "[[File:" <> f <> ".png]]"
+            Nothing -> return $ "£" <> k
+    KeyText k -> do
+        mloc <- getGameL10nIfPresent k
+        case mloc of
+            Just t -> return $ "<!--Localisation key:" <> k <> "-->" <> t
+            Nothing -> return $ "$" <> k <> "$"
+
+parseFormat :: Text -> Either String FormatText
+parseFormat = Ap.parseOnly parseFormat'
+
+parseFormat' :: Parser FormatText
+parseFormat' = many (PlainText  <$> Ap.takeWhile1 (not . \c -> '§' == c || '£' == c || '$' == c)
+        <|> PlainText   <$> (Ap.string "$$" *> "$")
+        <|> ColoredText <$> colKey <*> colText
+        <|> KeyText     <$> keyText
+        <|> IconText    <$> iconText)
+    <?> "format characters"
+
+colKey :: Parser Text
+colKey = "§" *> (T.singleton <$> Ap.satisfy (Ap.inClass "a-zA-Z0-9"))
+
+colText :: Parser FormatText
+colText = many (PlainText <$> Ap.takeWhile1 (not . \c -> '§' == c || '£' == c || '$' == c)
+        <|> PlainText   <$> (Ap.string "$$" *> "$")
+        <|> ColoredText <$> colKey <*> colText
+        <|> KeyText     <$> keyText
+        <|> IconText    <$> iconText) <* Ap.option "e" (Ap.string "§!")
+
+keyText :: Parser Text
+keyText = "$" *> Ap.takeWhile1 (Ap.inClass "a-zA-Z._0-9-") <* Ap.char '$'
+
+iconText :: Parser Text
+iconText = "£" *> Ap.takeWhile1 (Ap.inClass "a-zA-Z._0-9|-")
+    <* Ap.option 'e' (Ap.satisfy (not . \c -> isAlpha c || Ap.isHorizontalSpace c)) -- can be end of line or a special character directly after the key
+
+removeFormat :: Text -> Either String Text
+removeFormat = Ap.parseOnly removeCol
+
+removeCol :: Parser Text
+removeCol = mconcat <$> many removeCol'
+
+removeCol' :: Parser Text
+removeCol' = Ap.takeWhile1 (not . \c -> '§' == c )
+         <|> Ap.char '§'
+            *> (Ap.anyChar $> mempty)
+    <?> "color character"
+
 -- | Get the localization string for a given key. If it doesn't exist, use the
 -- key itself.
 getGameL10n :: (IsGameData (GameData g), Monad m) => Text -> PPT g m Text
-getGameL10n key = content . HM.findWithDefault (LocEntry 0 key) key <$> getCurrentLang
+getGameL10n key = getGameL10nDefault key key
 
 -- | Get the localization string for a given key. If it doesn't exist, use the
 -- given default (the first argument) instead.
 getGameL10nDefault :: (IsGameData (GameData g), Monad m) => Text -> Text -> PPT g m Text
-getGameL10nDefault def key = content . HM.findWithDefault (LocEntry 0 def) key <$> getCurrentLang
+getGameL10nDefault def key = handleLocFormat . content . HM.findWithDefault (LocEntry 0 def) key =<< getCurrentLang
 
 -- | Get the localization string for a given key, if it exists.
 getGameL10nIfPresent :: (IsGameData (GameData g), Monad m) => Text -> PPT g m (Maybe Text)
-getGameL10nIfPresent key = fmap content . HM.lookup key <$> getCurrentLang
+getGameL10nIfPresent key = traverse handleLocFormat . fmap content . HM.lookup key =<< getCurrentLang
 
 -- | Pass the current file to the action. If there is no current file, set it
 -- to "(unknown)".
@@ -389,6 +492,19 @@ setCurrentFile f = local (modifyCurrentFile (Just f))
 -- | Get the list of output languages.
 getLangs :: (IsGameData (GameData g), Monad m) => PPT g m [Lang]
 getLangs = gets (langs . getSettings)
+
+-- | Get the image name for a given key. If it doesn't exist, use the
+-- given default (the first argument) instead.
+getGameInterface :: (IsGameData (GameData g), Monad m) => Text -> Text -> PPT g m Text
+getGameInterface def key = do
+    gfx <- gets (gameInterface . getSettings)
+    return $ HM.findWithDefault def key gfx
+
+-- | Get the image name for a given key, if it exists.
+getGameInterfaceIfPresent :: (IsGameData (GameData g), Monad m) => Text -> PPT g m (Maybe Text)
+getGameInterfaceIfPresent key = do
+    gfx <- gets (gameInterface . getSettings)
+    return $ HM.lookup key gfx
 
 -- Misc. utilities
 

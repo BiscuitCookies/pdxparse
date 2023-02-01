@@ -20,11 +20,10 @@ import Debug.Trace (trace, traceM)
 import Control.Arrow ((&&&))
 import Control.Monad (foldM, forM, (<=<))
 import Control.Monad.Except (ExceptT (..), MonadError (..))
-import Control.Monad.State (MonadState (..), gets)
+import Control.Monad.State (gets)
 import Control.Monad.Trans (MonadIO (..))
 
-import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
-import Data.Monoid ((<>))
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.List (intersperse, foldl', intercalate)
 
 import Data.HashMap.Strict (HashMap)
@@ -42,11 +41,11 @@ import HOI4.Messages -- everything
 import MessageTools (iquotes, italicText)
 import HOI4.Handlers (flagText, getStateLoc)
 import QQ (pdx)
-import SettingsTypes ( PPT, Settings (..), Game (..)
+import SettingsTypes ( PPT, Settings (..)
                      , IsGame (..), IsGameData (..), IsGameState (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile
-                     , hoistErrors, hoistExceptions)
+                     , hoistErrors, hoistExceptions, getGameInterface)
 import HOI4.Common -- everything
 
 -- | Empty decision category. Starts off Nothing/empty everywhere, except id and name
@@ -97,7 +96,7 @@ parseHOI4Decisioncat [pdx| %left = %right |] = case right of
             case ddeccat of
                 Left err -> return (Left err)
                 Right Nothing -> return (Right Nothing)
-                Right (Just deccat) -> withCurrentFile $ \file ->
+                Right (Just deccat) -> withCurrentFile $ \_file ->
                     return (Right (Just deccat ))
         _ -> throwError "unrecognized form for decision category"
     _ -> throwError "unrecognized form for decision category"
@@ -141,7 +140,6 @@ decisioncatAddSection ddeccat stmt
 writeHOI4DecisionCats :: (HOI4Info g, MonadIO m) => PPT g m ()
 writeHOI4DecisionCats = do
     decisionCats <- getDecisioncats
-    interface <- getInterfaceGFX
     let pathedDecisionCats :: [Feature HOI4Decisioncat]
         pathedDecisionCats = map (\decc -> Feature {
                                         featurePath = Just $ decc_path decc
@@ -150,11 +148,11 @@ writeHOI4DecisionCats = do
                               (HM.elems decisionCats)
     writeFeatures "decisions"
                   pathedDecisionCats
-                  (\d -> scope HOI4Country $ ppdecisioncat d interface)
+                  (scope HOI4Country . ppdecisioncat)
 
 -- | Present a parsed decision category.
-ppdecisioncat :: forall g m. (HOI4Info g, MonadError Text m) => HOI4Decisioncat -> HashMap Text Text -> PPT g m Doc
-ppdecisioncat decc gfx = setCurrentFile (decc_path decc) $ do
+ppdecisioncat :: forall g m. (HOI4Info g, MonadError Text m) => HOI4Decisioncat -> PPT g m Doc
+ppdecisioncat decc = setCurrentFile (decc_path decc) $ do
     version <- gets (gameVersion . getSettings)
     decc_text_loc <- getGameL10nIfPresent (decc_name decc <> "_desc")
     let deccArg :: Text -> (HOI4Decisioncat -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
@@ -175,10 +173,8 @@ ppdecisioncat decc gfx = setCurrentFile (decc_path decc) $ do
         nameD = Doc.strictText name
     name_loc <- getGameL10n name
     let icon = decc_icon decc
-    icon_pp <- (\iconc ->
-                let iconcat = if not $ "GFX_decision_category_" `T.isPrefixOf` iconc then "GFX_decision_category_" <> iconc else iconc in
-                return $ HM.findWithDefault "decision_category_generic" iconcat gfx)
-            icon
+    icon_pp <- let iconcat = if not $ "GFX_decision_category_" `T.isPrefixOf` icon then "GFX_decision_category_" <> icon else icon in
+                getGameInterface  "decision_category_generic" iconcat
     return . mconcat $
         ["== [[File:", Doc.strictText icon_pp, ".png]]" , "<!-- ", nameD, " --> ", Doc.strictText name_loc," ==", PP.line
         ," version = ", Doc.strictText version, PP.line
@@ -223,7 +219,7 @@ parseHOI4Decisions scripts = HM.unions . HM.elems <$> do
 -- | Parse one file's decision groups scripts into decision data structures.
 parseHOI4DecisionGroup :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
     GenericStatement -> PPT g (ExceptT Text m) [Either Text (Maybe HOI4Decision)]
-parseHOI4DecisionGroup stmt@(StatementBare _) = throwError "bare statement at top level"
+parseHOI4DecisionGroup (StatementBare _) = throwError "bare statement at top level"
 parseHOI4DecisionGroup [pdx| $left = @scr |]
     = forM scr $ \stmt -> (Right <$> parseHOI4Decision stmt left)
                             `catchError` (return . Left)
@@ -301,8 +297,8 @@ decisionAddSection dec stmt
                 GenericRhs "no" [] -> dec { dec_fire_only_once = False }
                 _ -> dec
             "cost" -> case rhs of --var or num
-                GenericRhs var [txt] -> dec { dec_cost = Just (HOI4DecisionCostVariable txt) }
-                GenericRhs txt _ -> dec { dec_cost = Just (HOI4DecisionCostVariable txt) }
+                GenericRhs txt [] -> dec { dec_cost = Just (HOI4DecisionCostVariable txt) }
+                GenericRhs _var [txt] -> dec { dec_cost = Just (HOI4DecisionCostVariable txt) }
                 FloatRhs num -> dec { dec_cost = Just (HOI4DecisionCostSimple num) }
                 _ -> dec
             "custom_cost_trigger" -> case rhs of
@@ -369,11 +365,11 @@ decisionAddSection dec stmt
             "on_map_mode" -> dec
             "modifier" -> case rhs of -- effects that apply when decision is active (timer/mission?)
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
-                CompoundRhs scr -> dec { dec_modifier = Just stmt }
+                CompoundRhs _scr -> dec { dec_modifier = Just stmt }
                 _ -> dec
             "targeted_modifier" -> case rhs of -- effects for country/state targeted and duration?
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
-                CompoundRhs scr -> let oldstmt = fromMaybe [] (dec_targeted_modifier dec) in
+                CompoundRhs _scr -> let oldstmt = fromMaybe [] (dec_targeted_modifier dec) in
                     dec { dec_targeted_modifier = Just (oldstmt ++ [stmt]) }
                 _ -> dec
             "cancel_if_not_visible" -> case rhs of -- cancels mission if visible is false
@@ -394,14 +390,13 @@ decisionAddSection dec stmt
             "target_non_existing" -> dec -- no clue
             "power_balance" -> dec -- no clue, only seen in debug so far
             other -> trace ("unknown decision section: " ++ show other ++ "  " ++ show stmt) dec
-        decisionAddSection' dec stmt = trace "unrecognised form for decision section" dec
+        decisionAddSection' dec _stmt = trace "unrecognised form for decision section" dec
 
 -- | Present the parsed decisions as wiki text and write them to the
 -- appropriate files.
 writeHOI4Decisions :: (HOI4Info g, MonadIO m) => PPT g m ()
 writeHOI4Decisions = do
     decisions <- getDecisions
-    interface <- getInterfaceGFX
     let pathedDecisions :: [Feature HOI4Decision]
         pathedDecisions = map (\dec -> Feature {
                                         featurePath = Just $ dec_path dec
@@ -410,11 +405,11 @@ writeHOI4Decisions = do
                               (HM.elems decisions)
     writeFeatures "decisions"
                   pathedDecisions
-                  (\d -> scope HOI4Country $ ppdecision d interface)
+                  (scope HOI4Country . ppdecision)
 
 -- | Present a parsed decision.
-ppdecision :: forall g m. (HOI4Info g, MonadError Text m) => HOI4Decision -> HashMap Text Text -> PPT g m Doc
-ppdecision dec gfx = setCurrentFile (dec_path dec) $ do
+ppdecision :: forall g m. (HOI4Info g, MonadError Text m) => HOI4Decision -> PPT g m Doc
+ppdecision dec = setCurrentFile (dec_path dec) $ do
     version <- gets (gameVersion . getSettings)
     dec_text_loc <- getGameL10nIfPresent (dec_name dec <> "_desc")
     let decArg :: Text -> (HOI4Decision -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
@@ -477,7 +472,7 @@ ppdecision dec gfx = setCurrentFile (dec_path dec) $ do
     icon_pp'd <- case dec_icon dec of
             Just (HOI4DecisionIconSimple txt) ->
                 let icond = if not $ "GFX_decision_" `T.isPrefixOf` txt then "GFX_decision_" <> txt else txt in
-                return $ HM.findWithDefault "decision_generic_decision" icond gfx
+                getGameInterface  "decision_generic_decision" icond
             _ -> return "Check script"
     let days_remove = dec_days_remove dec
         days_re_enable = dec_days_re_enable dec
@@ -515,7 +510,7 @@ ppdecision dec gfx = setCurrentFile (dec_path dec) $ do
         ( if cancelIfNotVisible then
             ["| cancel_if_not_visible = yes", PP.line]
         else []) ++
-        ( if cancelIfNotVisible then
+        ( if targetsDynamic then
             ["| targets_dynamic = yes", PP.line]
         else []) ++
         allow_pp'd ++
@@ -548,7 +543,7 @@ ppdecision dec gfx = setCurrentFile (dec_path dec) $ do
         extractTargets (StatementBare (GenericLhs e [])) = Just e
         extractTargets stmt = trace ("Unknown in targets array statement: " ++ show stmt) Nothing
         extractTargetsStates (StatementBare (IntLhs e)) = Just e
-        extractTargetsStates stmt@[pdx| state = !e |] = Just e
+        extractTargetsStates [pdx| state = !e |] = Just e
         extractTargetsStates stmt = trace ("Unknown in targets array statement: " ++ show stmt) Nothing
 
 
@@ -699,9 +694,8 @@ ppDecisionSource (HOI4DecSrcOnAction act weight) = do
             ,("on_weekly","<!-- on_weekly -->On every week")
             ]
 ppDecisionSource (HOI4DecSrcNFComplete id loc icon) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault "goal_unknown" icon gfx in
+    iconnf <- do
+        iconname <- getGameInterface "goal_unknown" icon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Completing the national focus "
         , iconnf
@@ -710,10 +704,9 @@ ppDecisionSource (HOI4DecSrcNFComplete id loc icon) = do
         , " -->"
         , iquotes't loc
         ]
-ppDecisionSource (HOI4DecSrcNFSelect id loc icon) =  do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault "goal_unknown" icon gfx in
+ppDecisionSource (HOI4DecSrcNFSelect id loc icon) = do
+    iconnf <- do
+        iconname <- getGameInterface "goal_unknown" icon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Selecting the national focus "
         , iconnf
@@ -723,9 +716,8 @@ ppDecisionSource (HOI4DecSrcNFSelect id loc icon) =  do
         , iquotes't loc
         ]
 ppDecisionSource (HOI4DecSrcIdeaOnAdd id loc icon categ) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault "idea_unknown" icon gfx in
+    iconnf <- do
+        iconname <- getGameInterface "idea_unknown" icon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -739,9 +731,8 @@ ppDecisionSource (HOI4DecSrcIdeaOnAdd id loc icon categ) = do
         , " is added"
         ]
 ppDecisionSource (HOI4DecSrcIdeaOnRemove id loc icon categ) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault "idea_unknown" icon gfx in
+    iconnf <- do
+        iconname <- getGameInterface "idea_unknown" icon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -770,7 +761,7 @@ ppDecisionSource (HOI4DecSrcCharacterOnRemove id loc) =
         , iquotes't loc
         , " is removed"
         ]
-ppDecisionSource (HOI4DecSrcScriptedEffect id weight) =
+ppDecisionSource (HOI4DecSrcScriptedEffect id _weight) =
     return $ Doc.strictText $ mconcat ["When scripted effect "
         , iquotes't id
         , " is activated"
@@ -796,8 +787,8 @@ ppDecisionSource (HOI4DecSrcBopOnDeactivate id) = do
 
 
 findInStmt :: GenericStatement -> [(HOI4DecisionWeight, Text)]
-findInStmt stmt@[pdx| $lhs = $id |] | lhs == "activate_mission" = [(Nothing, id)]
-findInStmt [pdx| %lhs = @scr |] = findInStmts scr
+findInStmt [pdx| $lhs = $id |] | lhs == "activate_mission" = [(Nothing, id)]
+findInStmt [pdx| %_lhs = @scr |] = findInStmts scr
 findInStmt _ = []
 
 findInStmts :: [GenericStatement] -> [(HOI4DecisionWeight, Text)]
@@ -845,7 +836,7 @@ findActivatedDecisionsInOnActions hm scr = foldl' findInAction hm scr
     where
         findInAction :: HOI4DecisionTriggers -> GenericStatement -> HOI4DecisionTriggers
         findInAction hm [pdx|on_actions = @stmts |] = foldl' findInAction hm stmts
-        findInAction hm stmt@[pdx| $lhs = @scr |] = addDecisionTriggers hm (addDecisionSource (HOI4DecSrcOnAction lhs) (findInStmts scr))
+        findInAction hm [pdx| $lhs = @scr |] = addDecisionTriggers hm (addDecisionSource (HOI4DecSrcOnAction lhs) (findInStmts scr))
         findInAction hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm
 
 findActivatedDecisionsInNationalFocus :: HOI4DecisionTriggers -> [HOI4NationalFocus] -> HOI4DecisionTriggers
@@ -876,7 +867,7 @@ findActivatedDecisionsInScriptedEffects :: HOI4DecisionTriggers -> [GenericState
 findActivatedDecisionsInScriptedEffects hm scr = foldl' findInScriptEffect hm scr -- needs editing
     where
         findInScriptEffect :: HOI4DecisionTriggers -> GenericStatement -> HOI4DecisionTriggers
-        findInScriptEffect hm stmt@[pdx| $lhs = @scr |] = addDecisionTriggers hm (addDecisionSource (HOI4DecSrcScriptedEffect lhs) (findInStmts scr))
+        findInScriptEffect hm [pdx| $lhs = @scr |] = addDecisionTriggers hm (addDecisionSource (HOI4DecSrcScriptedEffect lhs) (findInStmts scr))
         findInScriptEffect hm stmt = trace ("Unknown on_actions statement: " ++ show stmt) hm
 
 findActivatedDecisionsInBops :: HOI4DecisionTriggers -> [HOI4BopRange] -> HOI4DecisionTriggers

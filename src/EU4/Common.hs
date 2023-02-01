@@ -248,6 +248,23 @@ handlersRhsIrrelevant = Tr.fromList
                         ,"** {{icon|shinto}} Shinto"
                         ,"* The state religion is {{icon|confucian}} Confucian with a harmonized Buddhist religion and the province has another harmonized religion"
                 ])
+        ,("province_is_buddhist_or_accepts_buddhism_or_is_dharmic", genericTextLines [
+                        "Either:"
+                        ,"* Province has one of the following religions (which is either the state religion, the syncretic religion, or harmonized):"
+                        ,"** {{icon|buddhism}} Theravada"
+                        ,"** {{icon|vajrayana}} Vajrayana"
+                        ,"** {{icon|mahayana}} Mahayana"
+                        ,"* The state religion is {{icon|tengri}} Tengri with a Dharmic religion as the syncretic religion ''and'' the province religion is in the Dharmic group."
+                        ,"* The province and state religion are {{icon|tengri}} Tengri with any Buddhist ''or'' Dharmic religion as the syncretic religion."
+                        ,"* The province and state religion are {{icon|confucian}} Confucian with a harmonized Buddhist religion."
+                        ,"* The province and state religion are one of the following:"
+                       --(unneccessary, because hindu is allowed as part of the dharmic group) ,"** {{icon|hinduism}} Hindu with {{icon|buddha}} Buddha as personal deity"
+                        ,"** {{icon|fetishism}} Fetishist with the {{icon|buddhadharma}} Buddhadharma cult"
+                        ,"** {{icon|shinto}} Shinto"
+                        ,"** in the Dharmic group"
+                        ,"* The state religion is {{icon|confucian}} Confucian with a harmonized Buddhist religion and the province has another harmonized religion"
+                ])
+
         ]
 
 -- | Handlers for numeric statements
@@ -645,7 +662,7 @@ handlersForModifiers = Tr.unionL handlersForNonModifiersWithinModifiiers (Tr.fro
         ,("monthly_reform_progress_building"      , handleModifier "MODIFIER_MONTHLY_REFORM_PROGRESS_BUILDING" (colourNumSign True))
         ,("monthly_reform_progress_building"      , handleModifier "MODIFIER_MONTHLY_REFORM_PROGRESS_BUILDING" (colourNumSign True))
         ,("monthly_reform_progress_modifier"      , handleModifier "MODIFIER_MONTHLY_REFORM_PROGRESS_MODIFIER" (reducedNum (colourPcSign True)))
-        ,("monthly_support_heir_gain"             , handleModifier "MODIFIER_MONTHLY_SUPPORT_HEIR_GAIN" (colourNumSign True))
+        ,("monthly_support_heir_gain"             , handleModifierWithIcon "{{DLC-only|Monthly heir support gain}}" "monthly heir support gain" (colourNumSign True))
         ,("morale_in_fleet_modifier"              , handleModifier "MODIFIER_NAVAL_MORALE_IN_FLEET" (reducedNum (colourPcSign True)))
         ,("movement_speed_onto_off_boat_modifier" , handleModifier "MODIFIER_MOVEMENT_SPEED_ONTO_OFF_BOAT" (reducedNum (colourPcSign True)))
         ,("naval_attrition_in_fleet_modifier"     , handleModifier "MODIFIER_NAVAL_ATTRITION_IN_FLEET" (reducedNum (colourPcSign False)))
@@ -689,7 +706,7 @@ handlersForModifiers = Tr.unionL handlersForNonModifiersWithinModifiiers (Tr.fro
         ,("unrest_catholic_provinces"             , handleModifier "MODIFIER_UNREST_CATHOLIC_PROVINCES" (colourNumSign False))
         ,("vaisyas_influence_modifier"            , handleModifierWithIcon "Vaishyas influence" "vaishyas influence" (reducedNum plainPcSign))
         ,("vaisyas_non_muslim_influence_modifier" , handleModifierWithIcon "Vaishyas non-muslim influence" "vaishyas influence" (reducedNum plainPcSign))
-        ,("yearly_doom_reduction"                 , handleModifier "MODIFIER_YEARLY_DOOM_REDUCTION" (colourNumSign True))
+        ,("yearly_doom_reduction"                 , handleModifierWithIcon "{{DLC-only|Yearly doom reduction}}" "yearly doom reduction" (colourNumSign True))
         ,("administrative_efficiency"             , handleModifier "MODIFIER_ADMINISTRATIVE_EFFICIENCY" (reducedNum (colourPcSign True)))
         ,("imperial_mandate"                      , handleModifierWithIcon "{{DLC-only|Mandate growth modifier}}" "mandate growth modifier" (colourNumSign True))
         ,("land_forcelimit"                       , handleModifier "LAND_FORCELIMIT" (colourNumSign True))
@@ -809,7 +826,7 @@ handlersForModifiers = Tr.unionL handlersForNonModifiersWithinModifiiers (Tr.fro
         ,("governing_capacity"                    , handleModifier "MODIFIER_GOVERNING_CAPACITY" (colourNumSign True))
         ,("governing_capacity_modifier"           , handleModifier "MODIFIER_GOVERNING_CAPACITY_MODIFIER" (reducedNum (colourPcSign True)))
         ,("great_project_upgrade_cost"            , handleModifier "MODIFIER_GREAT_PROJECT_UPGRADE_COST" (reducedNum (colourPcSign False)))
-        ,("harmonization_speed"                   , handleModifier "MODIFIER_HARMONIZATION_SPEED" (reducedNum (colourPcSign True)))
+        ,("harmonization_speed"                   , handleModifierWithIcon "{{DLC-only|Religious harmonization speed}}" "religious harmonization speed" (reducedNum (colourPcSign True)))
         ,("harsh_treatment_cost"                  , handleModifier "MODIFIER_HARSH_TREATMENT_COST" (reducedNum (colourPcSign False)))
         ,("heavy_ship_cost"                       , handleModifier "HEAVYSHIP_COST" (reducedNum (colourPcSign False)))
         ,("heavy_ship_power"                      , handleModifierWithIcon "HEAVYSHIP_POWER" "heavy ship power" (reducedNum (colourPcSign True)))
@@ -897,8 +914,8 @@ handlersForModifiers = Tr.unionL handlersForNonModifiersWithinModifiiers (Tr.fro
         ,("monthly_fervor_increase"               , handleModifierWithIcon "{{DLC-only|Monthly fervor}}" "monthly fervor" (colourNumSign True))
         ,("monthly_gold_inflation_modifier"       , handleModifier "MODIFIER_MONTHLY_GOLD_INFLATION_MODIFIER" (reducedNum (colourPcSign False)))
         ,("monthly_heir_claim_increase"           , handleModifier "MODIFIER_MONTHLY_HEIR_CLAIM_INCREASE" (colourNumSign True))
-        ,("monthly_karma"                         , handleModifier "MODIFIER_MONTHLY_KARMA" (bold . plainNumSign))
-        ,("monthly_militarized_society"           , handleModifier "MODIFIER_MONTHLY_MILITARIZED_SOCIETY" (colourNumSign True))
+        ,("monthly_karma"                         , handleModifierWithIcon "{{DLC-only|Monthly karma}}" "monthly karma" (bold . plainNumSign))
+        ,("monthly_militarized_society"           , handleModifierWithIcon "{{DLC-only|Militarization of state}}" "militarization of state" (colourNumSign True))
         ,("monthly_piety"                         , handleModifier "MODIFIER_MONTHLY_PIETY" (bold . reducedNum plainNumSign))
         ,("monthly_splendor"                      , handleModifier "MONTHLY_SPLENDOR" (colourNumSign True))
         ,("move_capital_cost_modifier"            , handleModifier "MODIFIER_MOVE_CAPITAL_COST_MODIFIER" (reducedNum (colourPcSign False)))
@@ -980,10 +997,10 @@ handlersForModifiers = Tr.unionL handlersForNonModifiersWithinModifiiers (Tr.fro
         ,("warscore_cost_vs_other_religion"       , handleModifier "MODIFIER_WARSCORE_COST_VS_OTHER_RELIGION" (reducedNum (colourPcSign False)))
         ,("yearly_absolutism"                     , handleModifierWithIcon "MODIFIER_YEARLY_ABSOLUTISM" "absolutism" (colourNumSign True))
         ,("yearly_army_professionalism"           , handleModifierWithIcon "{{DLC-only|Yearly army professionalism}}" "yearly army professionalism" (reducedNum (colourPcSign True)))
-        ,("yearly_authority"                      , handleModifier "MODIFIER_YEARLY_AUTHORITY" (colourNumSign True))
+        ,("yearly_authority"                      , handleModifierWithIcon "{{DLC-only|Yearly authority}}" "yearly authority" (colourNumSign True))
         ,("yearly_corruption"                     , handleModifier "MODIFIER_YEARLY_CORRUPTION" (colourNumSign False))
-        ,("yearly_harmony"                        , handleModifier "MODIFIER_YEARLY_HARMONY" (colourNumSign True))
-        ,("yearly_karma_decay"                    , handleModifier "MODIFIER_YEARLY_KARMA_DECAY" (reducedNum (colourPcSign True)))
+        ,("yearly_harmony"                        , handleModifierWithIcon "{{DLC-only|Yearly harmony increase}}" "yearly harmony increase" (colourNumSign True))
+        ,("yearly_karma_decay"                    , handleModifierWithIcon "{{DLC-only|Yearly karma decay}}" "yearly karma decay" (reducedNum (colourPcSign True)))
         ,("yearly_patriarch_authority"            , handleModifier "MODIFIER_YEARLY_PATRIARCH_AUTHORITY" (reducedNum (colourPcSign True)))
         ,("yearly_revolutionary_zeal"             , handleModifierWithIcon "{{DLC-only|Yearly revolutionary zeal}}" "revolutionary zeal" (colourNumSign True))
         ,("years_of_nationalism"                  , handleModifier "MODIFIER_YEARS_OF_NATIONALISM" (colourNumSign False))
@@ -1912,6 +1929,7 @@ handlersSpecialComplex = Tr.fromList
         ,("add_loot_from_rich_province_general_effect" , simpleEffectAtom "looter" MsgAddLootFromRichProvince) -- Note: RHS ignored
         ,("add_prestige_or_monarch_power"  , simpleEffectNumIcon "prestige" "amount" MsgAddPrestigeOrMonarchPower)
         ,("allow_baseline_invite_scholar"   , simpleEffectAtom "religious_school" MsgAllowBaselineInviteScholar)
+        ,("can_swap_out_of_estate_granting_reform", simpleEffectAtom "estate" MsgCanSwapOutEstateGrantingReform)
         ,("check_reducing_estate_revolt_size_trigger" , simpleEffectAtom "flag" (MsgCheckEstateRevoltSize False))
         ,("check_reducing_estate_revolt_size_more_trigger" , simpleEffectAtom "flag" (MsgCheckEstateRevoltSize True))
         ,("disable_rebels_from_seize_land_for_estate" , simpleEffectAtom "estate" MsgDisableRebelsFromSeizeLand)

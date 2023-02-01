@@ -59,14 +59,13 @@ module Abstract (
     ) where
 
 
-import Control.Applicative (Applicative (..), Alternative (..), many)
+import Control.Applicative (Alternative (..), many)
 import Control.Monad (void)
 
 import qualified Data.Foldable as F
-import Data.Char (isAlpha, isAlphaNum, isDigit, isSpace)
+import Data.Char (isAlphaNum, isDigit, isSpace)
 import Data.List (intersperse)
 import Data.Maybe (fromMaybe)
-import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL

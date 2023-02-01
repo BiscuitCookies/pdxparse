@@ -7,40 +7,34 @@ module Localization (
     ,   L10n -- re-exported from Yaml
     ) where
 
-import Control.Monad (liftM, filterM, forM, when)
-import Control.Monad.Trans (MonadIO (..), liftIO)
+import Control.Monad (filterM, forM)
 
 import Data.List (isInfixOf, foldl')
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HM
+import qualified Data.HashMap.Strict.InsOrd as HMO
 
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
 
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
-import qualified Data.Yaml as Y
 import Data.Attoparsec.Text (Parser)
 import qualified Data.Attoparsec.Text as Ap
 
-import System.Directory (doesFileExist, getDirectoryContents, doesDirectoryExist, listDirectory)
+import System.Directory (doesFileExist, getDirectoryContents, doesDirectoryExist)
 import System.Directory.Recursive (getSubdirsRecursive)
 import System.FilePath ((</>))
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 
 import SettingsTypes (Settings (..), L10nScheme (..), concatMapM)
-import Yaml (L10n, LocEntry (..), parseLocFile, mergeLangs, mergeLangList)
+import Yaml (L10n, L10nO, LocEntry (..), parseLocFile, mergeLangs, mergeLangList)
 
 -- | Read and parse localization files for the current game.
 --
 -- This function is capable of dealing with both the old CSV-style localisation
 -- and the newer quasi-YAML localization. It does not understand the old EU4
 -- true YAML localisation, which, as far as I know, no PDS game uses any more.
-readL10n :: Settings -> IO L10n
+readL10n :: Settings -> IO (L10n, L10nO)
 readL10n settings = do
     let dir           = gamePath settings
                         </> languageFolder settings
@@ -54,17 +48,16 @@ readL10n settings = do
                         </> "localisation"
                         </> "replace"
     modexist <- doesDirectoryExist dirmod
-    dirmodsub <- if modexist then getSubdirsRecursive dirmod else return []
+    dirmod' <- if modexist then do
+        dirmodsub <- getSubdirsRecursive dirmod
+        return $ dirmod : dirmodsub else return []
     replaceexist <- doesDirectoryExist dirifYAMLmod
     replaceexistr <- doesDirectoryExist dirifYAMLmodr
-    let dirmod'       = dirmod : dirmodsub
-        dirifYAMLmod' = if replaceexist then dirifYAMLmod else dirifYAMLmodr
-        dirs = addlistdir
-                [dir]
-                (gameFolder settings /= gameOrModFolder settings)
-                dirmod'
-                (gameFolder settings /= gameOrModFolder settings && l10nScheme settings == L10nQYAML && (replaceexist || replaceexistr))
-                [dirifYAMLmod']
+    let dirifYAMLmod'
+          | replaceexist = dirifYAMLmod
+          | replaceexistr = dirifYAMLmodr
+          | otherwise = []
+        dirs = [dirifYAMLmod'] ++ dirmod'++ [dir]
 
     files <- concatMapM (readL10nDirs settings) dirs
     case l10nScheme settings of
@@ -81,10 +74,10 @@ readL10n settings = do
                     tag:fields <- csvField `Ap.sepBy` Ap.string ";"
                     -- fields :: [Text]
                     let addField (fieldnum, lang)
-                            = HM.singleton
+                            = HMO.singleton
                                 lang
-                                (HM.singleton tag (LocEntry 0 (fields!!fieldnum)))
-                    return $ mergeLangList (map addField langs)
+                                (HMO.singleton tag (LocEntry 0 (fields!!fieldnum)))
+                    return $ HMO.toHashMap $ HMO.map HMO.toHashMap (mergeLangList (map addField langs))
             in fmap mconcat . forM files $ \file -> do
                 fileContents <- T.lines <$> TIO.readFile file
                 let parsedLines = mapM (Ap.parseOnly parseLine) fileContents
@@ -94,14 +87,17 @@ readL10n settings = do
                             ++ file
                             ++ ": " ++ err)
                         exitFailure
-                    Right lines -> return (mconcat lines)
-        L10nQYAML -> fmap (foldl' mergeLangs HM.empty) . forM files $ \file -> do
-            parseResult <- parseLocFile <$> TIO.readFile file
-            case parseResult of
-                Left exc -> do
-                    hPutStrLn stderr $ "Parsing localisation file " ++ file ++ " failed: " ++ show exc
-                    return HM.empty
-                Right contents -> return contents
+                    Right lines -> return (mconcat lines, HMO.empty)
+        L10nQYAML -> do
+            hmolist <- forM files $ \file -> do
+                parseResult <- parseLocFile <$> TIO.readFile file
+                case parseResult of
+                    Left exc -> do
+                        hPutStrLn stderr $ "Parsing localisation file " ++ file ++ " failed: " ++ show exc
+                        return HMO.empty
+                    Right contents -> return contents
+            let hmlist = (HMO.toHashMap (HMO.map HMO.toHashMap (foldl' mergeLangs HMO.empty hmolist)),foldl' mergeLangs HMO.empty hmolist)
+            pure hmlist
 
 readL10nDirs :: Settings -> FilePath -> IO [FilePath]
 readL10nDirs settings dirs = filterM doesFileExist
@@ -117,9 +113,3 @@ readL10nDirs settings dirs = filterM doesFileExist
                     -- don't care about.
                     L10nQYAML -> filter (T.unpack (language settings) `isInfixOf`))
                     =<< getDirectoryContents dirs
-addlistdir :: [FilePath] -> Bool -> [FilePath] -> Bool -> [FilePath] -> [FilePath]
-addlistdir dirgame checkmod dirmod checkmodreplace dirmodreplace =
-    case (checkmod, checkmodreplace) of
-        (True, True) -> dirmodreplace ++ dirmod ++ dirgame
-        (True, False) -> dirmod ++ dirgame
-        _ -> dirgame

@@ -13,34 +13,24 @@ import Debug.Trace (trace, traceM)
 import Control.Arrow ((&&&))
 import Control.Monad (foldM, forM)
 import Control.Monad.Except (ExceptT (..), MonadError (..))
-import Control.Monad.State (MonadState (..), gets)
-import Control.Monad.Trans (MonadIO (..))
 
 import Data.Char (toLower)
-import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
-import Data.Monoid ((<>))
-import Data.List (intersperse, foldl', intercalate)
+import Data.Maybe (catMaybes, fromMaybe)
 
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.Text (Text)
 import qualified Data.Text as T
-import Text.PrettyPrint.Leijen.Text (Doc)
-import qualified Text.PrettyPrint.Leijen.Text as PP
 import System.FilePath ((</>))
 
 import Abstract -- everything
-import qualified Doc
-import FileIO (Feature (..), writeFeatures)
-import HOI4.Messages -- everything
-import MessageTools (iquotes)
-import HOI4.Handlers (flagText, getStateLoc, plainMsg')
+ -- everything
 import QQ (pdx)
-import SettingsTypes ( PPT, Settings (..), Game (..)
+import SettingsTypes ( PPT
                      , IsGame (..), IsGameData (..), IsGameState (..)
                      , getGameL10n, getGameL10nIfPresent
-                     , setCurrentFile, withCurrentFile, withCurrentIndent
-                     , hoistErrors, hoistExceptions)
+                     , setCurrentFile, withCurrentFile
+                     , hoistExceptions)
 import HOI4.Common -- everything
 
 -- | Take the idea group scripts from game data and parse them into idea group
@@ -86,7 +76,7 @@ parseHOI4IdeaGroup _ = withCurrentFile $ \file ->
 -- | Empty idea. Starts off Nothing everywhere, except id and name
 -- (should get filled in immediately).
 newIdea :: HOI4Idea
-newIdea = HOI4Idea undefined undefined "<!-- Check Script -->" undefined "GFX_idea_unknown" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined undefined
+newIdea = HOI4Idea undefined undefined "<!-- Check Script -->" undefined "GFX_idea_unknown" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined undefined
 
 -- | Parse one idea script into a idea data structure.
 parseHOI4Idea :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
@@ -189,7 +179,10 @@ ideaAddSection iidea stmt
             "level"             -> iidea
             "allowed_to_remove" -> iidea
             "cost"              -> iidea
-            "traits"            -> iidea
+            "traits"            -> case rhs of
+                CompoundRhs [] -> iidea
+                CompoundRhs scr -> iidea { id_traits = Just scr }
+                _-> trace "bad idea traits" iidea
             "ledger"            -> iidea
             "default"           -> iidea
             other               -> trace ("unknown idea section: " ++ T.unpack other) iidea

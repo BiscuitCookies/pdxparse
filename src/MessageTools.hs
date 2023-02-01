@@ -49,7 +49,6 @@ module MessageTools (
     ) where
 
 import Data.List (unfoldr, intersperse)
-import Data.Monoid ((<>))
 
 import Numeric (floatToDigits)
 

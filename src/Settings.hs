@@ -9,11 +9,11 @@ module Settings (
     ) where
 
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 
 import Data.Char (toLower)
-import Data.List (intersperse, intercalate)
+import Data.List (intercalate)
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashMap.Strict.InsOrd as HMO
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Version as V
@@ -28,11 +28,11 @@ import System.IO (hPutStrLn, stderr)
 import qualified System.Info
 import System.FilePath ((</>), replaceFileName)
 
-import Control.Monad (when, liftM, forM_, unless)
+import Control.Monad (when, forM_, unless)
 
 import Localization (readL10n)
+import Interface (readInterface)
 import SettingsTypes ( CLArgs (..), Settings (..), Game (..), IsGame (..)
-                     , L10nScheme (..)
                      , setGameL10n)
 import Paths_pdxparse (version, getDataFileName)
 import EU4.Settings (EU4 (..))
@@ -161,21 +161,21 @@ readSettings = do
                 modfolder = fromMaybe "" (modNameI settingsIn)
                 modlocation = fromMaybe "C:/thisgoesnowhere" (modDirI settingsIn)
 
-            game <- case gamefolder of
-                "Europa Universalis IV" -> return $ Game EU4
-                "Hearts of Iron IV" -> return $ Game HOI4
-                "Stellaris" -> return $ Game Stellaris
-                "Victoria 2" -> return $ Game Vic2
+            (game, gameString) <- case gamefolder of
+                "Europa Universalis IV" -> return (Game EU4, "EU4")
+                "Hearts of Iron IV" -> return (Game HOI4, "HOI4")
+                "Stellaris" -> return (Game Stellaris, "Stellaris")
+                "Victoria 2" -> return (Game Vic2, "Vic2")
                 other -> do
                     putStrLn $ "I don't know how to handle " ++ other ++ "!"
                     exitFailure
 
             langFolder <- case gamefolder of
                 "Hearts of Iron IV" -> return $ "localisation" </> T.unpack lang
-                other -> return "localisation"
+                _other -> return "localisation"
 
             gameormodfolder <- case modNameI settingsIn of
-                Just mname -> return modfolder
+                Just _mname -> return modfolder
                 _ -> return gamefolder
 
             let provisionalSettings = Settings
@@ -183,6 +183,7 @@ readSettings = do
                             , steamApps = steamAppsCanonicalized
                             , l10nScheme = case game of Game g -> locScheme g
                             , game = game
+                            , gameString = gameString
                             , gameFolder = gamefolder
                             , gameOrModFolder = gameormodfolder
                             , gameModPath = modlocation
@@ -192,14 +193,18 @@ readSettings = do
                             , languageFolder = langFolder
                             , languageS = "l_" <> T.unpack lang
                             , gameVersion = T.pack (gameVersionI settingsIn)
+                            , gameInterface = HM.empty -- filled in later
                             , gameL10n = HM.empty -- filled in later
+                            , gameL10nKeys = [] -- filled in later
                             , langs = ["en"]
                             , settingsFile = settingsFilePath
                             , clargs = opts
                             , filesToProcess = nonopts }
 
-            game_l10n <- readL10n provisionalSettings
-            return $ provisionalSettings `setGameL10n` game_l10n
+            (game_l10n, ordered) <- readL10n provisionalSettings
+            interface <- readInterface provisionalSettings
+            let l10nkeys = HMO.keys $ HMO.unions (HMO.elems ordered)
+            return $ setGameL10n provisionalSettings game_l10n l10nkeys interface
 
         Left exc -> do
             hPutStrLn stderr $ "Couldn't parse settings: " ++ show exc
