@@ -15,7 +15,6 @@ module Doc
     ) where
 
 import Data.List (unfoldr)
-import Data.Monoid (Monoid (..), (<>))
 
 import Data.Text (Text)
 import qualified Data.Text as T

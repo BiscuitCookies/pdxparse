@@ -84,11 +84,7 @@ module QQ (
         pdx     -- :: QuasiQuoter
     ) where
 
-import Control.Applicative (Applicative (..), Alternative (..))
-import Control.Monad (forM, guard)
-import Data.Monoid ((<>))
-import Data.Either (partitionEithers)
-import Data.Maybe (isNothing)
+import Control.Applicative (Alternative (..))
 
 import Data.Attoparsec.Text (Parser)
 import qualified Data.Attoparsec.Text as Ap
@@ -96,7 +92,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.String (IsString (..))
 
-import Language.Haskell.TH (Q (..),Exp (..),Pat (..),Type (..),Dec (..))
+import Language.Haskell.TH (Q ,Exp (..),Pat (..),Type (..),Dec (..))
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Lift as TL
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
@@ -352,7 +348,7 @@ lhs2pat lhs = case lhs of
     CustomLhs (PatStringlike _) -> error "stringlike pattern not supported on LHS"
     CustomLhs (PatStringOrNum _) -> error "string-or-num pattern not supported on LHS"
     -- non-custom
-    AtLhs label -> error "statement starting with @ not supported on LHS"
+    AtLhs _label -> error "statement starting with @ not supported on LHS"
     IntLhs _ -> error "int pattern not supported on LHS"
     GenericLhs gs gts ->
         [p| GenericLhs $(TH.litP (TH.stringL (T.unpack gs)))

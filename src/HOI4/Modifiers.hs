@@ -192,7 +192,7 @@ ppOpinionModifier mod = do
 
     where
         modText :: Text -> Text -> Maybe Double -> [Doc]
-        modText p s (Just val) | val /= 0 = [mconcat [ Doc.strictText p, colourNumSign True val, Doc.strictText s ]]
+        modText p s (Just val) | val /= 0 = [mconcat [ Doc.strictText p, templateColor $ colourNumSign True val, Doc.strictText s ]]
         modText _ _ _ = []
 
         isTrade = fromMaybe False $ omodTrade mod
@@ -200,7 +200,7 @@ ppOpinionModifier mod = do
 
         monthlyDecay :: Maybe Double -> Maybe Double -> [Doc]
         monthlyDecay (Just op) (Just decay) = [mconcat [
-                colourNumSign True (if op < 0 then decay else -decay)
+                templateColor $ colourNumSign True (if op < 0 then decay else -decay)
                 , Doc.strictText " Monthly decay"
             ]]
         monthlyDecay _ _ = []

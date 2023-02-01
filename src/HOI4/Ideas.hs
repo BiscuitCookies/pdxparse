@@ -43,7 +43,7 @@ import SettingsTypes ( PPT, Settings (..), Game (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile, withCurrentIndent
                      , hoistErrors, hoistExceptions
-                     , concatMapM)
+                     , concatMapM, getGameInterface)
 import HOI4.Common -- everything
 import GHC.RTS.Flags (RTSFlags(costCentreFlags))
 
@@ -90,7 +90,7 @@ parseHOI4IdeaGroup _ = withCurrentFile $ \file ->
 -- | Empty idea. Starts off Nothing everywhere, except id and name
 -- (should get filled in immediately).
 newIdea :: HOI4Idea
-newIdea = HOI4Idea undefined undefined "<!-- Check Script -->" undefined "GFX_idea_unknown" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined undefined Nothing Nothing
+newIdea = HOI4Idea undefined undefined "<!-- Check Script -->" undefined "GFX_idea_unknown" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined undefined Nothing
 
 -- | Parse one idea script into a idea data structure.
 parseHOI4Idea :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
@@ -197,7 +197,7 @@ ideaAddSection iidea stmt
                 _-> trace "bad idea cost" iidea
             "traits"            -> case rhs of
                 CompoundRhs [] -> iidea
-                CompoundRhs scr -> iidea { id_traits = Just stmt }
+                CompoundRhs scr -> iidea { id_traits = Just scr }
                 _-> trace "bad idea traits" iidea
             "ledger"            -> iidea
             "default"           -> iidea
@@ -208,7 +208,6 @@ ideaAddSection iidea stmt
 writeHOI4Ideas :: (HOI4Info g, MonadIO m) => PPT g m ()
 writeHOI4Ideas = do
     ideas <- getIdeaScripts
-    interface <- getInterfaceGFX
     pathIDS <- parseHOI4IdeasPath ideas
     let pathedIdea :: [Feature [HOI4Idea]]
         pathedIdea = map (\ids -> Feature {
@@ -218,7 +217,7 @@ writeHOI4Ideas = do
                               (HM.elems pathIDS)
     writeFeatures "ideas"
                   pathedIdea
-                  (ppIdeas interface)
+                  ppIdeas
 
 parseHOI4IdeasPath :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
     HashMap String GenericScript -> PPT g m (HashMap FilePath [HOI4Idea])
@@ -244,10 +243,10 @@ parseHOI4IdeasPath scripts = do
                     Right nfocus -> nfocus)
                     enfs
 
-ppIdeas :: forall g m. (HOI4Info g, Monad m) => HashMap Text Text -> [HOI4Idea] -> PPT g m Doc
-ppIdeas gfx nfs = do
+ppIdeas :: forall g m. (HOI4Info g, Monad m) =>  [HOI4Idea] -> PPT g m Doc
+ppIdeas nfs = do
     version <- gets (gameVersion . getSettings)
-    nfDoc <- mapM (scope HOI4Country . ppIdea gfx) nfs -- Better to leave unsorted? (sortOn (sortName . nf_name_loc) nfs)
+    nfDoc <- mapM (scope HOI4Country . ppIdea) nfs -- Better to leave unsorted? (sortOn (sortName . nf_name_loc) nfs)
     return . mconcat $
         [ "{{Version|", Doc.strictText version, "}}", PP.line
         , "{| class=\"mildtable\" ", PP.line
@@ -262,8 +261,8 @@ ppIdeas gfx nfs = do
         [ "|}", PP.line
         ]
 
-ppIdea :: forall g m. (HOI4Info g, Monad m) => HashMap Text Text -> HOI4Idea -> PPT g m Doc
-ppIdea gfx id = setCurrentFile (id_path id) $ do
+ppIdea :: forall g m. (HOI4Info g, Monad m) => HOI4Idea -> PPT g m Doc
+ppIdea id = setCurrentFile (id_path id) $ do
     let nfArg :: (HOI4Idea -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
         nfArg field fmt
             = maybe (return [])
@@ -284,7 +283,7 @@ ppIdea gfx id = setCurrentFile (id_path id) $ do
                         ,"}}"
                         ,PP.line])
             (field id)
-        icon_pp = HM.findWithDefault "idea_unknown" (id_picture id) gfx
+    icon_pp <- getGameInterface "idea_unknown" (id_picture id)
     name_pp <- getGameL10n $ id_name id
     prerequisite_pp <- nfArg id_available ppScript
     allowBranch_pp <- nfArg id_allowed ppScript
@@ -295,12 +294,12 @@ ppIdea gfx id = setCurrentFile (id_path id) $ do
     tarmod <- nfArg id_targeted_modifier ppScript
     available_pp <- nfArg id_available ppScript
     traitmsg <- case id_traits id of
-        Just [pdx| %_ = @arr |] -> do
+        Just arr -> do
             let traitbare = mapMaybe getbaretraits arr
             concatMapM getLeaderTraits traitbare
         _-> return []
     traitids <- case id_traits id of
-        Just [pdx| %_ = @arr |] -> do
+        Just arr -> do
             let traitbare = mapMaybe getbaretraits arr
                 traitlist = intersperse ", " traitbare
                 traitids = map Doc.strictText traitlist

@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 {-|
 Module      : HOI4.Common
 Description : Message handler for Europa Hearts of Iron IV
@@ -15,44 +14,28 @@ module HOI4.Common (
     ,   module HOI4.Types
     ) where
 
-import Debug.Trace (trace, traceM)
-import Yaml (LocEntry (..))
 
-import Control.Applicative (liftA2)
-import Control.Arrow (first)
-import Control.Monad (liftM, MonadPlus (..), forM, foldM, join {- temp -}, when)
-import Control.Monad.Reader (MonadReader (..), asks)
-import Control.Monad.State (MonadState (..), gets)
 
-import Data.Char (isUpper, toUpper, toLower, isDigit)
-import Data.List (foldl', intersperse)
-import Data.Maybe (isJust, fromMaybe, listToMaybe, fromJust)
-import Data.Monoid ((<>))
-import Data.Foldable (fold)
+import Data.Char (isDigit)
+import Data.List (foldl')
+import Data.Maybe (fromMaybe)
 import Data.Void (Void)
 
-import Data.ByteString (ByteString)
 
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as TE
 
 -- TODO: get rid of these, do icon key lookups from another module
-import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.Trie (Trie)
 import qualified Data.Trie as Tr
 
-import qualified Data.Set as S
 
 import Text.PrettyPrint.Leijen.Text (Doc)
-import qualified Text.PrettyPrint.Leijen.Text as PP
 
 import Abstract -- everything
-import qualified Doc
 import HOI4.Messages -- everything
-import MessageTools (plural)
 import QQ (pdx)
 import SettingsTypes -- everything
 import HOI4.Handlers -- everything
@@ -70,7 +53,10 @@ ppScript script = imsg2doc =<< ppMany script
 -- | Format a single statement as wiki text.
 ppStatement :: (HOI4Info g, Monad m) =>
     GenericStatement -> PPT g m Doc
-ppStatement statement = imsg2doc =<< ppOne statement
+ppStatement statement = imsg2doc =<< ppIndent statement
+
+ppIndent :: (Monad m, HOI4Info g) => GenericStatement -> PPT g m IndentedMessages
+ppIndent stmt = indentUp $ ppOne stmt
 
 flagTextMaybe :: (HOI4Info g, Monad m) => Text -> PPT g m (Text,Text)
 flagTextMaybe = fmap (mempty,) . flagText (Just HOI4Country)
@@ -229,6 +215,12 @@ handlersModifiers = Tr.fromList
         ,("research_bonus"              , handleResearchBonus)
         ,("targeted_modifier"           , handleTargetedModifier)
         ,("equipment_bonus"             , handleEquipmentBonus)
+        ,("hidden_modifier"             , handleHiddenModifier)
+
+        ,("non_shared_modifier"         , handleModifier)
+        ,("corps_commander_modifier"    , handleModifier)
+        ,("field_marshal_modifier"      , handleModifier)
+        ,("sub_unit_modifiers"          , handleEquipmentBonus)
         ]
 
 -- | Handlers for simple compound statements
@@ -362,6 +354,7 @@ handlersCompound = Tr.fromList
         -- random and random_list are also part of flow control but are more complicated
         ]
 
+-- Helpers for LocRhs
 withLocAtomName :: (HOI4Info g, Monad m) =>
     (Text -> ScriptMessage) -> StatementHandler g m
 withLocAtomName msg = withLocAtom' msg (<> "_name")
@@ -375,7 +368,6 @@ handlersLocRhs = Tr.fromList
         ,("custom_effect_tooltip" , withLocAtom MsgCustomEffectTooltip)
         ,("has_country_leader_with_trait" , withLocAtom MsgHasCountryLeaderWithTrait)
         ,("has_decision"          , withLocAtomKey MsgHasDecision)
-        ,("has_opinion_modifier"  , withLocAtom MsgHasOpinionMod)
         ,("has_power_balance"     , withLocAtomCompound MsgHasPowerBalance)
         ,("has_tech"              , withLocAtom MsgHasTech)
         ,("has_template"          , withLocAtom MsgHasTemplate)
@@ -425,6 +417,7 @@ handlersAdvisorId = Tr.fromList
         ]
 
 -- | Simple statements whose RHS should be presented as is, in typewriter face
+--   or just need the RHS unmodified
 handlersTypewriter :: (HOI4Info g, Monad m) => Trie (StatementHandler g m)
 handlersTypewriter = Tr.fromList
         [("clr_character_flag"  , withNonlocAtom2 MsgCharacterFlag MsgClearFlag)
@@ -839,9 +832,9 @@ ppOne' stmt lhs rhs = case lhs of
                         scripteffect <- getScriptedEffects
                         scripttrigger <- getScriptedTriggers
                         case HM.lookup label scripteffect of
-                            Just effect -> plainStatement "Scripted Effect: " stmt
+                            Just _effect -> plainStatement "Scripted Effect: " stmt
                             _ -> case HM.lookup label scripttrigger of
-                                Just trigger -> plainStatement "Scripted Trigger: " stmt
+                                Just _trigger -> plainStatement "Scripted Trigger: " stmt
                                 _ -> preStatement stmt
                 _ -> preStatement stmt
     AtLhs _ -> return [] -- don't know how to handle these
@@ -869,12 +862,12 @@ extractStmt p xs = extractStmt' p xs []
 
 -- | Predicate for matching text on the left hand side
 matchLhsText :: Text -> GenericStatement -> Bool
-matchLhsText t s@[pdx| $lhs = %_ |] | t == lhs = True
-matchLhsText t s@[pdx| $lhs < %_ |] | t == lhs = True
-matchLhsText t s@[pdx| $lhs > %_ |] | t == lhs = True
+matchLhsText t [pdx| $lhs = %_ |] | t == lhs = True
+matchLhsText t [pdx| $lhs < %_ |] | t == lhs = True
+matchLhsText t [pdx| $lhs > %_ |] | t == lhs = True
 matchLhsText _ _ = False
 
 -- | Predicate for matching text on boths sides
 matchExactText :: Text -> Text -> GenericStatement -> Bool
-matchExactText l r s@[pdx| $lhs = $rhs |] | l == lhs && r == T.toLower rhs = True
+matchExactText l r [pdx| $lhs = $rhs |] | l == lhs && r == T.toLower rhs = True
 matchExactText _ _ _ = False

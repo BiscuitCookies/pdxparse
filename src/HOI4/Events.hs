@@ -18,20 +18,18 @@ module HOI4.Events (
 import Debug.Trace (trace, traceM)
 
 import Control.Arrow ((&&&))
-import Control.Monad (liftM, forM, foldM, when, (<=<))
+import Control.Monad (forM, foldM, when, (<=<))
 import Control.Monad.Except (MonadError (..))
-import Control.Monad.State (MonadState (..), gets)
+import Control.Monad.State (gets)
 import Control.Monad.Trans (MonadIO (..))
 
 import Data.List (intersperse, foldl')
 import Data.Maybe (isJust, isNothing, fromMaybe, fromJust, catMaybes, mapMaybe)
-import Data.Monoid ((<>))
 
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
 
 import Text.PrettyPrint.Leijen.Text (Doc)
 import qualified Text.PrettyPrint.Leijen.Text as PP
@@ -43,11 +41,11 @@ import FileIO (Feature (..), writeFeatures)
 import HOI4.Messages (imsg2doc)
 import MessageTools (iquotes)
 import QQ (pdx)
-import SettingsTypes ( PPT, Settings (..), Game (..)
-                     , IsGame (..), IsGameData (..), IsGameState (..)
+import SettingsTypes ( PPT, Settings (..)
+                     , IsGame (..), IsGameData (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile
-                     , hoistErrors, hoistExceptions)
+                     , hoistErrors, hoistExceptions, getGameInterface)
 import HOI4.Handlers (flagText)
 
 -- | Empty event value. Starts off Nothing/empty everywhere.
@@ -647,9 +645,8 @@ ppEventSource (HOI4EvtSrcOnAction act weight) = do
             ,("on_weekly","<!-- on_weekly -->On every week")
             ]
 ppEventSource (HOI4EvtSrcNFComplete id loc icon) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault "goal_unknown" icon gfx in
+    iconnf <- do
+        iconname <- getGameInterface "goal_unknown" icon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Completing the national focus "
         , iconnf
@@ -659,9 +656,8 @@ ppEventSource (HOI4EvtSrcNFComplete id loc icon) = do
         , iquotes't loc
         ]
 ppEventSource (HOI4EvtSrcNFSelect id loc icon) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault "goal_unknown" icon gfx in
+    iconnf <- do
+        iconname <- getGameInterface "goal_unknown" icon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Selecting the national focus "
         , iconnf
@@ -671,9 +667,8 @@ ppEventSource (HOI4EvtSrcNFSelect id loc icon) = do
         , iquotes't loc
         ]
 ppEventSource (HOI4EvtSrcIdeaOnAdd id loc icon categ) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault "idea_unknown" icon gfx in
+    iconnf <- do
+        iconname <- getGameInterface "idea_unknown" icon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -687,9 +682,8 @@ ppEventSource (HOI4EvtSrcIdeaOnAdd id loc icon categ) = do
         , " is added"
         ]
 ppEventSource (HOI4EvtSrcIdeaOnRemove id loc icon categ) = do
-    gfx <- getInterfaceGFX
-    iconnf <-
-        let iconname = HM.findWithDefault "idea_unknown" icon gfx in
+    iconnf <- do
+        iconname <- getGameInterface "idea_unknown" icon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "

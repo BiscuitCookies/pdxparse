@@ -12,7 +12,7 @@ $locsyn
 -}
 module Yaml (
         LocEntry (..)
-    ,   L10nLang, L10n
+    ,   L10nLang, L10n, L10nO,L10nLangO
     ,   parseLocFile
     ,   mergeLangs, mergeLangList
 --  ,   message
@@ -22,10 +22,10 @@ module Yaml (
 import Control.Applicative (Applicative (..), Alternative (..), liftA2)
 
 import Data.List (foldl')
-import Data.Monoid (Monoid (..), (<>))
 
 import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HM
+import qualified Data.HashMap.Strict.InsOrd as HMO
+import Data.HashMap.Strict.InsOrd (InsOrdHashMap)
 
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -40,6 +40,11 @@ type L10nLang = HashMap Text LocEntry
 -- | Localization tables for all languages.
 type L10n = HashMap Text L10nLang
 
+-- | Localization table for a single language.
+type L10nLangO = InsOrdHashMap Text LocEntry
+-- | Localization tables for all languages.
+type L10nO = InsOrdHashMap Text L10nLangO
+
 -- | Content of an individual localization entry. Note that the 'Ord' instance
 -- orders by version number before content.
 data LocEntry = LocEntry {
@@ -51,26 +56,26 @@ data LocEntry = LocEntry {
 -- best. If they're equal, use the first argument.
 -- Changed to always take the first. seems version number ahs no bearing in game.
 latest :: LocEntry -> LocEntry -> LocEntry
-latest a b = a
+latest a _b = a
 
 -- | Merge localizations for two languages (using 'latest' to resolve
 -- duplicates).
-mergeLoc :: L10nLang -> L10nLang -> L10nLang
-mergeLoc = HM.unionWith latest
+mergeLoc :: L10nLangO -> L10nLangO -> L10nLangO
+mergeLoc = HMO.unionWith latest
 
 -- | Merge two localization tables. If two entries exist for the same language
 -- and key, prefer the one with more recent version number, or (if the same)
 -- the one in the first argument.
-mergeLangs :: L10n -> L10n -> L10n
-mergeLangs = HM.unionWith mergeLoc
+mergeLangs :: L10nO -> L10nO -> L10nO
+mergeLangs = HMO.unionWith mergeLoc
 
 -- TODO: make L10nLang and L10n newtypes, so we can define Monoid instances for
 -- them with the above as mappend. Then this will be mconcat:
 
 -- | Merge a list of localization tables, from left to right, using
 -- 'mergeLangs'.
-mergeLangList :: [L10n] -> L10n
-mergeLangList = foldl' mergeLangs HM.empty
+mergeLangList :: [L10nO] -> L10nO
+mergeLangList = foldl' mergeLangs HMO.empty
 
 ------------------------
 -- Parser combinators --
@@ -180,18 +185,18 @@ stringChar = Ap.satisfy (not . \c -> Ap.inClass "\\" c || Ap.isEndOfLine c)
 -- are escaped as \n.) We do expect it to end at the end of the line.
 --
 -- Blank lines and comments (beginning with @#@) are permitted.
-locFile :: Parser L10n
+locFile :: Parser L10nO
 locFile = startspace *> lang <* endspace
     <?> "localization file"
 
 -- | Parse a localization file. If the parser fails, returns
 -- @Left <the parse error>@.
-parseLocFile :: Text -> Either String L10n
+parseLocFile :: Text -> Either String L10nO
 parseLocFile = Ap.parseOnly locFile
 
 -- | Parser for one language's localisations.
-lang :: Parser L10n
-lang = HM.singleton <$> (liftA2 (<>) (Ap.string "l_")
+lang :: Parser L10nO
+lang = HMO.singleton <$> (liftA2 (<>) (Ap.string "l_")
                                      (Ap.takeWhile1 (Ap.inClass "a-z_"))
                             <?> "language tag")
                                          -- Stellaris has l_braz_por
@@ -202,8 +207,8 @@ lang = HM.singleton <$> (liftA2 (<>) (Ap.string "l_")
 
 -- | Parse localization messages, separated by line breaks, blank lines, and/or
 -- comments.
-messages :: Parser L10nLang
-messages = HM.fromList <$> message `Ap.sepBy` Ap.many1 newline
+messages :: Parser L10nLangO
+messages = HMO.fromList <$> message `Ap.sepBy` Ap.many1 newline
     <?> "messages"
 
 -- | Parse a single message. We assume the localisation files have strictly a

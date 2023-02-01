@@ -28,6 +28,7 @@ module HOI4.Messages (
         ScriptMessage (..)
     ,   StatementHandler
     ,   template, templateDoc
+    ,   templateColor, templateColor'
     ,   message, messageText
     ,   imsg2doc, imsg2doc_html
     ,   IndentedMessage, IndentedMessages
@@ -526,6 +527,7 @@ data ScriptMessage
     | MsgModifierPcPosReduced {scriptMessageWhat :: Text, scriptMessageAmt :: Double}
     | MsgModifierPcNegReduced {scriptMessageWhat :: Text, scriptMessageAmt :: Double}
     | MsgModifierBop {scriptMessageWhat :: Text, scriptMessageAmt :: Double}
+    | MsgModifierYesNo {scriptMessageWhat :: Text, scriptMessageAmt :: Double}
     | MsgModifierVar {scriptMessageWhat :: Text, scriptMessageAmtText :: Text}
     | MsgCustomModifierTooltip {scriptMessageLoc :: Text}
     | MsgAddCompliance {scriptMessageAmt :: Double}
@@ -1242,7 +1244,7 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , _icon
                 , " "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 , " "
                 , _loc
                 ]
@@ -1259,7 +1261,7 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ addOrRemove _amt
                 , " "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 , " "
                 , _icon
                 , " "
@@ -1277,7 +1279,7 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ gainOrLose _amt
                 , " "
-                , toMessage (reducedNum (colourPc True) _amt)
+                , toMessage $ templateColor (reducedNum (colourPc True) _amt)
                 , " "
                 , _icon
                 , " "
@@ -1394,7 +1396,7 @@ instance RenderMessage Script ScriptMessage where
                 [ "Add "
                 , _what
                 , " Skill: "
-                , toMessage (colourNumSign True _amt)
+                , toMessage $ templateColor (colourNumSign True _amt)
                 ]
         MsgTooltip {scriptMessageWhat = _what}
             -> mconcat
@@ -2624,10 +2626,10 @@ instance RenderMessage Script ScriptMessage where
         MsgAddDoctrineCostReduction {scriptMessageAmt = _amt, scriptMessageAmt2 = _amt2, scriptMessageWhat = _what }
             -> mconcat
                 [ "Gain "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 , plural _amt " use" " uses"
                 , " of "
-                , toMessage (reducedNum (colourPcSign True) _amt2)
+                , toMessage $ templateColor (reducedNum (colourPcSign True) _amt2)
                 , " "
                 , _what
                 , "doctrine cost reduction for:"
@@ -2938,7 +2940,7 @@ instance RenderMessage Script ScriptMessage where
         MsgModifierSign {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
                 [ _what
-                , ": {{yellow|"
+                , ": {{color|yellow|"
                 , toMessage (plainNumSign _amt)
                 , "}}"
                 ]
@@ -2946,13 +2948,13 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ _what
                 , ": "
-                , toMessage (colourNumSign True _amt)
+                , toMessage $ templateColor (colourNumSign True _amt)
                 ]
         MsgModifierColourNeg {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
                 [ _what
                 , ": "
-                , toMessage (colourNumSign False _amt)
+                , toMessage $ templateColor (colourNumSign False _amt)
                 ]
         MsgModifierPc {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
@@ -2963,8 +2965,9 @@ instance RenderMessage Script ScriptMessage where
         MsgModifierPcSign {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
                 [ _what
-                , ": "
+                , ": {{color|yellow|"
                 , toMessage (bold (plainPcSign _amt))
+                , "}}"
                 ]
         MsgModifierPcReduced {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
@@ -2975,14 +2978,14 @@ instance RenderMessage Script ScriptMessage where
         MsgModifierPcReducedSign {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
                 [ _what
-                , ": {{yellow|"
+                , ": {{color|yellow|"
                 , toMessage (reducedNum plainPcSign _amt)
                 , "}}"
                 ]
         MsgModifierPcReducedSignMin {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
                 [ _what
-                , ": {{yellow|"
+                , ": {{color|yellow|"
                 , toMessage (reducedNum plainPcMin _amt)
                 , "}}"
                 ]
@@ -2990,25 +2993,25 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ _what
                 , ": "
-                , toMessage (colourPcSign True _amt)
+                , toMessage $ templateColor (colourPcSign True _amt)
                 ]
         MsgModifierPcNeg {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
                 [ _what
                 , ": "
-                , toMessage (colourPcSign False _amt)
+                , toMessage $ templateColor (colourPcSign False _amt)
                 ]
         MsgModifierPcPosReduced {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
                 [ _what
                 , ": "
-                , toMessage (reducedNum (colourPcSign True) _amt)
+                , toMessage $ templateColor (reducedNum (colourPcSign True) _amt)
                 ]
         MsgModifierPcNegReduced {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
                 [ _what
                 , ": "
-                , toMessage (reducedNum (colourPcSign False) _amt)
+                , toMessage $ templateColor (reducedNum (colourPcSign False) _amt)
                 ]
         MsgModifierBop {scriptMessageWhat = _what, scriptMessageAmt = _amt}
             -> mconcat
@@ -3016,6 +3019,12 @@ instance RenderMessage Script ScriptMessage where
                 , ": "
                 , bopicon _amt
                 , toMessage (bold (reducedNum plainPc _amt))
+                ]
+        MsgModifierYesNo {scriptMessageWhat = _what, scriptMessageAmt = _amt}
+            -> mconcat
+                [ _what
+                , ": "
+                , if _amt /= 0 then "{{color|red|Yes}}" else "{{color|green|No}} <!-- This should not appear -->"
                 ]
         MsgModifierVar {scriptMessageWhat = _what, scriptMessageAmtText = _amtT}
             -> mconcat
@@ -3031,26 +3040,26 @@ instance RenderMessage Script ScriptMessage where
         MsgAddCompliance {scriptMessageAmt = _amt}
             -> mconcat
                 [ "Compliance:"
-                , toMessage (colourPcSign True _amt)
+                , toMessage $ templateColor (colourPcSign True _amt)
                 ]
         MsgAddResearchSlot {scriptMessageAmt = _amt}
             -> mconcat
                 [ gainOrLose _amt
                 , " "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 , plural _amt " research slot" " research slots"
                 ]
         MsgAddResistance {scriptMessageAmt = _amt}
             -> mconcat
                 [ "Resistance: "
-                , toMessage (colourPcSign False _amt)
+                , toMessage $ templateColor (colourPcSign False _amt)
                 ]
         MsgAddThreat {scriptMessageAmt = _amt}
             -> mconcat
                 [ "{{icon|world tension|1}} is "
                 , increasedOrDecreased _amt
                 , " by "
-                , toMessage (colourNum False _amt)
+                , toMessage $ templateColor (colourNum False _amt)
                 ]
         MsgAddNamedThreat {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageWhom = _whom}
             -> mconcat
@@ -3059,7 +3068,7 @@ instance RenderMessage Script ScriptMessage where
                 , " is "
                 , toMessage (increasedOrDecreased _amt)
                 , " by "
-                , toMessage (colourNumSign False _amt)
+                , toMessage $ templateColor (colourNumSign False _amt)
                 , " ("
                 , toMessage (italicText _whom)
                 , ")"
@@ -3067,11 +3076,11 @@ instance RenderMessage Script ScriptMessage where
         MsgAddTechBonus {scriptMessageAmt = _amt, scriptMessageName = _name, scriptMessageUses = _uses}
             -> mconcat
                 [ "Gain "
-                , toMessage (reducedNum (colourPcSign True) _amt)
+                , toMessage $ templateColor (reducedNum (colourPcSign True) _amt)
                 , " research bonus "
                 , if T.null _name then "" else _name
                 , "("
-                , toMessage (colourNum True _uses)
+                , toMessage $ templateColor (colourNum True _uses)
                 , " "
                 , plural _uses "use" "uses"
                 , ") towards:"
@@ -3079,12 +3088,12 @@ instance RenderMessage Script ScriptMessage where
         MsgAddTechBonusAhead {scriptMessageAmt = _amt, scriptMessageName = _name, scriptMessageUses = _uses}
             -> mconcat
                 [ "Gain "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 , plural _amt " year" " years"
                 , " ahead of time penalty reduction "
                 , if T.null _name then "" else toMessage (italicText _name)
                 , "("
-                , toMessage (colourNum True  _uses)
+                , toMessage $ templateColor (colourNum True  _uses)
                 , " "
                 , plural _uses "use" "uses"
                 , ") towards:"
@@ -3092,14 +3101,14 @@ instance RenderMessage Script ScriptMessage where
         MsgAddTechBonusAheadBoth {scriptMessageBonus = _bonus, scriptMessageYearahead = _year, scriptMessageName = _name, scriptMessageUses = _uses}
             -> mconcat
                 [ "Gain "
-                , toMessage (reducedNum (colourPcSign True) _bonus)
+                , toMessage $ templateColor (reducedNum (colourPcSign True) _bonus)
                 , " research bonus or "
-                , toMessage (colourNum True _year)
+                , toMessage $ templateColor (colourNum True _year)
                 , plural _year " year" " years"
                 , " ahead of time penalty reduction "
                 , if T.null _name then "" else toMessage  _name
                 , "("
-                , toMessage (colourNum True  _uses)
+                , toMessage $ templateColor (colourNum True  _uses)
                 , " "
                 , plural _uses "use" "uses"
                 , ") towards:"
@@ -3190,37 +3199,37 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ addOrRemove _amt
                 , " Logistics Skill: "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 ]
         MsgAddPlanning {scriptMessageAmt = _amt}
             -> mconcat
                 [ addOrRemove _amt
                 , " Plannning Skill: "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 ]
         MsgAddDefense {scriptMessageAmt = _amt}
             -> mconcat
                 [ addOrRemove _amt
                 , " Defense Skill: "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 ]
         MsgAddAttack {scriptMessageAmt = _amt}
             -> mconcat
                 [ addOrRemove _amt
                 , " Attack Skill: "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 ]
         MsgAddCoordination {scriptMessageAmt = _amt}
             -> mconcat
                 [ addOrRemove _amt
                 , " Coordination Skill: "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 ]
         MsgAddManeuver {scriptMessageAmt = _amt}
             -> mconcat
                 [ addOrRemove _amt
                 , " Maneuvering Skill: "
-                , toMessage (colourNum True _amt)
+                , toMessage $ templateColor (colourNum True _amt)
                 ]
         MsgSurrenderProgress  {scriptMessageAmt = _amt, scriptMessageCompare = _comp}
             -> mconcat
@@ -3644,7 +3653,7 @@ instance RenderMessage Script ScriptMessage where
                 [ "Modify "
                 , _what
                 , " resource output by: "
-                , toMessage (colourNumSign True _amt)
+                , toMessage $ templateColor (colourNumSign True _amt)
                 , " "
                 , _icon
                 ]
@@ -4052,7 +4061,7 @@ instance RenderMessage Script ScriptMessage where
                 [ "Modify technology sharing bonus "
                 , _who
                 , " by "
-                , toMessage (reducedNum (colourPcSign True) _amt)
+                , toMessage $ templateColor (reducedNum (colourPcSign True) _amt)
                 ]
         MsgModifyTechSharingBonusVar {scriptMessageWho = _who, scriptMessageAmtText = _amtT}
             -> mconcat
@@ -4380,7 +4389,7 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , _what
                 , " receives "
-                , toMessage (colourNum False _amt)
+                , toMessage $ templateColor (colourNum False _amt)
                 , " "
                 , plural _amt "level" "levels"
                 , " of damage"
@@ -4758,7 +4767,7 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , _what
                 , " by up to "
-                , toMessage (colourNumSign True (negate _amt))
+                , toMessage $ templateColor (colourNumSign True (negate _amt))
                 ]
         MsgRemoveBuildingVar {scriptMessageIcon = _icon, scriptMessageWhat = _what, scriptMessageAmtText = _amtT}
             -> mconcat
@@ -4842,6 +4851,16 @@ bopMoreLess comp i
 -- | Convert a single message to Doc.
 message :: (IsGameData (GameData g), Monad m) => ScriptMessage -> PPT g m Doc
 message msg = Doc.strictText <$> messageText msg
+
+templateColor :: Doc -> Doc
+templateColor td = Doc.strictText (templateColor' td)
+
+templateColor' :: Doc -> Text
+templateColor' td = rr
+    where
+        gr = T.replace "{{green" "{{color|green" (Doc.doc2text td)
+        rr = T.replace "{{red" "{{color|red" gr
+
 
 -- | Convert a list of messages zipped with their indentation levels to a Doc.
 -- Each message is prepended with a number of asterisks (levels of bullet

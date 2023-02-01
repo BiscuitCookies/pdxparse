@@ -33,14 +33,12 @@ import Data.List (foldl')
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HM
-import Data.Hashable (Hashable)
-import GHC.Generics (Generic)
 
 import Abstract -- everything
 import QQ (pdx)
 import SettingsTypes ( PPT, Settings
                      , IsGame (..), IsGameData (..), IsGameState (..))
+import HOI4.Messages (ScriptMessage)
 --import Doc
 
 --------------------------------------------
@@ -73,8 +71,8 @@ data HOI4Data = HOI4Data {
 
     ,   hoi4countryHistoryScripts :: HashMap FilePath GenericScript -- Country Tag -> country tag + ideology
     ,   hoi4extraScripts :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
-    ,   hoi4interfacegfxScripts :: HashMap FilePath GenericScript
-    ,   hoi4interfacegfx :: HashMap Text Text
+--    ,   hoi4interfacegfxScripts :: HashMap FilePath GenericScript
+--    ,   hoi4interfacegfx :: HashMap Text Text
     ,   hoi4characterScripts :: HashMap FilePath GenericScript
     ,   hoi4characters :: HashMap Text HOI4Character
     ,   hoi4countryleadertraitScripts :: HashMap FilePath GenericScript
@@ -90,8 +88,12 @@ data HOI4Data = HOI4Data {
     ,   hoi4scriptedeffects :: HashMap Text GenericStatement
     ,   hoi4scriptedtriggerScripts :: HashMap FilePath GenericScript
     ,   hoi4scriptedtriggers :: HashMap Text GenericStatement
+    ,   hoi4modifierdefinitionScripts :: HashMap FilePath GenericScript
+    ,   hoi4modifierdefinitions :: HashMap Text (Text -> Double -> ScriptMessage)
     ,   hoi4bopScripts :: HashMap FilePath GenericScript
     ,   hoi4bops :: HashMap Text HOI4BopRange
+    ,   hoi4lockeys :: [Text]
+    ,   hoi4modkeys :: [Text]
 
     ,   hoi4extraScriptsCountryScope :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
     ,   hoi4extraScriptsProvinceScope :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
@@ -164,10 +166,6 @@ class (IsGame g,
     getCountryHistoryScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the country history parsed
     getCountryHistory :: Monad m => PPT g m (HashMap Text HOI4CountryHistory)
-    -- | Get the interface, for icon paths, scripts
-    getInterfaceGFXScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
-    -- | Get the interface, for icon paths, parsed
-    getInterfaceGFX :: Monad m => PPT g m (HashMap Text Text)
     -- | Get character script
     getCharacterScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the characters parsed
@@ -198,10 +196,18 @@ class (IsGame g,
     getScriptedTriggerScripts  :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the scripted triggers parsed
     getScriptedTriggers  :: Monad m => PPT g m (HashMap Text GenericStatement)
+    -- | Get modifier definition scripts
+    getModifierDefintionScripts  :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the modifier definition  parsed
+    getModifierDefinitions  :: Monad m => PPT g m (HashMap Text (Text -> Double -> ScriptMessage))
     -- | Get balance of power script
     getBopScripts  :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the balance of power parsed
     getBops  :: Monad m => PPT g m (HashMap Text HOI4BopRange)
+    -- | Get the lockeys
+    getLocKeys :: Monad m => PPT g m [Text]
+    -- | Get the modkeys parsed
+    getModKeys :: Monad m => PPT g m [Text]
 
     -- | Get extra scripts parsed from command line arguments
     getExtraScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
@@ -315,7 +321,7 @@ data HOI4DecisionSource =
     | HOI4DecSrcIdeaOnRemove Text Text Text Text    -- Effect of removing an idea
     | HOI4DecSrcCharacterOnAdd Text Text            -- Effect of adding an advisor
     | HOI4DecSrcCharacterOnRemove Text Text         -- Effect of removing an advisor
-    | HOI4DecSrcScriptedEffect Text HOI4EventWeight -- Effect of a scripted effect
+    | HOI4DecSrcScriptedEffect Text HOI4DecisionWeight -- Effect of a scripted effect
     | HOI4DecSrcBopOnActivate Text                  -- Effect of a balance of power range activation
     | HOI4DecSrcBopOnDeactivate Text                -- Effect of a balance of power range deactivation
     deriving Show
@@ -342,10 +348,10 @@ data HOI4Idea = HOI4Idea
     ,   id_cancel :: Maybe GenericScript -- ^ tirggers for removing the idea
     ,   id_do_effect :: Maybe GenericScript -- ^ requirements for the idea's modifiers to work
     ,   id_allowed_civil_war :: Maybe GenericScript
+    ,   id_traits :: Maybe GenericScript
     ,   id_category :: Text
     ,   id_path :: FilePath -- ^ Source file
     ,   id_cost :: Maybe Double
-    ,   id_traits :: Maybe GenericStatement
     } deriving (Show)
 
 -- | Decision data.
@@ -605,6 +611,6 @@ awdModifierAddSection aim stmt@[pdx| $left = %right |] = case T.toLower left of
         (floatRhs right)
     _ -> -- the rest of the statements are just the conditions.
         aim { aim_triggers = aim_triggers aim ++ [stmt] }
-awdModifierAddSection aim stmt@[pdx| $left > %right |] = aim { aim_triggers = aim_triggers aim ++ [stmt] }
-awdModifierAddSection aim stmt@[pdx| $left < %right |] = aim { aim_triggers = aim_triggers aim ++ [stmt] }
+awdModifierAddSection aim stmt@[pdx| $_left > %_right |] = aim { aim_triggers = aim_triggers aim ++ [stmt] }
+awdModifierAddSection aim stmt@[pdx| $_left < %_right |] = aim { aim_triggers = aim_triggers aim ++ [stmt] }
 awdModifierAddSection aim _ = aim
