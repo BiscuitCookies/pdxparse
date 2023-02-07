@@ -318,9 +318,9 @@ ppIdea id = setCurrentFile (id_path id) $ do
         available_pp ++
         [ "| ",PP.line]++
         mod ++
-        equipmod ++
         tarmod ++
         resmod ++
+        equipmod ++
         traitids ++
         [traitmsg_pp, PP.line
         , "| ", if id_category id == "country" then mempty else maybe "150" plainNum (id_cost id), PP.line]
