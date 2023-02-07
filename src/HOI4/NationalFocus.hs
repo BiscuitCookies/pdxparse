@@ -252,7 +252,7 @@ ppNationalFocuses nfs = do
         [ "{{Version|", Doc.strictText version, "}}", PP.line
         , "{| class=\"mildtable\" {{buffer}}", PP.line
         , "! style=\"width: 30%;\" | Focus", PP.line
-        , "! style=\"width: 40%;\" | Prerequisites", PP.line
+        , "! style=\"width: 30%;\" | Prerequisites", PP.line
         , "! style=\"width: 40%;\" | Effects", PP.line
         ] ++ nfDoc ++
         [ "|}", PP.line

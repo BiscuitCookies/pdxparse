@@ -374,7 +374,7 @@ data HOI4Decisioncat = HOI4Decisioncat
     } deriving (Show)
 
 data HOI4DecisionCost
-    = HOI4DecisionCostSimple Double
+    = HOI4DecisionCostSimple Int
     | HOI4DecisionCostVariable Text
     deriving Show
 
@@ -394,21 +394,22 @@ data HOI4Decision = HOI4Decision
     ,   dec_target_root_trigger :: Maybe GenericScript
     ,   dec_visible :: Maybe GenericScript
     ,   dec_available :: Maybe GenericScript
+    ,   dec_is_good :: Bool -- ^ changes tooltip on whether timing out or compeleting mission is desirable, default is no and assumes complete_effect is desirable
     ,   dec_complete_effect :: Maybe GenericScript -- ^ the block of effects that gets executed immediately
                                                    --   when the decision is selected (Starting the timer if it has one).
-    ,   dec_days_re_enable :: Maybe Double
+    ,   dec_days_re_enable :: Maybe Int
     ,   dec_fire_only_once :: Bool
     ,   dec_cost :: Maybe HOI4DecisionCost
     ,   dec_custom_cost_trigger  :: Maybe GenericScript
     ,   dec_custom_cost_text :: Maybe Text
-    ,   dec_days_remove :: Maybe Double
+    ,   dec_days_remove :: Maybe Int
     ,   dec_remove_effect :: Maybe GenericScript
     ,   dec_remove_trigger :: Maybe GenericScript
     ,   dec_modifier :: Maybe GenericStatement
     ,   dec_cancel_trigger ::  Maybe GenericScript
     ,   dec_cancel_effect ::  Maybe GenericScript
 
-    ,   dec_days_mission_timeout :: Maybe Double
+    ,   dec_days_mission_timeout :: Maybe Int
     ,   dec_activation :: Maybe GenericScript
     ,   dec_timeout_effect :: Maybe GenericScript
     ,   dec_cancel_if_not_visible :: Bool
