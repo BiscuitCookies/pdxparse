@@ -1529,7 +1529,7 @@ getLeaderTraits trait = do
             equipmod <- maybe (return []) handleEquipmentBonus (clt_equipment_bonus clt)
             tarmod <- maybe (return []) (concatMapM handleTargetedModifier) (clt_targeted_modifier clt)
             hidmod <- maybe (return []) handleModifier (clt_hidden_modifier clt)
-            return ( mod ++ tarmod ++ equipmod ++ hidmod)
+            return ( mod ++ hidmod ++ tarmod ++ equipmod )
         Nothing -> getUnitTraits trait
 
 getUnitTraits :: (Monad m, HOI4Info g) => Text-> PPT g m IndentedMessages
@@ -1539,16 +1539,26 @@ getUnitTraits trait = do
         Just ult-> do
             attack <- maybe (return []) (msgToPP . MsgAddSkill "Attack") (ult_attack_skill ult)
             defense <- maybe (return []) (msgToPP . MsgAddSkill "Defense") (ult_defense_skill ult)
-            logistics <- maybe (return []) (msgToPP . MsgAddSkill "Logistics") (ult_logistics_skill ult)
             planning <- maybe (return []) (msgToPP . MsgAddSkill "Planning") (ult_planning_skill ult)
+            logistics <- maybe (return []) (msgToPP . MsgAddSkill "Logistics") (ult_logistics_skill ult)
             maneuvering <- maybe (return []) (msgToPP . MsgAddSkill "Maneuvering") (ult_maneuvering_skill ult)
             coordination <- maybe (return []) (msgToPP . MsgAddSkill "Coordination") (ult_coordination_skill ult)
-            let skillmsg = attack ++ defense ++ logistics ++ planning ++ maneuvering ++ coordination
+            let skillmsg = attack ++ defense ++ planning ++ logistics ++ maneuvering ++ coordination
+                mod = getscript (ult_modifier ult)
+                nsmod = getscript (ult_non_shared_modifier ult)
+                ccmod = getscript (ult_corps_commander_modifier ult)
+                fmmod = getscript (ult_field_marshal_modifier ult)
             trtxp <- maybe (return []) handleModifier (ult_trait_xp_factor ult)
-            mod <- maybe (return []) handleModifier (ult_modifier ult)
-            nsmod <- maybe (return []) handleModifier (ult_non_shared_modifier ult)
-            ccmod <- maybe (return []) handleModifier (ult_corps_commander_modifier ult)
-            fmmod <- maybe (return []) handleModifier (ult_field_marshal_modifier ult)
+            mods <- do
+                let mods' = mod ++ nsmod ++ ccmod ++ fmmod
+                keys <- getModKeys
+                sm <- sortmods mods' keys
+                fold <$> traverse (modifierMSG False "") sm
             sumod <- maybe (return []) handleEquipmentBonus (ult_sub_unit_modifiers ult)
-            return (skillmsg ++ trtxp ++ mod ++ nsmod ++ ccmod ++ fmmod ++ sumod)
+
+            return (trtxp ++ mods ++ sumod ++ skillmsg)
         Nothing -> return []
+    where
+        getscript stmt = case stmt of
+            Just [pdx| %_ = @scr|] -> scr
+            _ -> []
