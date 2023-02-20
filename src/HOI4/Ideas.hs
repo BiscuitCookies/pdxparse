@@ -301,7 +301,10 @@ ppIdea id = setCurrentFile (id_path id) $ do
     traitids <- case id_traits id of
         Just arr -> do
             let traitbare = mapMaybe getbaretraits arr
-                traitlist = intersperse ", " traitbare
+            traitloc <- traverse (\t -> do
+                tloc <- getGameL10n t
+                return $ tloc <> "<!-- " <> t <> "-->") traitbare
+            let traitlist = intersperse ", " traitloc
                 traitids = map Doc.strictText traitlist
             return $ ["traitids: "] ++ traitids ++ ["\n\n"]
         _-> return []
@@ -317,9 +320,14 @@ ppIdea id = setCurrentFile (id_path id) $ do
         prerequisite_pp ++
         available_pp ++
         [ "| ",PP.line]++
-        mod ++
-        tarmod ++
-        resmod ++
+        (if id_category id `elem` ["tank_manufacturer", "naval_manufacturer", "aircraft_manufacturer", "materiel_manufacturer", "industrial_concern"] then
+            resmod ++
+            mod ++
+            tarmod
+        else
+            mod ++
+            tarmod ++
+            resmod)++
         equipmod ++
         traitids ++
         [traitmsg_pp, PP.line
