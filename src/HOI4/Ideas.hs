@@ -285,14 +285,13 @@ ppIdea id = setCurrentFile (id_path id) $ do
             (field id)
     icon_pp <- getGameInterface "idea_unknown" (id_picture id)
     name_pp <- getGameL10n $ id_name id
-    prerequisite_pp <- nfArg id_available ppScript
-    allowBranch_pp <- nfArg id_allowed ppScript
+    allowed_pp <- nfArg id_allowed ppScript
     visible_pp <- nfArg id_visible ppScript
+    available_pp <- nfArg id_available ppScript
     mod <- nfArg id_modifier ppStatement
     equipmod <- nfArg id_equipment_bonus ppStatement
     resmod <- nfArg id_research_bonus ppStatement
     tarmod <- nfArg id_targeted_modifier ppScript
-    available_pp <- nfArg id_available ppScript
     traitmsg <- case id_traits id of
         Just arr -> do
             let traitbare = mapMaybe getbaretraits arr
@@ -316,8 +315,8 @@ ppIdea id = setCurrentFile (id_path id) $ do
         , "| ", Doc.strictText name_pp, "<!-- ", Doc.strictText (id_id id), " -->", PP.line
         , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (id_desc_loc id), PP.line
         , "| ",PP.line]++
-        allowBranch_pp ++
-        prerequisite_pp ++
+        allowed_pp ++
+        visible_pp ++
         available_pp ++
         [ "| ",PP.line]++
         (if id_category id `elem` ["tank_manufacturer", "naval_manufacturer", "aircraft_manufacturer", "materiel_manufacturer", "industrial_concern"] then
