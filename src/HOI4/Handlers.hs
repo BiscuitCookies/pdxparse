@@ -3415,21 +3415,21 @@ setTechnology stmt@[pdx| %_ = @scr |] =
 setTechnology stmt = preStatement stmt
 
 setCapital :: forall g m. (HOI4Info g, Monad m) =>
-    (Text -> ScriptMessage) -> StatementHandler g m
+    (Text -> Text -> ScriptMessage) -> StatementHandler g m
 setCapital msg stmt@[pdx| %_ = @scr |] =
         let (_, rest) = extractStmt (matchLhsText "remember_old_capital") scr in
         case rest of
             [[pdx| state = !state |]] -> do
                 stateloc <- getStateLoc state
-                msgToPP $ msg stateloc
+                msgToPP $ msg stateloc ""
             [[pdx| state = $state |]] -> do
                 stated <- eGetState (Left state)
                 let stateloc = fromMaybe "<!-- Check Script -->"  stated
-                msgToPP $ msg stateloc
+                msgToPP $ msg stateloc ""
             [[pdx| state = $vartag:$var |]] -> do
                 stated <- eGetState (Right (vartag, var))
                 let stateloc = fromMaybe "<!-- Check Script -->"  stated
-                msgToPP $ msg stateloc
+                msgToPP $ msg stateloc ""
             _ -> preStatement stmt
 setCapital msg stmt = withFlag msg stmt
 

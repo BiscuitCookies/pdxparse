@@ -297,28 +297,30 @@ ppIdea id = setCurrentFile (id_path id) $ do
             let traitbare = mapMaybe getbaretraits arr
             concatMapM getLeaderTraits traitbare
         _-> return []
-    traitids <- case id_traits id of
+    (traitids, traitloc) <- case id_traits id of
         Just arr -> do
             let traitbare = mapMaybe getbaretraits arr
-            traitloc <- traverse (\t -> do
-                tloc <- getGameL10n t
-                return $ tloc <> "<!-- " <> t <> "-->") traitbare
-            let traitlist = intersperse ", " traitloc
+                traitlist = map (\t-> "{{countrytrait|"<> t <> "|noname=1}}") traitbare
                 traitids = map Doc.strictText traitlist
-            return $ ["traitids: "] ++ traitids ++ ["\n\n"]
-        _-> return []
+            traitloc <- do
+                tloc <- traverse getGameL10n traitbare
+                return $ T.intercalate "<br>" tloc
+            return  (traitids, traitloc)
+        _-> return ([],"")
     traitmsg_pp <- imsg2doc traitmsg
     return . mconcat $
         [ "|- ", PP.line
         , "| ", Doc.strictText $ id_category id, PP.line
-        , "| [[File:", Doc.strictText icon_pp, ".png]]", PP.line
-        , "| ", Doc.strictText name_pp, "<!-- ", Doc.strictText (id_id id), " -->", PP.line
-        , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (id_desc_loc id), PP.line
-        , "| ",PP.line]++
+        , "{{advisors/row", PP.line
+        , "| advisor = {{image title|", Doc.strictText icon_pp
+        , "| ", Doc.strictText name_pp, "}}<!-- ", Doc.strictText (id_id id), " -->", PP.line
+        , "| trait = ",Doc.strictText traitloc,PP.line
+        , "| desc = ",maybe mempty (Doc.strictText . Doc.nl2br) (id_desc_loc id), PP.line
+        , "| prereq =",PP.line]++
         allowed_pp ++
         visible_pp ++
         available_pp ++
-        [ "| ",PP.line]++
+        [ "| effect = ",PP.line]++
         (if id_category id `elem` ["tank_manufacturer", "naval_manufacturer", "aircraft_manufacturer", "materiel_manufacturer", "industrial_concern"] then
             resmod ++
             mod ++
@@ -330,4 +332,4 @@ ppIdea id = setCurrentFile (id_path id) $ do
         equipmod ++
         traitids ++
         [traitmsg_pp, PP.line
-        , "| ", if id_category id == "country" then mempty else maybe "150" plainNum (id_cost id), PP.line]
+        , "| cost = ", if id_category id == "country" then mempty else maybe "{{icon|political power|150}} }}" (\c -> "{{icon|political power|"<> plainNum c <>"}} }}") (id_cost id), PP.line]
