@@ -1104,15 +1104,15 @@ numericOrTagIcon _ _ _ stmt = preStatement stmt -- CHECK FOR USEFULNESS
 
 -- | Handler for a statement referring to a country. Use a flag.
 withFlag :: (HOI4Info g, Monad m) =>
-    (Text -> ScriptMessage) -> StatementHandler g m
+    (Text -> Text -> ScriptMessage)  -> StatementHandler g m
 withFlag msg stmt@[pdx| %_ = $vartag:$var |] = do
     mwhoflag <- eflag (Just HOI4Country) (Right (vartag, var))
     case mwhoflag of
-        Just whoflag -> msgToPP . msg $ whoflag
+        Just whoflag -> msgToPP $ msg whoflag ""
         Nothing -> preStatement stmt
 withFlag msg [pdx| %_ = $who |] = do
-    whoflag <- flag (Just HOI4Country) who
-    msgToPP . msg . Doc.doc2text $ whoflag
+    whoflag <- flagText (Just HOI4Country) who
+    msgToPP $ msg whoflag who
 withFlag _ stmt = preStatement stmt
 
 -- | Handler for a statement referring to a country. Use a flag.
@@ -1125,7 +1125,7 @@ withFlagAndTag msg stmt@[pdx| %_ = $vartag:$var |] = do
         Nothing -> preStatement stmt
 withFlagAndTag msg [pdx| %_ = $who |] = do
     whoflag <- flagText (Just HOI4Country) who
-    msgToPP $ msg whoflag  who
+    msgToPP $ msg whoflag who
 withFlagAndTag _ stmt = preStatement stmt
 
 -- | Handler for yes-or-no statements.
@@ -1178,7 +1178,7 @@ boolIconLoc the_icon what msg stmt
 -- | Handler for statements whose RHS may be "yes"/"no" or a tag.
 withFlagOrBool :: (HOI4Info g, Monad m) =>
     (Bool -> ScriptMessage)
-        -> (Text -> ScriptMessage)
+        -> (Text -> Text -> ScriptMessage)
         -> StatementHandler g m
 withFlagOrBool bmsg _ [pdx| %_ = yes |] = msgToPP (bmsg True)
 withFlagOrBool bmsg _ [pdx| %_ = no  |]  = msgToPP (bmsg False)
@@ -1925,7 +1925,7 @@ hasDlc [pdx| %_ = ?dlc |]
 hasDlc stmt = preStatement stmt
 
 withFlagOrState :: (HOI4Info g, Monad m) =>
-    (Text -> ScriptMessage)
+    (Text -> Text -> ScriptMessage)
         -> (Text -> ScriptMessage)
         -> StatementHandler g m
 withFlagOrState countryMsg _ stmt@[pdx| %_ = ?_ |]

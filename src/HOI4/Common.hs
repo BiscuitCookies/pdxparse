@@ -798,7 +798,7 @@ ppOne' stmt lhs rhs = case lhs of
              then case rhs of
                 CompoundRhs scr ->
                     withCurrentIndent $ \_ -> do -- force indent level at least 1
-                        lflag <- plainMsg' . (<> ":") =<< flagText (Just HOI4Country) label
+                        lflag <- plainMsg' . (<>"<!-- " <> label <> " -->" <>":") =<< flagText (Just HOI4Country) label
                         scriptMsgs <- scope HOI4Country $ ppMany scr
                         return (lflag : scriptMsgs)
                 _ -> preStatement stmt
