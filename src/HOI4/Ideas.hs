@@ -313,7 +313,7 @@ ppIdea id = setCurrentFile (id_path id) $ do
         , "| ", Doc.strictText $ id_category id, PP.line
         , "{{advisors/row", PP.line
         , "| advisor = {{image title|", Doc.strictText icon_pp
-        , "| ", Doc.strictText name_pp, "}}<!-- ", Doc.strictText (id_id id), " -->", PP.line
+        , "|", Doc.strictText name_pp, "}}<!-- ", Doc.strictText (id_id id), " -->", PP.line
         , "| trait = ",Doc.strictText traitloc,PP.line
         , "| desc = ",maybe mempty (Doc.strictText . Doc.nl2br) (id_desc_loc id), PP.line
         , "| prereq =",PP.line]++
