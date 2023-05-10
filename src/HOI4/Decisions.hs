@@ -38,14 +38,15 @@ import Abstract -- everything
 import qualified Doc
 import FileIO (Feature (..), writeFeatures)
 import HOI4.Messages -- everything
-import MessageTools (iquotes, italicText)
+import MessageTools (iquotes, italicText, formatDays)
 import HOI4.Handlers (flagText, getStateLoc)
 import QQ (pdx)
 import SettingsTypes ( PPT, Settings (..)
                      , IsGame (..), IsGameData (..), IsGameState (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile
-                     , hoistErrors, hoistExceptions, getGameInterface)
+                     , hoistErrors, hoistExceptions
+                     , getGameInterface, getGameInterfaceIfPresent)
 import HOI4.Common -- everything
 
 -- | Empty decision category. Starts off Nothing/empty everywhere, except id and name
@@ -173,13 +174,25 @@ ppdecisioncat decc = setCurrentFile (decc_path decc) $ do
         nameD = Doc.strictText name
     name_loc <- getGameL10n name
     let icon = decc_icon decc
-    icon_pp <- let iconcat = if not $ "GFX_decision_category_" `T.isPrefixOf` icon then "GFX_decision_category_" <> icon else icon in
-                getGameInterface  "decision_category_generic" iconcat
+        deccpicture = decc_picture decc
+    icon_pp <- do
+        micon <- getGameInterfaceIfPresent ("GFX_decision_category_" <> decc_name decc)
+        case micon of
+            Nothing -> let iconcat = if not $ "GFX_decision_category_" `T.isPrefixOf` icon then "GFX_decision_category_" <> icon else icon in
+                    getGameInterface "decision_category_generic" iconcat
+            Just icond -> return icond
+    picture_pp <- do
+        case deccpicture of
+            Nothing -> return mempty
+            Just picd -> do
+                let piccat = if not $ "GFX_decision_category_" `T.isPrefixOf` picd then "GFX_decision_category_" <> picd else picd
+                mpic <- getGameInterfaceIfPresent piccat
+                maybe (return mempty) (\p -> return $ mconcat ["<!-- picture: ", Doc.strictText p, " -->", PP.line]) mpic
     return . mconcat $
-        ["== [[File:", Doc.strictText icon_pp, ".png]]" , "<!-- ", nameD, " --> ", Doc.strictText name_loc," ==", PP.line
-        ," version = ", Doc.strictText version, PP.line
-        ,maybe mempty
-               (\txt -> mconcat [ Doc.strictText $ italicText $ Doc.nl2br txt, PP.line])
+        ["== [[File:", Doc.strictText icon_pp, ".png]]" , "<!-- ", nameD, " --> ", Doc.strictText name_loc," ==", PP.line]++
+
+        [maybe mempty
+               (\txt -> mconcat [picture_pp, Doc.strictText $ italicText $ Doc.nl2br txt, PP.line, PP.line])
                decc_text_loc
         ] ++
         allow_pp'd ++
@@ -189,7 +202,7 @@ ppdecisioncat decc = setCurrentFile (decc_path decc) $ do
 -- | Empty decision. Starts off Nothing/empty everywhere, except id and name
 -- (which should get filled in immediately).
 newDecision :: HOI4Decision
-newDecision = HOI4Decision undefined undefined Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing False Nothing Nothing False Nothing undefined undefined
+newDecision = HOI4Decision undefined undefined Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing False Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing False Nothing Nothing False Nothing Nothing False Nothing undefined undefined
 
 -- | Take the decisions scripts from game data and parse them into decision
 -- data structures.
@@ -266,94 +279,104 @@ decisionAddSection dec stmt
             "allowed" -> case rhs of -- Checks only once on start/load an is used to restrict which countries have/not have it
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_allowed = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions allowed" dec
             "complete_effect" -> case rhs of -- effect when selecting decision, or when mission starts
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_complete_effect = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions complete_effect" dec
             "ai_will_do" -> case rhs of
                 CompoundRhs scr -> dec { dec_ai_will_do = Just (aiWillDo scr) }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions ai_will_do" dec
             "target_root_trigger" -> case rhs of -- can only check root for targeted decisions if allowed is true
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_target_root_trigger = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions target_root_trigger" dec
             "visible" -> case rhs of -- can check from and root if target_root_trigger is true (or allowed if it's not present)
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_visible = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions visible" dec
             "available" -> case rhs of -- checks visible, if it's false the decision is greyed out but still visible
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_available = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions available" dec
             "priority" -> dec
             "highlight_states" -> dec
             "days_re_enable" -> case rhs of -- number of days it takes for decision to reapear after completion
-                FloatRhs num -> dec { dec_days_re_enable = Just num }
-                _ -> dec
+                (floatRhs -> num) -> dec { dec_days_re_enable = num }
+                --_ -> trace "DEBUG: bad decisions days_re_enable" dec
             "fire_only_once"  -> case rhs of --bool, standard false
                 GenericRhs "yes" [] -> dec { dec_fire_only_once = True }
                 -- no is the default, so I don't think this is ever used
                 GenericRhs "no" [] -> dec { dec_fire_only_once = False }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions fire_only_once" dec
             "cost" -> case rhs of --var or num
                 GenericRhs txt [] -> dec { dec_cost = Just (HOI4DecisionCostVariable txt) }
                 GenericRhs _var [txt] -> dec { dec_cost = Just (HOI4DecisionCostVariable txt) }
-                FloatRhs num -> dec { dec_cost = Just (HOI4DecisionCostSimple num) }
-                _ -> dec
+                (floatRhs -> Just num)  -> dec { dec_cost = Just (HOI4DecisionCostSimple num) }
+                _ -> trace "DEBUG: bad decisions costt" dec
             "custom_cost_trigger" -> case rhs of
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_custom_cost_trigger = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions custom_cost_trigger" dec
             "custom_cost_text" -> case rhs of
                 GenericRhs txt _ -> -- localizable
                     dec { dec_custom_cost_text = Just txt }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions custom_cost_text" dec
             "days_remove" -> case rhs of --number of days it takes to finish decision
-                FloatRhs num -> dec { dec_days_remove = Just num }
-                _ -> dec
+                (floatRhs -> num) -> dec { dec_days_remove = num }
+                --_ -> trace "DEBUG: bad decisions days_remove" dec
             "remove_effect" -> case rhs of -- effect when decision completes
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_remove_effect = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions remove_effect" dec
             "cancel_trigger" -> case rhs of -- trigger for canceling missions
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_cancel_trigger = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions cancel_trigger" dec
             "cancel_effect" -> case rhs of -- effect when mission is canceled
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_cancel_effect = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions cancel_effect" dec
             "war_with_on_remove" -> dec -- used to inform if a decison declares war when finished
             "war_with_on_complete" -> dec -- used to inform if a decison declares war when selected
             "war_with_on_timeout" -> dec -- used to inform if a decison declares war when selected
             "fixed_random_seed" -> dec --bool, standard True
             "days_mission_timeout" -> case rhs of -- how long the mission takes to finish, and turns decision into mission
-                FloatRhs num -> dec { dec_days_remove = Just num }
-                _ -> dec
-            "activation" -> dec -- checks for if a mission starts
-            "selectable_mission" -> dec --bool, standard false
+                (floatRhs -> num)  -> dec { dec_days_mission_timeout = num }
+                --_ -> trace "DEBUG: bad decisions days_mission_timeout" dec
+            "activation" -> case rhs of -- checks for if a mission starts
+                CompoundRhs [] -> dec -- empty, treat as if it wasn't there
+                CompoundRhs scr -> dec { dec_activation = Just scr }
+                _ -> trace "DEBUG: bad decisions activation" dec
+            "selectable_mission" -> case rhs of --bool, standard false
+                GenericRhs "yes" [] -> dec { dec_selectable_mission = True }
+                -- no is the default, so I don't think this is ever used
+                GenericRhs "no" [] -> dec { dec_selectable_mission = False }
+                _ -> trace "DEBUG: bad decisions selectable_mission" dec
             "timeout_effect" -> case rhs of -- effect for mission completing
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_timeout_effect = Just scr }
-                _ -> dec
-            "is_good" -> dec --bool, standard false but not really, says wether finishing the mission is good or bad
+                _ -> trace "DEBUG: bad decisions trimeout_effect" dec
+            "is_good" ->  case rhs of --bool, standard false, says wether finishing the mission is good or bad
+                GenericRhs "yes" [] -> dec { dec_is_good = True }
+                GenericRhs "no" [] -> dec { dec_is_good = False }
+                _ -> trace "DEBUG: bad decisions is_good" dec
             "targets" -> case rhs of -- weirdo array , checks countries for which decision can be targeted to, turn decisions into targeted decision
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_targets = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions targets" dec
             "target_array" -> case rhs of -- uses variables to create targets for decision, turn decisions into targeted decision
                 GenericRhs txt _ -> dec { dec_target_array = Just txt }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions target array" dec
             "targets_dynamic" -> case rhs of --bool, standard false , makes targets also check for orignal_tag
                 GenericRhs "yes" [] -> dec { dec_targets_dynamic = True }
                 -- no is the default, so I don't think this is ever used
                 GenericRhs "no" [] -> dec { dec_targets_dynamic = False }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions targets_dynamic" dec
             "target_trigger" -> case rhs of -- alternate to visible for targeted decision
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_target_trigger = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions target_trigger" dec
             "war_with_target_on_complete" -> dec --bool, standard false
             "war_with_target_on_remove" -> dec --bool, standard false
             "war_with_target_on_timeout" -> dec --bool, standard false
@@ -361,32 +384,32 @@ decisionAddSection dec stmt
                 GenericRhs "yes" [] -> dec { dec_state_target = True }
                 -- no is the default, so I don't think this is ever used
                 GenericRhs "no" [] -> dec { dec_state_target = False }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions state_target" dec
             "on_map_mode" -> dec
             "modifier" -> case rhs of -- effects that apply when decision is active (timer/mission?)
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs _scr -> dec { dec_modifier = Just stmt }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions modifier" dec
             "targeted_modifier" -> case rhs of -- effects for country/state targeted and duration?
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs _scr -> let oldstmt = fromMaybe [] (dec_targeted_modifier dec) in
                     dec { dec_targeted_modifier = Just (oldstmt ++ [stmt]) }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions targeted_modifier" dec
             "cancel_if_not_visible" -> case rhs of -- cancels mission if visible is false
                 GenericRhs "yes" [] -> dec { dec_cancel_if_not_visible = True }
                 -- no is the default, so I don't think this is ever used
                 GenericRhs "no" [] -> dec { dec_cancel_if_not_visible = False }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions cancel_if_not_visible" dec
             "name" -> case rhs of -- is used over the localized id
                 GenericRhs txt _ -> dec {dec_name = txt}
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions name" dec
             "ai_hint_pp_cost" -> dec
             "cosmetic_tag" -> dec -- no clue
             "cosmetic_ideology" -> dec -- no clue
             "remove_trigger" -> case rhs of -- used to cancel timed decision
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_remove_trigger = Just scr }
-                _ -> dec
+                _ -> trace "DEBUG: bad decisions remove_trigger" dec
             "target_non_existing" -> dec -- no clue
             "power_balance" -> dec -- no clue, only seen in debug so far
             other -> trace ("unknown decision section: " ++ show other ++ "  " ++ show stmt) dec
@@ -423,6 +446,15 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
                         ,content_pp'd
                         ,PP.line])
                 (field dec)
+    let decNoArg :: (HOI4Decision -> Maybe a) -> (a -> PPT g m Doc) -> Doc -> PPT g m [Doc]
+        decNoArg field fmt opttext
+            = maybe (return [])
+                (\field_content -> do
+                    content_pp'd <- fmt field_content
+                    return
+                        [opttext, content_pp'd
+                        ,PP.line])
+                (field dec)
     targets <- case (dec_targets dec, dec_target_array dec, dec_state_target dec) of
         (Just array, _, True) -> do
             let targetlist = mapMaybe extractTargetsStates array
@@ -434,20 +466,20 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
             targetlistloc <- traverse (flagText (Just HOI4Country)) targetlist
             let targetdoc = [Doc.ppString (intercalate ", " $ map T.unpack targetlistloc)]
             return $ ["| targets = "] ++ targetdoc ++ [PP.line]
-        (_, Just array, True) -> return ["| targets = States ",Doc.strictText array]
-        (_, Just array, False) -> return ["| targets = ",Doc.strictText array]
+        (_, Just array, True) -> return ["| targets = States ",Doc.strictText array, PP.line]
+        (_, Just array, False) -> return ["| targets = ",Doc.strictText array, PP.line]
         _ -> return [""]
     ------
-    allow_pp'd  <- decArg "allowed" dec_allowed ppScript
-    targetRootTrigger_pp'd  <- decArg "target_root_trigger" dec_target_root_trigger ppScript -- checks ROOT
-    visible_pp'd  <- decArg "visible" dec_visible ppScript
-    targetTrigger_pp'd  <- decArg "target_trigger" dec_target_trigger ppScript --checks FROM and ROOT and makes decision visible if true
-    available_pp'd  <- decArg "available" dec_available ppScript
-    removeTrigger_pp'd  <- decArg "remove_trigger" dec_remove_trigger ppScript --removes decision? and ends modifier effect and triggers remove_effect?
-    cancelTrigger_pp'd  <- decArg "cancel_trigger" dec_cancel_trigger ppScript -- cancels missions, tirggers canceleffect
-    effect_pp'd <- setIsInEffect True (decArg "complete_effect" dec_complete_effect ppScript)
+    allow_pp'd <- decNoArg dec_allowed ppScript "<!-- allowed -->"
+    targetRootTrigger_pp'd <- decNoArg dec_target_root_trigger ppScript "<!-- target_root_trigger -->" -- checks ROOT
+    visible_pp'd <- decNoArg dec_visible ppScript "<!-- visible -->"
+    targetTrigger_pp'd <- decNoArg dec_target_trigger ppScript "<!-- target_trigger -->" --checks FROM and ROOT and makes decision visible if true
+    available_pp'd <- decArg "available" dec_available ppScript
+    removeTrigger_pp'd <- decArg "remove_trigger" dec_remove_trigger ppScript --removes decision? and ends modifier effect and triggers remove_effect?
+    cancelTrigger_pp'd <- decArg "cancel_trigger" dec_cancel_trigger ppScript -- cancels missions, triggers canceleffect
+    effect_pp'd <- setIsInEffect True (decArg "select_effect" dec_complete_effect ppScript)
     removeEffect_pp'd <- setIsInEffect True (decArg "remove_effect" dec_remove_effect ppScript)
-    cancelEffect_pp'd <- setIsInEffect True (decArg "cancel_effect" dec_complete_effect ppScript)
+    cancelEffect_pp'd <- setIsInEffect True (decArg "cancel_effect" dec_cancel_effect ppScript)
     timeoutEffect_pp'd <- setIsInEffect True (decArg "timeout_effect" dec_timeout_effect ppScript)
     mawd_pp'd   <- setIsInEffect True (mapM (imsg2doc <=< ppAiWillDo) (dec_ai_will_do dec))
     let name = dec_name dec
@@ -457,55 +489,65 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
             Just (HOI4DecisionCostVariable txt) -> Just txt
             _ -> Nothing
         isFireOnlyOnce = dec_fire_only_once dec
+        isGood = dec_is_good dec
+        isSelectableMission = dec_selectable_mission dec
         cancelIfNotVisible = dec_cancel_if_not_visible dec
         targetsDynamic = dec_targets_dynamic dec
     custom_cost_loc_pp'd <- case dec_custom_cost_text dec of
             Just custom_cost_text -> do
                 custom_cost_text_loc <- getGameL10n custom_cost_text
-                return ["| custom_cost = ", Doc.strictText custom_cost_text_loc, PP.line]
+                return ["| cost = ", Doc.strictText custom_cost_text_loc, "<!-- custom cost -->" ,PP.line]
             _ -> return []
     custom_cost_trigger_pp'd  <- decArg "custom_cost_trigger" dec_custom_cost_trigger ppScript
-    activation_pp'd <- decArg "activation" dec_activation ppScript
-    modifier_pp'd <- setIsInEffect True (decArg "modifier" dec_modifier ppStatement)
-    targetedModifier_pp'd <- setIsInEffect True (decArg "targeted_modifier" dec_targeted_modifier ppScript)
+    activation_pp'd <- decNoArg dec_activation ppScript "<!-- activation -->"
+    modifier_pp'd <- setIsInEffect True (decNoArg dec_modifier ppStatement "")
+    targetedModifier_pp'd <- setIsInEffect True (decNoArg dec_targeted_modifier ppScript "")
     name_loc <- getGameL10n name
     icon_pp'd <- case dec_icon dec of
-            Just (HOI4DecisionIconSimple txt) ->
-                let icond = if not $ "GFX_decision_" `T.isPrefixOf` txt then "GFX_decision_" <> txt else txt in
-                getGameInterface  "decision_generic_decision" icond
-            _ -> return "Check script"
+        Just (HOI4DecisionIconSimple txt) -> do
+            let icond = if not $ "GFX_decision_" `T.isPrefixOf` txt then "GFX_decision_" <> txt else txt
+            micon <- getGameInterfaceIfPresent icond
+            case micon of
+                Just icondd -> return $ "| decision_icon = " <> icondd <> "\n"
+                Nothing -> return mempty
+        Just (HOI4DecisionIconScript _) -> return "| decision_icon = <!-- Check script -->\n"
+        _ -> return mempty
     let days_remove = dec_days_remove dec
         days_re_enable = dec_days_re_enable dec
         days_mission_timeout = dec_days_mission_timeout dec
     ppActivatedBy_pp'd <- ppActivatedBy (dec_name dec)
     return . mconcat $
-        ["<section begin=", nameD, "/>"
+        ["<section begin=", nameD, "/>", PP.line
         ,"{{Decision", PP.line
         ,"| version = ", Doc.strictText version, PP.line
         ,"| decision_id = ", nameD, PP.line
         ,"| decision_name = ", Doc.strictText name_loc, PP.line
-        ,"| icon = ", Doc.strictText icon_pp'd, PP.line
-        ,maybe mempty (\txt -> mconcat ["| cost = ", Doc.strictText txt, PP.line])
-               cost_pp
+        , Doc.strictText icon_pp'd
         ,maybe mempty
-               (\txt -> mconcat ["| decision_text = ", Doc.strictText $ italicText $ Doc.nl2br txt, PP.line])
+               (\txt -> mconcat ["| decision_text = ", Doc.strictText $ Doc.nl2br txt, PP.line])
                dec_text_loc
         ] ++
         custom_cost_loc_pp'd ++
         custom_cost_trigger_pp'd ++
-        [
-        maybe mempty
-               (\num -> mconcat ["| days_remove = ", Doc.strictText ((T.pack . show . floor) num), PP.line])
-               days_remove
+        [maybe mempty (\txt -> if txt /= "0" then mconcat ["| cost = ", Doc.strictText txt, PP.line] else mconcat [])
+               cost_pp
         ,maybe mempty
-               (\num -> mconcat ["| days_re_enable = ", Doc.strictText ((T.pack . show . floor) num), PP.line])
+               (\num -> mconcat ["| cooldown = ", Doc.strictText $ formatDays $ fromIntegral num, PP.line])
                days_re_enable
         ,maybe mempty
-               (\num -> mconcat ["| days_mission_timeout = ", Doc.strictText ((T.pack . show . floor) num), PP.line])
+               (\num -> mconcat ["| days_mission_timeout = ", Doc.strictText $ formatDays $ fromIntegral num, PP.line])
                days_mission_timeout
-        ] ++
+        ,maybe mempty
+               (\num -> mconcat ["| days_remove = ", Doc.strictText $ formatDays $ fromIntegral num, PP.line])
+               days_remove] ++
+        ( if isGood then
+            ["| is_good = yes", PP.line]
+        else []) ++
         ( if isFireOnlyOnce then
             ["| fire_only_once = yes", PP.line]
+        else []) ++
+        ( if isSelectableMission then
+            ["| selectable_mission = yes", PP.line]
         else []) ++
         ( if cancelIfNotVisible then
             ["| cancel_if_not_visible = yes", PP.line]
@@ -513,31 +555,39 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
         ( if targetsDynamic then
             ["| targets_dynamic = yes", PP.line]
         else []) ++
+        (if not $ all null [allow_pp'd
+            ,targetRootTrigger_pp'd
+            ,visible_pp'd
+            ,activation_pp'd
+            ,targetTrigger_pp'd] then
+            ["| visible =", PP.line]
+        else []) ++
         allow_pp'd ++
         targetRootTrigger_pp'd ++
         visible_pp'd ++
-        targetTrigger_pp'd ++
-        targets ++
-        ["----",PP.line] ++
-        available_pp'd ++
         activation_pp'd ++
+        targetTrigger_pp'd ++
+
+        available_pp'd ++
         ppActivatedBy_pp'd ++
-        ["----",PP.line] ++
         removeTrigger_pp'd ++
         cancelTrigger_pp'd ++
-        ["----",PP.line] ++
+        targets ++
         effect_pp'd ++
         removeEffect_pp'd ++
         cancelEffect_pp'd ++
         timeoutEffect_pp'd ++
-        ["----",PP.line] ++
+
+        (if not $ all null [modifier_pp'd, targetedModifier_pp'd] then
+            ["| modifier =", PP.line]
+        else []) ++
         modifier_pp'd ++
         targetedModifier_pp'd ++
         maybe [] (\awd_pp'd ->
-            ["| comment = AI decision factors:", PP.line
-            ,awd_pp'd, PP.line]) mawd_pp'd ++
-        ["}}" -- no line, causes unwanted extra space
-        ,"<section end=", nameD, "/>"
+            ["| comment = <!-- AI decision factors:", PP.line
+            ,awd_pp'd, " -->", PP.line]) mawd_pp'd ++
+        ["}}", PP.line
+        ,"<section end=", nameD, "/>", PP.line
         ]
     where
         extractTargets (StatementBare (GenericLhs e [])) = Just e
@@ -695,7 +745,11 @@ ppDecisionSource (HOI4DecSrcOnAction act weight) = do
             ]
 ppDecisionSource (HOI4DecSrcNFComplete id loc icon) = do
     iconnf <- do
-        iconname <- getGameInterface "goal_unknown" icon
+        iconname <- do
+            micon <- getGameInterfaceIfPresent ("GFX_focus_" <> id)
+            case micon of
+                Nothing -> getGameInterface "goal_unknown" icon
+                Just idicon -> return idicon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Completing the national focus "
         , iconnf
@@ -706,7 +760,11 @@ ppDecisionSource (HOI4DecSrcNFComplete id loc icon) = do
         ]
 ppDecisionSource (HOI4DecSrcNFSelect id loc icon) = do
     iconnf <- do
-        iconname <- getGameInterface "goal_unknown" icon
+        iconname <- do
+            micon <- getGameInterfaceIfPresent ("GFX_focus_" <> id)
+            case micon of
+                Nothing -> getGameInterface "goal_unknown" icon
+                Just idicon -> return idicon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Selecting the national focus "
         , iconnf
@@ -717,7 +775,11 @@ ppDecisionSource (HOI4DecSrcNFSelect id loc icon) = do
         ]
 ppDecisionSource (HOI4DecSrcIdeaOnAdd id loc icon categ) = do
     iconnf <- do
-        iconname <- getGameInterface "idea_unknown" icon
+        iconname <- do
+            micon <- getGameInterfaceIfPresent ("GFX_idea_" <> id)
+            case micon of
+                Nothing -> getGameInterface "idea_unknown" icon
+                Just idicon -> return idicon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -732,7 +794,11 @@ ppDecisionSource (HOI4DecSrcIdeaOnAdd id loc icon categ) = do
         ]
 ppDecisionSource (HOI4DecSrcIdeaOnRemove id loc icon categ) = do
     iconnf <- do
-        iconname <- getGameInterface "idea_unknown" icon
+        iconname <- do
+            micon <- getGameInterfaceIfPresent ("GFX_idea_" <> id)
+            case micon of
+                Nothing -> getGameInterface "idea_unknown" icon
+                Just idicon -> return idicon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -745,18 +811,32 @@ ppDecisionSource (HOI4DecSrcIdeaOnRemove id loc icon categ) = do
         , iquotes't loc
         , " is removed"
         ]
-ppDecisionSource (HOI4DecSrcCharacterOnAdd id loc) =
+ppDecisionSource (HOI4DecSrcCharacterOnAdd idtoken id name) = do
+    loc <- do
+        mloc <- getGameL10nIfPresent name
+        case mloc of
+            Just nloc -> return nloc
+            _-> getGameL10n idtoken
     return $ Doc.strictText $ mconcat ["When the advisor "
         , " <!-- "
         , id
+        , " "
+        , idtoken
         , " -->"
         , iquotes't loc
         , " is added"
         ]
-ppDecisionSource (HOI4DecSrcCharacterOnRemove id loc) =
+ppDecisionSource (HOI4DecSrcCharacterOnRemove idtoken id name) = do
+    loc <- do
+        mloc <- getGameL10nIfPresent name
+        case mloc of
+            Just nloc -> return nloc
+            _-> getGameL10n idtoken
     return $ Doc.strictText $ mconcat ["When the advisor "
         , " <!-- "
         , id
+        , " "
+        , idtoken
         , " -->"
         , iquotes't loc
         , " is removed"
@@ -788,8 +868,13 @@ ppDecisionSource (HOI4DecSrcBopOnDeactivate id) = do
 
 findInStmt :: GenericStatement -> [(HOI4DecisionWeight, Text)]
 findInStmt [pdx| $lhs = $id |] | lhs == "activate_mission" = [(Nothing, id)]
+findInStmt [pdx| activate_targeted_decision = @scr |] = concatMap findInStmt' scr
 findInStmt [pdx| %_lhs = @scr |] = findInStmts scr
 findInStmt _ = []
+
+findInStmt' :: GenericStatement -> [(HOI4DecisionWeight, Text)]
+findInStmt' [pdx| $lhs = $id |] | lhs == "decision" = [(Nothing, id)]
+findInStmt' _ = []
 
 findInStmts :: [GenericStatement] -> [(HOI4DecisionWeight, Text)]
 findInStmts = concatMap findInStmt
@@ -855,13 +940,13 @@ findActivatedDecisionsInIdeas hm idea = addDecisionTriggers hm (concatMap findIn
             addDecisionSource (const (HOI4DecSrcIdeaOnAdd (id_id idea) (id_name_loc idea) (id_picture idea) (id_category idea))) (maybe [] findInStmts (id_on_add idea)) ++
             addDecisionSource (const (HOI4DecSrcIdeaOnRemove (id_id idea) (id_name_loc idea) (id_picture idea) (id_category idea))) (maybe [] findInStmts (id_on_remove idea))
 
-findActivatedDecisionsInCharacters :: HOI4DecisionTriggers -> [HOI4Character] -> HOI4DecisionTriggers
+findActivatedDecisionsInCharacters :: HOI4DecisionTriggers -> [HOI4Advisor] -> HOI4DecisionTriggers
 findActivatedDecisionsInCharacters hm hChar = addDecisionTriggers hm (concatMap findInCharacter hChar)
     where
-        findInCharacter :: HOI4Character -> [(Text, HOI4DecisionSource)]
+        findInCharacter :: HOI4Advisor -> [(Text, HOI4DecisionSource)]
         findInCharacter hChar =
-            addDecisionSource (const (HOI4DecSrcCharacterOnAdd (chaTag hChar) (chaName hChar))) (maybe [] findInStmts (chaOn_add hChar)) ++
-            addDecisionSource (const (HOI4DecSrcCharacterOnRemove (chaTag hChar) (chaName hChar))) (maybe [] findInStmts (chaOn_remove hChar))
+            addDecisionSource (const (HOI4DecSrcCharacterOnAdd (adv_idea_token hChar) (adv_cha_id hChar) (adv_cha_name hChar))) (maybe [] findInStmts (adv_on_add hChar)) ++
+            addDecisionSource (const (HOI4DecSrcCharacterOnRemove (adv_idea_token hChar) (adv_cha_id hChar) (adv_cha_name hChar))) (maybe [] findInStmts (adv_on_remove hChar))
 
 findActivatedDecisionsInScriptedEffects :: HOI4DecisionTriggers -> [GenericStatement] -> HOI4DecisionTriggers
 findActivatedDecisionsInScriptedEffects hm scr = foldl' findInScriptEffect hm scr -- needs editing

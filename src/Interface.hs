@@ -86,5 +86,6 @@ processInterface stmt = Nothing
 readInterfaceDirs :: FilePath -> IO [FilePath]
 readInterfaceDirs dirs = filterM doesFileExist
                 . map (dirs </>)
+                . filter (`notElem` ["core.gfx"])
                 . filter (".gfx" `isExtensionOf`)
                     =<< getDirectoryContents dirs

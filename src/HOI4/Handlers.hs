@@ -23,6 +23,7 @@ module HOI4.Handlers (
     ,   withLocAtomCompound
     ,   withLocAtomKey
     ,   withLocAtom2
+    ,   withMaybelocAtom2
     ,   withLocAtomIcon
     ,   withLocAtomIconHOI4Scope
     ,   locAtomTagOrState
@@ -41,7 +42,6 @@ module HOI4.Handlers (
     ,   numericOrTagIcon
     ,   numericIconChange
     ,   withFlag
-    ,   withFlagAndTag
     ,   withBool
     ,   withBoolHOI4Scope
     ,   withFlagOrBool
@@ -184,7 +184,7 @@ import QQ -- everything
 import SettingsTypes ( PPT, IsGameData (..), GameData (..), IsGameState (..), GameState (..)
                      , indentUp, withCurrentIndent, withCurrentIndentZero, alsoIndent'
                      , getGameL10n, getGameL10nIfPresent, withCurrentFile
-                     , getGameInterface )
+                     , getGameInterface, getGameInterfaceIfPresent )
 import HOI4.Templates
 import {-# SOURCE #-} HOI4.Common (ppScript, ppMany, extractStmt, matchLhsText)
 import HOI4.Types -- everything
@@ -1104,29 +1104,19 @@ numericOrTagIcon _ _ _ stmt = preStatement stmt -- CHECK FOR USEFULNESS
 
 -- | Handler for a statement referring to a country. Use a flag.
 withFlag :: (HOI4Info g, Monad m) =>
-    (Text -> ScriptMessage) -> StatementHandler g m
+    (Text -> Text -> ScriptMessage)  -> StatementHandler g m
 withFlag msg stmt@[pdx| %_ = $vartag:$var |] = do
-    mwhoflag <- eflag (Just HOI4Country) (Right (vartag, var))
-    case mwhoflag of
-        Just whoflag -> msgToPP . msg $ whoflag
-        Nothing -> preStatement stmt
-withFlag msg [pdx| %_ = $who |] = do
-    whoflag <- flag (Just HOI4Country) who
-    msgToPP . msg . Doc.doc2text $ whoflag
-withFlag _ stmt = preStatement stmt
-
--- | Handler for a statement referring to a country. Use a flag.
-withFlagAndTag :: (HOI4Info g, Monad m) =>
-    (Text -> Text -> ScriptMessage) -> StatementHandler g m
-withFlagAndTag msg stmt@[pdx| %_ = $vartag:$var |] = do
     mwhoflag <- eflag (Just HOI4Country) (Right (vartag, var))
     case mwhoflag of
         Just whoflag -> msgToPP $ msg whoflag ""
         Nothing -> preStatement stmt
-withFlagAndTag msg [pdx| %_ = $who |] = do
+withFlag msg [pdx| %_ = $who |] = do
     whoflag <- flagText (Just HOI4Country) who
-    msgToPP $ msg whoflag  who
-withFlagAndTag _ stmt = preStatement stmt
+    msgToPP $ msg whoflag who
+withFlag msg [pdx| %_ = ?who |] = do
+    whoflag <- flagText (Just HOI4Country) who
+    msgToPP $ msg whoflag who
+withFlag _ stmt = preStatement stmt
 
 -- | Handler for yes-or-no statements.
 withBool :: (HOI4Info g, Monad m) =>
@@ -1178,7 +1168,7 @@ boolIconLoc the_icon what msg stmt
 -- | Handler for statements whose RHS may be "yes"/"no" or a tag.
 withFlagOrBool :: (HOI4Info g, Monad m) =>
     (Bool -> ScriptMessage)
-        -> (Text -> ScriptMessage)
+        -> (Text -> Text -> ScriptMessage)
         -> StatementHandler g m
 withFlagOrBool bmsg _ [pdx| %_ = yes |] = msgToPP (bmsg True)
 withFlagOrBool bmsg _ [pdx| %_ = no  |]  = msgToPP (bmsg False)
@@ -1418,8 +1408,8 @@ withNonlocTextValue :: forall g m. (HOI4Info g, Monad m) =>
     Text                                             -- ^ Label for "what"
         -> Text                                      -- ^ Label for "how much"
         -> ScriptMessage                             -- ^ submessage to send
-        -> (Text -> Text -> Double -> ScriptMessage) -- ^ Message constructor
-        -> (Text -> Text -> Text -> ScriptMessage) -- ^ Message constructor
+        -> (Text -> Text -> Double -> Text -> ScriptMessage) -- ^ Message constructor
+        -> (Text -> Text -> Text -> Text -> ScriptMessage) -- ^ Message constructor
         -> StatementHandler g m
 withNonlocTextValue whatlabel vallabel submsg valmsg varmsg stmt@[pdx| %_ = @scr |]
     = msgToPP =<< pp_tv (parseTV whatlabel vallabel scr)
@@ -1427,11 +1417,15 @@ withNonlocTextValue whatlabel vallabel submsg valmsg varmsg stmt@[pdx| %_ = @scr
         pp_tv :: TextValue -> PPT g m ScriptMessage
         pp_tv tv = case (tv_what tv, tv_value tv, tv_var tv) of
             (Just what, Just value, _) -> do
+                mloc <- getGameL10nIfPresent what
+                let loc = fromMaybe "" mloc
                 extratext <- messageText submsg
-                return $ valmsg extratext what value
+                return $ valmsg extratext what value loc
             (Just what, _, Just var) -> do
+                mloc <- getGameL10nIfPresent what
+                let loc = fromMaybe "" mloc
                 extratext <- messageText submsg
-                return $ varmsg extratext what var
+                return $ varmsg extratext what var loc
             _ -> return $ preMessage stmt
 withNonlocTextValue _ _ _ _ _ stmt = preStatement stmt
 
@@ -1925,7 +1919,7 @@ hasDlc [pdx| %_ = ?dlc |]
 hasDlc stmt = preStatement stmt
 
 withFlagOrState :: (HOI4Info g, Monad m) =>
-    (Text -> ScriptMessage)
+    (Text -> Text -> ScriptMessage)
         -> (Text -> ScriptMessage)
         -> StatementHandler g m
 withFlagOrState countryMsg _ stmt@[pdx| %_ = ?_ |]
@@ -1962,7 +1956,11 @@ focusProgress msg stmt@[pdx| $lhs = @compa |] = do
         Nothing -> preStatement stmt -- unknown national focus
         Just nnf -> do
             let nfKey = nf_id nnf
-            nfIcon <- getGameInterface "goal_unknown" (nf_icon nnf)
+            nfIcon <- do
+                micon <- getGameInterfaceIfPresent ("GFX_focus_" <> nfKey)
+                case micon of
+                    Nothing -> getGameInterface "goal_unknown" (nf_icon nnf)
+                    Just idicon -> return idicon
             nf_loc <- getGameL10n nfKey
             msgToPP (msg nfIcon nfKey nf_loc compare)
     where
@@ -1989,7 +1987,11 @@ handleFocus msg stmt@[pdx| $lhs = $nf |] = do
         Nothing -> preStatement stmt -- unknown national focus
         Just nnf -> do
             let nfKey = nf_id nnf
-            nfIcon <- getGameInterface "goal_unknown" (nf_icon nnf)
+            nfIcon <- do
+                micon <- getGameInterfaceIfPresent ("GFX_focus_" <> nfKey)
+                case micon of
+                    Nothing -> getGameInterface "goal_unknown" (nf_icon nnf)
+                    Just idicon -> return idicon
             nf_loc <- getGameL10n nfKey
             msgToPP (msg nfIcon nfKey nf_loc)
 handleFocus _ stmt = preStatement stmt
@@ -2025,7 +2027,11 @@ focusUncomplete msg stmt@[pdx| $lhs = @scr |] = do
                 Nothing -> return $ preMessage stmt -- unknown national focus
                 Just nnf -> do
                     let nfKey = nf_id nnf
-                    nfIcon <- getGameInterface "goal_unknown" (nf_icon nnf)
+                    nfIcon <- do
+                        micon <- getGameInterfaceIfPresent ("GFX_focus_" <> nfKey)
+                        case micon of
+                            Nothing -> getGameInterface "goal_unknown" (nf_icon nnf)
+                            Just idicon -> return idicon
                     nf_loc <- getGameL10n nfKey
                     return $ msg nfIcon nfKey nf_loc (uf_uncomplete_children uf)
 focusUncomplete _ stmt = preStatement stmt
@@ -2674,6 +2680,16 @@ addTechBonus stmt = preStatement stmt
 ------------------------------------------
 -- handlers for various flag statements --
 ------------------------------------------
+withMaybelocAtom2 :: (HOI4Info g, Monad m) =>
+    ScriptMessage
+        -> (Text -> Text -> Text -> ScriptMessage)
+        -> StatementHandler g m
+withMaybelocAtom2 submsg msg [pdx| %_ = ?txt |] = do
+    mloc <- getGameL10nIfPresent txt
+    let loc = fromMaybe "" mloc
+    extratext <- messageText submsg
+    msgToPP $ msg extratext txt loc
+withMaybelocAtom2 _ _ stmt = preStatement stmt
 
 data SetFlag = SetFlag
         {   sf_flag :: Text
@@ -2685,7 +2701,7 @@ data SetFlag = SetFlag
 newSF :: SetFlag
 newSF = SetFlag undefined Nothing Nothing Nothing
 setFlag :: forall g m. (HOI4Info g, Monad m) => ScriptMessage -> StatementHandler g m
-setFlag msgft stmt@[pdx| %_ = $flag |] = withNonlocAtom2 msgft MsgSetFlag stmt
+setFlag msgft stmt@[pdx| %_ = $flag |] = withMaybelocAtom2 msgft MsgSetFlag stmt
 setFlag msgft stmt@[pdx| %_ = @scr |]
     = msgToPP =<< pp_sf =<< foldM addLine newSF scr
     where
@@ -2708,21 +2724,23 @@ setFlag msgft stmt@[pdx| %_ = @scr |]
                     (Just day, _) -> " for " <> formatDays day
                     (_, Just day) -> " for " <> day <> " days"
                     _ -> ""
+            mloc <- getGameL10nIfPresent (sf_flag sf)
+            let loc = fromMaybe "" mloc
             msgfts <- messageText msgft
-            return $ MsgSetFlagFor msgfts (sf_flag sf) value days
+            return $ MsgSetFlagFor msgfts (sf_flag sf) value days loc
 setFlag _ stmt = preStatement stmt
 
 data HasFlag = HasFlag
         {   hf_flag :: Text
-        ,   hf_value :: Text
-        ,   hf_days :: Text
-        ,   hf_date :: Text
+        ,   hf_value :: Maybe Text
+        ,   hf_days :: Maybe Text
+        ,   hf_date :: Maybe Text
         }
 
 newHF :: HasFlag
-newHF = HasFlag undefined "" "" ""
+newHF = HasFlag undefined Nothing Nothing Nothing
 hasFlag :: forall g m. (HOI4Info g, Monad m) => ScriptMessage -> StatementHandler g m
-hasFlag msgft stmt@[pdx| %_ = $flag |] = withNonlocAtom2 msgft MsgHasFlag stmt
+hasFlag msgft stmt@[pdx| %_ = $flag |] = withMaybelocAtom2 msgft MsgHasFlag stmt
 hasFlag msgft stmt@[pdx| %_ = @scr |]
     = msgToPP =<< pp_hf =<< foldM addLine newHF scr
     where
@@ -2730,31 +2748,40 @@ hasFlag msgft stmt@[pdx| %_ = @scr |]
         addLine hf [pdx| flag = $flag |] =
             return hf { hf_flag = flag }
         addLine hf [pdx| value = !amt |] =
-            let amtd = " equal to or more than " <> show (amt :: Int) in
-            return hf { hf_value = T.pack amtd }
+            let amtd = " Is set equal to or more than " <> show (amt :: Int) <> "." in
+            return hf { hf_value = Just $ T.pack amtd }
         addLine hf [pdx| value < !amt |] =
-            let amtd = " to less than " <> show (amt :: Int) in
-            return hf { hf_value = T.pack amtd }
+            let amtd = " Is set to less than " <> show (amt :: Int) <> "." in
+            return hf { hf_value = Just $ T.pack amtd }
         addLine hf [pdx| value > !amt |] =
-            let amtd = " to more than " <> show (amt :: Int) in
-            return hf { hf_value = T.pack amtd }
+            let amtd = " Is set to more than " <> show (amt :: Int) <> "." in
+            return hf { hf_value = Just $ T.pack amtd }
         addLine hf [pdx| days < !amt |] =
-            let amtd = " for less than " <> show (amt :: Int) <> " days" in
-            return hf { hf_days = T.pack amtd }
+            let amtd = " Has been set for less than " <> show (amt :: Int) <> " days." in
+            return hf { hf_days = Just $ T.pack amtd }
         addLine hf [pdx| days > !amt |] =
-            let amtd = " for more than " <> show (amt :: Int) <> " days" in
-            return hf { hf_days = T.pack amtd }
+            let amtd = " Has been set for more than " <> show (amt :: Int) <> " days." in
+            return hf { hf_days = Just $ T.pack amtd }
         addLine hf [pdx| date > %amt |] =
-            let amtd = " later than " <> show amt in
-            return hf { hf_date = T.pack amtd }
+            let amtd = " Has been set later than " <> show amt <> "." in
+            return hf { hf_date = Just $ T.pack amtd }
         addLine hf [pdx| date < %amt |] =
-            let amtd = " earlier than " <> show amt in
-            return hf { hf_date = T.pack amtd }
+            let amtd = " Has been set earlier than " <> show amt <> "." in
+            return hf { hf_date = Just $ T.pack amtd }
         addLine hf stmt
             = trace ("unknown section in has_country_flag: " ++ show stmt) $ return hf
-        pp_hf hf = do
-            msgfts <- messageText msgft
-            return $ MsgHasFlagFor msgfts (hf_flag hf) (hf_value hf) (hf_days hf) (hf_date hf)
+        pp_hf hf =
+            case (hf_value hf, hf_days hf, hf_date hf) of
+                (Nothing, Nothing, Nothing) -> do
+                    mloc <- getGameL10nIfPresent (hf_flag hf)
+                    let loc = fromMaybe "" mloc
+                    msgfts <- messageText msgft
+                    return $ MsgHasFlag msgfts (hf_flag hf) loc
+                _ -> do
+                    mloc <- getGameL10nIfPresent (hf_flag hf)
+                    let loc = fromMaybe "" mloc
+                    msgfts <- messageText msgft
+                    return $ MsgHasFlagFor msgfts (hf_flag hf) (fromMaybe "" (hf_value hf)) (fromMaybe "" (hf_days hf)) (fromMaybe "" (hf_date hf)) loc
 hasFlag _ stmt = preStatement stmt
 
 ----------------------------------
@@ -3257,12 +3284,13 @@ buildRailway stmt = preStatement stmt
 data CanBuildRailway = CanBuildRailway
         {   cbr_start_state :: Maybe Text
         ,   cbr_target_state :: Maybe Text
+        ,   cbr_path :: Maybe [Double]
         ,   cbr_start_province :: Maybe Double
         ,   cbr_target_province :: Maybe Double
         }
 
 newCBR :: CanBuildRailway
-newCBR = CanBuildRailway Nothing Nothing Nothing Nothing
+newCBR = CanBuildRailway Nothing Nothing Nothing Nothing Nothing
 canBuildRailway  :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 canBuildRailway stmt@[pdx| %_ = @scr |]
     = msgToPP =<< pp_cbr =<< foldM addLine newCBR scr
@@ -3279,7 +3307,7 @@ canBuildRailway stmt@[pdx| %_ = @scr |]
                 GenericRhs txt [] -> do
                     stated <- eGetState (Left txt)
                     return cbr { cbr_start_state = stated }
-                _ -> trace "bad start_state in build_railway" $ return cbr
+                _ -> trace "bad start_state in can_build_railway" $ return cbr
             "target_state" -> case rhs of
                 IntRhs num -> do
                     stateloc <- getStateLoc num
@@ -3290,18 +3318,34 @@ canBuildRailway stmt@[pdx| %_ = @scr |]
                 GenericRhs txt [] -> do
                     stated <- eGetState (Left txt)
                     return cbr { cbr_target_state = stated }
-                _ -> trace "bad target_state in build_railway" $ return cbr
+                _ -> trace "bad target_state in can_build_railway" $ return cbr
+
+            "path" -> case rhs of
+                CompoundRhs arr ->
+                    let provs = mapMaybe provinceFromArray arr in
+                    return cbr { cbr_path = Just provs }
+                _ -> trace "bad path in can_build_railway" $ return cbr
 
             "start_province" ->
                     return cbr { cbr_start_province = floatRhs rhs }
             "target_province" ->
                     return cbr { cbr_target_province = floatRhs rhs }
             "build_only_on_allied" -> return cbr
+            "fallback" -> return cbr
             other -> trace ("unknown section in can_build_railway: " ++ show stmt) $ return cbr
         addLine cbr stmt
             = trace ("unknown form in can_build_railway: " ++ show stmt) $ return cbr
+
+        provinceFromArray :: GenericStatement -> Maybe Double
+        provinceFromArray (StatementBare (IntLhs e)) = Just $ fromIntegral e
+        provinceFromArray stmt = trace ("Unknown in generator array statement: " ++ show stmt) Nothing
+
         pp_cbr cbr =
-            case (cbr_start_state cbr, cbr_target_state cbr,
+            case cbr_path cbr of
+                Just path -> do
+                    let paths = T.pack $ concat ["on the provinces (" , intercalate "), (" (map (show . round) path),")"]
+                    return $ MsgCanBuildRailwayPath paths
+                _ -> case (cbr_start_state cbr, cbr_target_state cbr,
                            cbr_start_province cbr, cbr_target_province cbr) of
                         (Just start, Just end, _,_) -> return $ MsgCanBuildRailway start end
                         (_,_, Just start, Just end) -> return $ MsgCanBuildRailwayProv start end
@@ -3415,21 +3459,21 @@ setTechnology stmt@[pdx| %_ = @scr |] =
 setTechnology stmt = preStatement stmt
 
 setCapital :: forall g m. (HOI4Info g, Monad m) =>
-    (Text -> ScriptMessage) -> StatementHandler g m
+    (Text -> Text -> ScriptMessage) -> StatementHandler g m
 setCapital msg stmt@[pdx| %_ = @scr |] =
         let (_, rest) = extractStmt (matchLhsText "remember_old_capital") scr in
         case rest of
             [[pdx| state = !state |]] -> do
                 stateloc <- getStateLoc state
-                msgToPP $ msg stateloc
+                msgToPP $ msg stateloc ""
             [[pdx| state = $state |]] -> do
                 stated <- eGetState (Left state)
                 let stateloc = fromMaybe "<!-- Check Script -->"  stated
-                msgToPP $ msg stateloc
+                msgToPP $ msg stateloc ""
             [[pdx| state = $vartag:$var |]] -> do
                 stated <- eGetState (Right (vartag, var))
                 let stateloc = fromMaybe "<!-- Check Script -->"  stated
-                msgToPP $ msg stateloc
+                msgToPP $ msg stateloc ""
             _ -> preStatement stmt
 setCapital msg stmt = withFlag msg stmt
 

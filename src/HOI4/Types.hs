@@ -18,7 +18,7 @@ module HOI4.Types (
     ,   HOI4NationalFocus (..)
 
     ,   HOI4CountryHistory (..)
-    ,   HOI4Character (..)
+    ,   HOI4Character (..), HOI4Advisor (..)
     ,   HOI4CountryLeaderTrait (..)
     ,   HOI4UnitLeaderTrait (..)
     ,   HOI4BopRange (..)
@@ -83,7 +83,7 @@ data HOI4Data = HOI4Data {
     ,   hoi4terrain :: [Text]
     ,   hoi4ideologyScripts :: HashMap FilePath GenericScript
     ,   hoi4ideology :: HashMap Text Text
-    ,   hoi4chartoken :: HashMap Text HOI4Character
+    ,   hoi4chartoken :: HashMap Text HOI4Advisor
     ,   hoi4scriptedeffectScripts :: HashMap FilePath GenericScript
     ,   hoi4scriptedeffects :: HashMap Text GenericStatement
     ,   hoi4scriptedtriggerScripts :: HashMap FilePath GenericScript
@@ -186,8 +186,8 @@ class (IsGame g,
     getIdeologyScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the leader traits parsed
     getIdeology :: Monad m => PPT g m (HashMap Text Text)
-    -- | Get the characters keyed on ideatoken
-    getCharToken :: Monad m => PPT g m (HashMap Text HOI4Character)
+    -- | Get the advisors keyed on ideatoken
+    getCharToken :: Monad m => PPT g m (HashMap Text HOI4Advisor)
     -- | Get scripted effects script
     getScriptedEffectScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the scripted effects parsed
@@ -296,8 +296,8 @@ data HOI4EventSource =
     | HOI4EvtSrcNFSelect Text Text Text             -- Effect of selecting a national focus
     | HOI4EvtSrcIdeaOnAdd Text Text Text Text       -- Effect of adding an idea
     | HOI4EvtSrcIdeaOnRemove Text Text Text Text    -- Effect of removing an idea
-    | HOI4EvtSrcCharacterOnAdd Text Text            -- Effect of adding an advisor
-    | HOI4EvtSrcCharacterOnRemove Text Text         -- Effect of removing an advisor
+    | HOI4EvtSrcCharacterOnAdd Text Text Text            -- Effect of adding an advisor
+    | HOI4EvtSrcCharacterOnRemove Text Text Text         -- Effect of removing an advisor
     | HOI4EvtSrcScriptedEffect Text HOI4EventWeight -- Effect of a scripted effect
     | HOI4EvtSrcBopOnActivate Text                  -- Effect of a balance of power range activation
     | HOI4EvtSrcBopOnDeactivate Text                -- Effect of a balance of power range deactivation
@@ -319,8 +319,8 @@ data HOI4DecisionSource =
     | HOI4DecSrcNFSelect Text Text Text             -- Effect of selecting a national focus
     | HOI4DecSrcIdeaOnAdd Text Text Text Text       -- Effect of adding an idea
     | HOI4DecSrcIdeaOnRemove Text Text Text Text    -- Effect of removing an idea
-    | HOI4DecSrcCharacterOnAdd Text Text            -- Effect of adding an advisor
-    | HOI4DecSrcCharacterOnRemove Text Text         -- Effect of removing an advisor
+    | HOI4DecSrcCharacterOnAdd Text Text Text            -- Effect of adding an advisor
+    | HOI4DecSrcCharacterOnRemove Text Text Text         -- Effect of removing an advisor
     | HOI4DecSrcScriptedEffect Text HOI4DecisionWeight -- Effect of a scripted effect
     | HOI4DecSrcBopOnActivate Text                  -- Effect of a balance of power range activation
     | HOI4DecSrcBopOnDeactivate Text                -- Effect of a balance of power range deactivation
@@ -373,7 +373,7 @@ data HOI4Decisioncat = HOI4Decisioncat
     } deriving (Show)
 
 data HOI4DecisionCost
-    = HOI4DecisionCostSimple Double
+    = HOI4DecisionCostSimple Int
     | HOI4DecisionCostVariable Text
     deriving Show
 
@@ -393,22 +393,24 @@ data HOI4Decision = HOI4Decision
     ,   dec_target_root_trigger :: Maybe GenericScript
     ,   dec_visible :: Maybe GenericScript
     ,   dec_available :: Maybe GenericScript
+    ,   dec_is_good :: Bool -- ^ changes tooltip on whether timing out or compeleting mission is desirable, default is no and assumes complete_effect is desirable
     ,   dec_complete_effect :: Maybe GenericScript -- ^ the block of effects that gets executed immediately
                                                    --   when the decision is selected (Starting the timer if it has one).
-    ,   dec_days_re_enable :: Maybe Double
+    ,   dec_days_re_enable :: Maybe Int
     ,   dec_fire_only_once :: Bool
     ,   dec_cost :: Maybe HOI4DecisionCost
     ,   dec_custom_cost_trigger  :: Maybe GenericScript
     ,   dec_custom_cost_text :: Maybe Text
-    ,   dec_days_remove :: Maybe Double
+    ,   dec_days_remove :: Maybe Int
     ,   dec_remove_effect :: Maybe GenericScript
     ,   dec_remove_trigger :: Maybe GenericScript
     ,   dec_modifier :: Maybe GenericStatement
     ,   dec_cancel_trigger ::  Maybe GenericScript
     ,   dec_cancel_effect ::  Maybe GenericScript
 
-    ,   dec_days_mission_timeout :: Maybe Double
+    ,   dec_days_mission_timeout :: Maybe Int
     ,   dec_activation :: Maybe GenericScript
+    ,   dec_selectable_mission :: Bool
     ,   dec_timeout_effect :: Maybe GenericScript
     ,   dec_cancel_if_not_visible :: Bool
 
@@ -490,21 +492,36 @@ data HOI4CountryHistory = HOI4CountryHistory
     ,   chRulingTag :: Text
     } deriving (Show)
 
+data HOI4Advisor = HOI4Advisor
+    {   adv_advisor_slot :: Text
+    ,   adv_cha_id     :: Text
+    ,   adv_cha_name     :: Text
+    ,   adv_idea_token   :: Text
+    ,   adv_cha_portrait    :: Maybe Text
+    ,   adv_traits       :: Maybe [Text]
+    ,   adv_allowed      :: Maybe GenericScript
+    ,   adv_visible      :: Maybe GenericScript
+    ,   adv_available    :: Maybe GenericScript
+    ,   adv_on_add       :: Maybe GenericScript
+    ,   adv_on_remove    :: Maybe GenericScript
+    ,   adv_modifier     :: Maybe GenericStatement
+    ,   adv_research_bonus :: Maybe GenericStatement
+    ,   adv_cost        :: Maybe Double
+    ,   adv_can_be_fired :: Bool
+    ,   adv_path         :: FilePath -- ^ Source file
+    } deriving (Show)
+
 data HOI4Character = HOI4Character
-    {   chaTag          :: Text
-    ,   chaName         :: Text
+    {   cha_id          :: Text
+    ,   cha_loc_name    :: Text
+    ,   cha_name        :: Text
+    ,   cha_portrait    :: Maybe Text
 --    ,   chaId :: Maybe Int -- ^ legacy character id system is sometimes still used,
                          --   negative numbers count as not being there
-    ,   chaAdvisorTraits :: Maybe [Text]
-    ,   chaLeaderTraits :: Maybe [Text]
+    ,   cha_leader_traits :: Maybe [Text]
     ,   cha_leader_ideology :: Maybe Text
-    ,   cha_idea_token  :: Maybe Text
-    ,   cha_advisor_slot :: Maybe Text
-    ,   chaOn_add       :: Maybe GenericScript
-    ,   chaOn_remove    :: Maybe GenericScript
-    ,   cha_adv_modifier :: Maybe GenericStatement
-    ,   cha_adv_research_bonus :: Maybe GenericStatement
-    ,   chaPath         :: FilePath -- ^ Source file
+    ,   cha_advisor :: Maybe [HOI4Advisor]
+    ,   cha_path         :: FilePath -- ^ Source file
     } deriving (Show)
 
 data HOI4CountryLeaderTrait = HOI4CountryLeaderTrait

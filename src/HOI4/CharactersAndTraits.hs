@@ -36,10 +36,10 @@ import HOI4.Common -- everything
 ----------------
 
 newHOI4Character :: Text -> Text -> FilePath -> HOI4Character
-newHOI4Character chatag locname = HOI4Character chatag locname Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+newHOI4Character chatag locname = HOI4Character chatag chatag locname Nothing Nothing Nothing Nothing
 
 parseHOI4Characters :: (HOI4Info g, IsGameData (GameData g), Monad m) =>
-    HashMap String GenericScript -> PPT g m (HashMap Text HOI4Character, HashMap Text HOI4Character)
+    HashMap String GenericScript -> PPT g m (HashMap Text HOI4Character, HashMap Text HOI4Advisor)
 parseHOI4Characters scripts = do
     charmap <- HM.unions . HM.elems <$> do
         tryParse <- hoistExceptions $
@@ -64,16 +64,18 @@ parseHOI4Characters scripts = do
     return (charmap, chartokmap)
     where
         mkChaMap :: [HOI4Character] -> HashMap Text HOI4Character
-        mkChaMap = HM.fromList . map (chaTag &&& id)
+        mkChaMap = HM.fromList . map (cha_id &&& id)
         parseCharToken :: (HOI4Info g, IsGameData (GameData g), Monad m) =>
-            HashMap Text HOI4Character ->  PPT g m (HashMap Text HOI4Character)
+            HashMap Text HOI4Character ->  PPT g m (HashMap Text HOI4Advisor)
         parseCharToken chas = do
             let chaselem = HM.elems chas
-                chastoken = mapMaybe (\c -> case cha_idea_token c of
-                    Just txt -> Just (txt, c)
+                chastoken = mapMaybe (\c -> case cha_advisor c of
+                    Just adv ->
+                        let a = a { adv_cha_name = cha_name c,adv_cha_id = cha_id c, adv_cha_portrait = cha_portrait c} in
+                        Just $ map (\a -> (adv_idea_token a, a)) adv
                     _ -> Nothing)
                     chaselem
-            return $ HM.fromList chastoken
+            return $ HM.fromList $ concat chastoken
 
 character :: (HOI4Info g, IsGameData (GameData g), MonadError Text m) =>
     GenericStatement -> PPT g m (Either Text (Maybe HOI4Character))
@@ -107,23 +109,22 @@ characterAddSection hChar stmt
         characterAddSection' hChar [pdx| name = %name |] = case name of
             StringRhs name -> do
                 nameLoc <- getGameL10n name
-                return hChar {chaName = nameLoc}
+                return hChar {cha_loc_name = nameLoc, cha_name = name}
             GenericRhs name [] -> do
                 nameLoc <- getGameL10n name
-                return hChar {chaName = nameLoc}
+                return hChar {cha_loc_name  = nameLoc, cha_name = name}
             _ -> trace "Bad name in characters" $ return hChar
         characterAddSection' hChar [pdx| advisor = @adv |] = do
-            ai <- getAdvinfo adv
-            return hChar {chaAdvisorTraits = ai_traits ai, chaOn_add = ai_on_add ai,
-                         chaOn_remove = ai_on_remove ai, cha_idea_token = ai_idea_token ai,
-                         cha_advisor_slot = ai_slot ai, cha_adv_modifier = ai_modifier ai,
-                         cha_adv_research_bonus = ai_research_bonus ai}
+            let oldadv = fromMaybe [] (cha_advisor hChar )
+            advif <- getAdvinfo hChar adv
+            return hChar { cha_advisor = Just  (oldadv ++ [advif])}
         characterAddSection' hChar [pdx| country_leader = @clead |] =
             let cleadtraits = concatMap getTraits clead
                 ideo = getLeaderIdeo clead in
-            return hChar {chaLeaderTraits = Just cleadtraits, cha_leader_ideology = ideo}
-        characterAddSection' hChar [pdx| portraits = %_ |] =
-            return hChar
+            return hChar {cha_leader_traits = Just cleadtraits, cha_leader_ideology = ideo}
+        characterAddSection' hChar [pdx| portraits = @scr |] =
+            let port = getSmallPortrait scr in
+            return hChar { cha_portrait = port }
         characterAddSection' hChar [pdx| corps_commander = %_ |] =
             return hChar
         characterAddSection' hChar [pdx| field_marshal = %_ |] =
@@ -152,60 +153,79 @@ characterAddSection hChar stmt
             case ideo of
                 Just [pdx| %_ = $ideot |] -> Just ideot
                 _ -> Nothing
+
+--getSmallPortrait :: GenericStatement -> HOI4Character -> HOI4Character
+getSmallPortrait scr = getPortrait scr
+    where
+        getPortrait [] = Nothing
+        getPortrait ([pdx| $_ = @scr |]:can) = getPortrait' scr can
+        getPortrait (x:can) = getPortrait can
+        getPortrait' x can = getSmall x can
+        getSmall [] can = getPortrait can
+        getSmall (x:xs) can = getSmall' x xs can
+        getSmall' [pdx| small = $port |] _ _ = Just port
+        getSmall' [pdx| small = ?port |] _ _ = Just port
+        getSmall' _ x can = getSmall x can
+
+
 traitFromArray :: GenericStatement -> Maybe Text
 traitFromArray (StatementBare (GenericLhs e [])) = Just e
 traitFromArray stmt = trace ("Unknown in character trait array: " ++ show stmt) Nothing
 
-data AdvisorInfo = AdvisorInfo
-        {   ai_slot         :: Maybe Text
-        ,   ai_idea_token   :: Maybe Text
-        ,   ai_on_add       :: Maybe GenericScript
-        ,   ai_on_remove    :: Maybe GenericScript
-        ,   ai_traits       :: Maybe [Text]
-        ,   ai_modifier     :: Maybe GenericStatement
-        ,   ai_research_bonus :: Maybe GenericStatement
-        }
 
-newAI :: AdvisorInfo
-newAI = AdvisorInfo Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-getAdvinfo :: forall g m. (HOI4Info g, Monad m) =>
-    [GenericStatement] -> PPT g m AdvisorInfo
-getAdvinfo = foldM addLine newAI
+newAI :: HOI4Advisor
+newAI = HOI4Advisor "" "" "" "" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing True ""
+getAdvinfo :: forall g m. (HOI4Info g, Monad m) => HOI4Character ->
+    [GenericStatement] -> PPT g m HOI4Advisor
+getAdvinfo cha = foldM addLine newAI
     where
-        addLine :: AdvisorInfo -> GenericStatement -> PPT g m AdvisorInfo
-        addLine ai [pdx| slot = $txt |] = return ai { ai_slot = Just txt }
-        addLine ai [pdx| idea_token = $txt |] = return ai { ai_idea_token = Just txt}
+        addLine :: HOI4Advisor -> GenericStatement -> PPT g m HOI4Advisor
+        addLine ai [pdx| slot = $txt |] = return ai { adv_advisor_slot = txt }
+        addLine ai [pdx| idea_token = $txt |] = return ai { adv_idea_token = txt}
         addLine ai [pdx| on_add = %rhs |] = case rhs of
                 CompoundRhs [] -> return ai
-                CompoundRhs scr -> return ai { ai_on_add = Just scr }
+                CompoundRhs scr -> return ai { adv_on_add = Just scr }
                 _-> return ai
         addLine ai [pdx| on_remove = %rhs |] = case rhs of
                 CompoundRhs [] -> return ai
-                CompoundRhs scr -> return ai { ai_on_remove = Just scr }
+                CompoundRhs scr -> return ai { adv_on_remove = Just scr }
                 _-> return ai
         addLine ai [pdx| traits = @rhs |] = do
             let traits = Just (mapMaybe traitFromArray rhs)
-            return ai {ai_traits = traits}
+            return ai {adv_traits = traits}
         addLine ai stmt@[pdx| modifier = %rhs |] = case rhs of
                 CompoundRhs [] -> return ai
-                CompoundRhs _ -> return ai { ai_modifier = Just stmt }
+                CompoundRhs _ -> return ai { adv_modifier = Just stmt }
                 _-> return ai
         addLine ai stmt@[pdx| research_bonus = %rhs |] = case rhs of
                 CompoundRhs [] -> return ai
-                CompoundRhs _ -> return ai { ai_research_bonus = Just stmt }
+                CompoundRhs _ -> return ai { adv_research_bonus = Just stmt }
                 _-> return ai
-        addLine ai [pdx| allowed = %_|] = return ai
-        addLine ai [pdx| available = %_|] = return ai
-        addLine ai [pdx| visible = %_|] = return ai
+        addLine ai [pdx| allowed = %rhs |] = case rhs of
+                CompoundRhs [] -> return ai
+                CompoundRhs scr -> return ai { adv_allowed = Just scr }
+                _-> return ai
+        addLine ai [pdx| available = %rhs|] = case rhs of
+                CompoundRhs [] -> return ai
+                CompoundRhs scr -> return ai { adv_available = Just scr }
+                _-> return ai
+        addLine ai [pdx| visible = %rhs|] = case rhs of
+                CompoundRhs [] -> return ai
+                CompoundRhs scr -> return ai { adv_visible = Just scr }
+                _-> return ai
         addLine ai [pdx| ledger = %_|] = return ai
-        addLine ai [pdx| cost = %_|] = return ai
+        addLine ai [pdx| cost = %rhs|] = case rhs of
+                (floatRhs -> Just num) -> return ai { adv_cost = Just num }
+                _-> return $ trace "bad advisor cost" ai
         addLine ai [pdx| ai_will_do = %_|] = return ai
         addLine ai [pdx| removal_cost = %_|] = return ai
         addLine ai [pdx| do_effect = %_|] = return ai
         addLine ai [pdx| desc = %_|] = return ai
         addLine ai [pdx| picture = %_|] = return ai
         addLine ai [pdx| name = %_|] = return ai
-        addLine ai [pdx| can_be_fired = %_|] = return ai
+        addLine ai [pdx| can_be_fired = %rhs|]
+            | GenericRhs "no" [] <- rhs = return ai { adv_can_be_fired = True }
+            | GenericRhs "yes" [] <- rhs = return ai { adv_can_be_fired = False }
         addLine ai [pdx| $other = %_ |] = trace ("unknown section in advisor info: " ++ show other) $ return ai
         addLine ai stmt = trace ("unknown form in advisor info: " ++ show stmt) $ return ai
 

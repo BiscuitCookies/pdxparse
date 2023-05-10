@@ -37,7 +37,8 @@ import SettingsTypes ( PPT, Settings (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile
                      , hoistErrors, hoistExceptions
-                     , indentUp, getGameInterface)
+                     , indentUp
+                     , getGameInterface, getGameInterfaceIfPresent)
 import HOI4.Common -- everything
 
 -- | Empty national focus. Starts off Nothing/empty everywhere, except id and name
@@ -252,7 +253,7 @@ ppNationalFocuses nfs = do
         [ "{{Version|", Doc.strictText version, "}}", PP.line
         , "{| class=\"mildtable\" {{buffer}}", PP.line
         , "! style=\"width: 30%;\" | Focus", PP.line
-        , "! style=\"width: 40%;\" | Prerequisites", PP.line
+        , "! style=\"width: 30%;\" | Prerequisites", PP.line
         , "! style=\"width: 40%;\" | Effects", PP.line
         ] ++ nfDoc ++
         [ "|}", PP.line
@@ -286,7 +287,11 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
                         ,"}}"
                         ,PP.line])
             (field nf)
-    icon_pp <- getGameInterface "goal_unknown" (nf_icon nf)
+    icon_pp <- do
+        micon <- getGameInterfaceIfPresent ("GFX_focus_" <> nf_id nf)
+        case micon of
+            Nothing -> getGameInterface "goal_unknown" (nf_icon nf)
+            Just idicon -> return idicon
     prerequisite_pp <- ppPrereq $ catMaybes $ nf_prerequisite nf
     allowBranch_pp <- ppAllowBranch $ nf_allow_branch nf
     mutuallyExclusive_pp <- ppMutuallyExclusive $ nf_mutually_exclusive nf

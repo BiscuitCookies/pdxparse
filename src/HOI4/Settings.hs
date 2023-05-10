@@ -464,7 +464,7 @@ parseHOI4Scripts = do
         te3 = findTriggeredEventsInOnActions te2 (concat (HM.elems on_actions))
         te4 = findTriggeredEventsInNationalFocus te3 (HM.elems nationalFocus)
         te5 = findTriggeredEventsInIdeas te4 (HM.elems ideas)
-        te6 = findTriggeredEventsInCharacters te5 (HM.elems characters)
+        te6 = findTriggeredEventsInCharacters te5 (HM.elems chartoken)
         te7 = findTriggeredEventsInScriptedEffects te6 (HM.elems scriptedeffects)
         te8 = findTriggeredEventsInBops te7 (HM.elems bops)
     let td1 = findActivatedDecisionsInEvents HM.empty (HM.elems events)
@@ -472,7 +472,7 @@ parseHOI4Scripts = do
         td3 = findActivatedDecisionsInOnActions td2 (concat (HM.elems on_actions))
         td4 = findActivatedDecisionsInNationalFocus td3 (HM.elems nationalFocus)
         td5 = findActivatedDecisionsInIdeas td4 (HM.elems ideas)
-        td6 = findActivatedDecisionsInCharacters td5 (HM.elems characters)
+        td6 = findActivatedDecisionsInCharacters td5 (HM.elems chartoken)
         td7 = findActivatedDecisionsInScriptedEffects td6 (HM.elems scriptedeffects)
         td8 = findActivatedDecisionsInBops td7 (HM.elems bops)
     modify $ \(HOI4D s) -> HOI4D $
