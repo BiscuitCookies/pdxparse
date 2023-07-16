@@ -33,7 +33,8 @@ import SettingsTypes ( PPT, Settings (..){-, Game (..)-}
                      {-, IsGame (..)-}, IsGameData (..), IsGameState (..), GameState (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile, withCurrentIndent
-                     , hoistErrors, hoistExceptions)
+                     , hoistErrors, hoistExceptions
+                     , getGameInterface)
 import HOI4.Types -- everything
 import HOI4.Common (extractStmt, matchExactText, ppMany)
 import FileIO (Feature (..), writeFeatures)
@@ -285,6 +286,7 @@ writeHOI4DynamicModifiers = do
             return $ mconcat $
                 [ "{{Version|", Doc.strictText version, "}}", PP.line
                 , "{| class=\"mildtable\"", PP.line
+                , "! ", PP.line
                 , "! style=\"min-width:260px; text-align:center\" | Name", PP.line
                 , "! style=\"text-align:center\" | Requirements", PP.line
                 , "! style=\"min-width:260px; text-align:center\" | Effects", PP.line
@@ -301,12 +303,24 @@ writeHOI4DynamicModifiers = do
         pp_dynamic_modifier :: (HOI4Info g, Monad m) => HOI4DynamicModifier -> PPT g m Doc
         pp_dynamic_modifier mod = do
             req <- imsg2doc =<< ppMany (dmodEnable mod)
+            icon <- maybe (return mempty) (\i -> do
+                icond <- getGameInterface "idea_unknown" i
+                return $ "[[File:" <> icond <> ".png]]") (dmodIcon mod)
+            loc <- do
+                mloc <- getGameL10nIfPresent (dmodName mod <> "_desc")
+                case mloc of
+                    Just locd -> do
+                        let docloc = Doc.strictText locd
+                        return $ mconcat [docloc, PP.line]
+                    _ -> return ""
             eff <- withCurrentIndent $ \_ -> do imsg2doc . fold =<< traverse (modifierMSG False "") (dmodEffects mod)
             return $ mconcat
                 [ "|- style=\"vertical-align:top;\"", PP.line
+                , "| ", Doc.strictText icon, PP.line
                 , "| ", PP.line
                 , "==== ", Doc.strictText $ fromMaybe (dmodName mod) (dmodLocName mod) , " ===="
                 , " <!-- ", Doc.strictText (dmodName mod), " -->", PP.line
+                , loc
                 , "| ", PP.line
                 , req , PP.line
                 , "|", PP.line

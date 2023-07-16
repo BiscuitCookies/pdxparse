@@ -41,7 +41,7 @@ import HOI4.Decisions (parseHOI4Decisioncats, writeHOI4DecisionCats
                       ,findActivatedDecisionsInScriptedEffects
                       ,findActivatedDecisionsInBops)
 import HOI4.Ideas (parseHOI4Ideas
-    , writeHOI4Ideas
+    , writeHOI4Ideas, writeHOI4Designers
     )
 import HOI4.Modifiers (
                       parseHOI4OpinionModifiers, writeHOI4OpinionModifiers
@@ -54,7 +54,9 @@ import HOI4.Events (parseHOI4Events, writeHOI4Events
                    , findTriggeredEventsInIdeas, findTriggeredEventsInCharacters
                    , findTriggeredEventsInScriptedEffects
                    , findTriggeredEventsInBops)
-import HOI4.CharactersAndTraits (parseHOI4Characters, parseHOI4CountryLeaderTraits, parseHOI4UnitLeaderTraits)
+import HOI4.CharactersAndTraits (parseHOI4Characters, writeHOI4Characters
+                                , parseHOI4CountryLeaderTraits, parseHOI4UnitLeaderTraits
+                                ,writeHOI4CountryLeaderTraits,writeHOI4UnitLeaderTraits)
 import HOI4.Misc (parseHOI4CountryHistory
                  , parseHOI4Terrain, parseHOI4Ideology
                  , parseHOI4Effects, parseHOI4Triggers
@@ -438,13 +440,13 @@ parseHOI4Scripts :: Monad m => PPT HOI4 m ()
 parseHOI4Scripts = do
     -- Need idea groups and modifiers before everything else
     ideas <- parseHOI4Ideas =<< getIdeaScripts
-    opinionModifiers <- parseHOI4OpinionModifiers =<< getOpinionModifierScripts
-    dynamicModifiers <- parseHOI4DynamicModifiers =<< getDynamicModifierScripts
-    modifiers <- parseHOI4Modifiers =<< getModifierScripts
-    decisioncats <- parseHOI4Decisioncats =<< getDecisioncatScripts
-    decisions <- parseHOI4Decisions =<< getDecisionScripts
-    events <- parseHOI4Events =<< getEventScripts
-    on_actions <- getOnActionsScripts
+--    opinionModifiers <- parseHOI4OpinionModifiers =<< getOpinionModifierScripts
+--    dynamicModifiers <- parseHOI4DynamicModifiers =<< getDynamicModifierScripts
+--    modifiers <- parseHOI4Modifiers =<< getModifierScripts
+--    decisioncats <- parseHOI4Decisioncats =<< getDecisioncatScripts
+--    decisions <- parseHOI4Decisions =<< getDecisionScripts
+--    events <- parseHOI4Events =<< getEventScripts
+--    on_actions <- getOnActionsScripts
     nationalFocus <- parseHOI4NationalFocuses =<< getNationalFocusScripts
 
     countryHistory <- parseHOI4CountryHistory =<< getCountryHistoryScripts
@@ -456,15 +458,15 @@ parseHOI4Scripts = do
     scriptedeffects <- parseHOI4Effects =<< getScriptedEffectScripts
     scriptedtriggers <- parseHOI4Triggers =<< getScriptedTriggerScripts
     moddef <- parseHOI4ModifierDefinitions =<< getModifierDefintionScripts
-    bops <- parseHOI4BopRanges =<< getBopScripts
+--    bops <- parseHOI4BopRanges =<< getBopScripts
     modkeys <- parseHOI4LocKeys =<< getLocKeys
-
+{-
     let te1 = findTriggeredEventsInEvents HM.empty (HM.elems events)
         te2 = findTriggeredEventsInDecisions te1 (HM.elems decisions)
         te3 = findTriggeredEventsInOnActions te2 (concat (HM.elems on_actions))
         te4 = findTriggeredEventsInNationalFocus te3 (HM.elems nationalFocus)
         te5 = findTriggeredEventsInIdeas te4 (HM.elems ideas)
-        te6 = findTriggeredEventsInCharacters te5 (HM.elems characters)
+        te6 = findTriggeredEventsInCharacters te5 (HM.elems chartoken)
         te7 = findTriggeredEventsInScriptedEffects te6 (HM.elems scriptedeffects)
         te8 = findTriggeredEventsInBops te7 (HM.elems bops)
     let td1 = findActivatedDecisionsInEvents HM.empty (HM.elems events)
@@ -472,20 +474,21 @@ parseHOI4Scripts = do
         td3 = findActivatedDecisionsInOnActions td2 (concat (HM.elems on_actions))
         td4 = findActivatedDecisionsInNationalFocus td3 (HM.elems nationalFocus)
         td5 = findActivatedDecisionsInIdeas td4 (HM.elems ideas)
-        td6 = findActivatedDecisionsInCharacters td5 (HM.elems characters)
+        td6 = findActivatedDecisionsInCharacters td5 (HM.elems chartoken)
         td7 = findActivatedDecisionsInScriptedEffects td6 (HM.elems scriptedeffects)
         td8 = findActivatedDecisionsInBops td7 (HM.elems bops)
+        -}
     modify $ \(HOI4D s) -> HOI4D $
-            s { hoi4events = events
-            ,   hoi4decisioncats = decisioncats
-            ,   hoi4decisions = decisions
-            ,   hoi4ideas = ideas
-            ,   hoi4opmods = opinionModifiers
-            ,   hoi4nationalfocus = nationalFocus
-            ,   hoi4eventTriggers = te8
-            ,   hoi4decisionTriggers = td8
-            ,   hoi4dynamicmodifiers = dynamicModifiers
-            ,   hoi4modifiers = modifiers
+            s { --hoi4events = events
+--            ,   hoi4decisioncats = decisioncats
+--            ,   hoi4decisions = decisions
+                hoi4ideas = ideas
+--            ,   hoi4opmods = opinionModifiers
+            ,  hoi4nationalfocus = nationalFocus
+--            ,   hoi4eventTriggers = te8
+--            ,   hoi4decisionTriggers = td8
+--            ,   hoi4dynamicmodifiers = dynamicModifiers
+--            ,   hoi4modifiers = modifiers
 
             ,   hoi4countryHistory = countryHistory
             ,   hoi4characters = characters
@@ -500,7 +503,7 @@ parseHOI4Scripts = do
             ,   hoi4scriptedtriggers = scriptedtriggers
 
             ,   hoi4modifierdefinitions = moddef
-            ,   hoi4bops = bops
+--            ,   hoi4bops = bops
             ,   hoi4modkeys = modkeys
             }
 
@@ -521,5 +524,13 @@ writeHOI4Scripts = do
 --        writeHOI4OpinionModifiers
 --        liftIO $ putStrLn "Writing dynamic modifiers."
 --        writeHOI4DynamicModifiers
+        liftIO $ putStrLn "Writing designers."
+        writeHOI4Designers
         liftIO $ putStrLn "Writing ideas."
         writeHOI4Ideas
+        liftIO $ putStrLn "Writing characters."
+        writeHOI4Characters
+        liftIO $ putStrLn "Writing country leader traits."
+        writeHOI4CountryLeaderTraits
+        liftIO $ putStrLn "Writing unit leader traits."
+        writeHOI4UnitLeaderTraits

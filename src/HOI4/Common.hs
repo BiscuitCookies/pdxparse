@@ -173,6 +173,7 @@ handlersNumericCompare = Tr.fromList
         ,("num_of_available_civilian_factories" , numericCompare "more than" "fewer than" MsgNumOfAvailableCivilianFactories MsgNumOfAvailableCivilianFactoriesVar)
         ,("num_of_civilian_factories_available_for_projects" , numericCompare "more than" "less than" MsgNumOfProjectFactories MsgNumOfProjectFactoriesVar)
         ,("num_of_factories"                 , numericCompare "more than" "fewer than" MsgNumOfFactories MsgNumOfFactoriesVar)
+        ,("num_of_military_factories"        , numericCompare "more than" "fewer than" MsgNumOfMilitaryFactories MsgNumOfMilitaryFactoriesVar)
         ,("num_of_nukes"                     , numericCompare "more than" "fewer than" MsgNumOfNukes MsgNumOfNukesVar)
         ,("num_of_naval_factories"           , numericCompare "more than" "fewer than" MsgNumOfNavalFactories MsgNumOfNavalFactoriesVar)
         ,("num_of_operatives"                , numericCompare "more than" "fewer than" MsgNumOfOperatives MsgNumOfOperativesVar)
@@ -420,11 +421,11 @@ handlersAdvisorId = Tr.fromList
 --   or just need the RHS unmodified
 handlersTypewriter :: (HOI4Info g, Monad m) => Trie (StatementHandler g m)
 handlersTypewriter = Tr.fromList
-        [("clr_character_flag"  , withNonlocAtom2 MsgCharacterFlag MsgClearFlag)
-        ,("clr_country_flag"    , withNonlocAtom2 MsgCountryFlag MsgClearFlag)
-        ,("clr_global_flag"     , withNonlocAtom2 MsgGlobalFlag MsgClearFlag)
-        ,("clr_state_flag"      , withNonlocAtom2 MsgStateFlag MsgClearFlag)
-        ,("clr_unit_leader_flag" , withNonlocAtom2 MsgUnitLeaderFlag MsgClearFlag)
+        [("clr_character_flag"  , withMaybelocAtom2 MsgCharacterFlag MsgClearFlag)
+        ,("clr_country_flag"    , withMaybelocAtom2 MsgCountryFlag MsgClearFlag)
+        ,("clr_global_flag"     , withMaybelocAtom2 MsgGlobalFlag MsgClearFlag)
+        ,("clr_state_flag"      , withMaybelocAtom2 MsgStateFlag MsgClearFlag)
+        ,("clr_unit_leader_flag" , withMaybelocAtom2 MsgUnitLeaderFlag MsgClearFlag)
         ,("has_focus_tree"        , withNonlocAtom MsgHasFocusTree)
         ,("save_event_target_as", withNonlocAtom MsgSaveEventTargetAs)
         ,("save_global_event_target_as", withNonlocAtom MsgSaveGlobalEventTargetAs)
@@ -489,7 +490,7 @@ handlersSimpleFlag = Tr.fromList
         ,("transfer_state_to"       , withFlag MsgTransferStateTo)
         ,("has_war_with"            , withFlag MsgHasWarWith)
         ,("has_war_together_with"   , withFlag MsgHasWarTogetherWith)
-        ,("original_tag"            , withFlagAndTag MsgOrignalTag)
+        ,("original_tag"            , withFlag MsgOrignalTag)
         ,("white_peace"             , withFlag MsgMakeWhitePeace)
         ]
 
@@ -764,13 +765,14 @@ handlersMisc = Tr.fromList
         ,("set_popularities"    , setPopularities)
         ,("set_rule"            , setRule MsgSetRule)
         ,("set_technology"      , setTechnology)
+
+        ,("effect_tooltip"        , customTriggerTooltip) -- shows the effects but doesn't execute them, don't know if I want it to show up in the parser
         ]
 
 -- | Handlers for ignored statements
 handlersIgnored :: (HOI4Info g, Monad m) => Trie (StatementHandler g m)
 handlersIgnored = Tr.fromList
         [("custom_tooltip", return $ return [])
-        ,("effect_tooltip", return $ return []) -- shows the effects but doesn't execute them, don't know if I want it to show up in the parser
         ,("goto"          , return $ return [])
         ,("log"           , return $ return [])
         ,("required_personality", return $ return[]) -- From the 1.30 patch notes: "The required_personality field will now be ignored"
@@ -807,7 +809,7 @@ ppOne' stmt lhs rhs = case lhs of
                     characters <- getCharacters
                     case HM.lookup label characters of
                         Just charid -> withCurrentIndent $ \_ -> do  -- force indent level at least 1
-                            lchar <- plainMsg' (chaName charid <> ":")
+                            lchar <- plainMsg' (cha_loc_name charid <> ":")
                             scriptMsgs <- scope HOI4ScopeCharacter $ ppMany scr
                             return (lchar : scriptMsgs)
                         _

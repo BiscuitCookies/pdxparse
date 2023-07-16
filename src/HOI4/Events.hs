@@ -45,7 +45,8 @@ import SettingsTypes ( PPT, Settings (..)
                      , IsGame (..), IsGameData (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile
-                     , hoistErrors, hoistExceptions, getGameInterface)
+                     , hoistErrors, hoistExceptions
+                     , getGameInterface, getGameInterfaceIfPresent)
 import HOI4.Handlers (flagText)
 
 -- | Empty event value. Starts off Nothing/empty everywhere.
@@ -646,7 +647,11 @@ ppEventSource (HOI4EvtSrcOnAction act weight) = do
             ]
 ppEventSource (HOI4EvtSrcNFComplete id loc icon) = do
     iconnf <- do
-        iconname <- getGameInterface "goal_unknown" icon
+        iconname <- do
+            micon <- getGameInterfaceIfPresent ("GFX_focus_" <> id)
+            case micon of
+                Nothing -> getGameInterface "goal_unknown" icon
+                Just idicon -> return idicon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Completing the national focus "
         , iconnf
@@ -657,7 +662,11 @@ ppEventSource (HOI4EvtSrcNFComplete id loc icon) = do
         ]
 ppEventSource (HOI4EvtSrcNFSelect id loc icon) = do
     iconnf <- do
-        iconname <- getGameInterface "goal_unknown" icon
+        iconname <- do
+            micon <- getGameInterfaceIfPresent ("GFX_focus_" <> id)
+            case micon of
+                Nothing -> getGameInterface "goal_unknown" icon
+                Just idicon -> return idicon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     return $ Doc.strictText $ mconcat ["Selecting the national focus "
         , iconnf
@@ -668,7 +677,11 @@ ppEventSource (HOI4EvtSrcNFSelect id loc icon) = do
         ]
 ppEventSource (HOI4EvtSrcIdeaOnAdd id loc icon categ) = do
     iconnf <- do
-        iconname <- getGameInterface "idea_unknown" icon
+        iconname <- do
+            micon <- getGameInterfaceIfPresent ("GFX_idea_" <> id)
+            case micon of
+                Nothing -> getGameInterface "idea_unknown" icon
+                Just idicon -> return idicon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -683,7 +696,11 @@ ppEventSource (HOI4EvtSrcIdeaOnAdd id loc icon categ) = do
         ]
 ppEventSource (HOI4EvtSrcIdeaOnRemove id loc icon categ) = do
     iconnf <- do
-        iconname <- getGameInterface "idea_unknown" icon
+        iconname <- do
+            micon <- getGameInterfaceIfPresent ("GFX_idea_" <> id)
+            case micon of
+                Nothing -> getGameInterface "idea_unknown" icon
+                Just idicon -> return idicon
         return $ "[[File:" <> iconname <> ".png|28px]]"
     catloc <- getGameL10n categ
     return $ Doc.strictText $ mconcat ["When the "
@@ -696,18 +713,32 @@ ppEventSource (HOI4EvtSrcIdeaOnRemove id loc icon categ) = do
         , iquotes't loc
         , " is removed"
         ]
-ppEventSource (HOI4EvtSrcCharacterOnAdd id loc) =
+ppEventSource (HOI4EvtSrcCharacterOnAdd idtoken id name) = do
+    loc <- do
+        mloc <- getGameL10nIfPresent name
+        case mloc of
+            Just nloc -> return nloc
+            _-> getGameL10n idtoken
     return $ Doc.strictText $ mconcat ["When the advisor "
         , " <!-- "
         , id
+        , " "
+        , idtoken
         , " -->"
         , iquotes't loc
         , " is added"
         ]
-ppEventSource (HOI4EvtSrcCharacterOnRemove id loc) =
+ppEventSource (HOI4EvtSrcCharacterOnRemove idtoken id name) = do
+    loc <- do
+        mloc <- getGameL10nIfPresent name
+        case mloc of
+            Just nloc -> return nloc
+            _-> getGameL10n idtoken
     return $ Doc.strictText $ mconcat ["When the advisor "
         , " <!-- "
         , id
+        , " "
+        , idtoken
         , " -->"
         , iquotes't loc
         , " is removed"
@@ -838,13 +869,13 @@ findTriggeredEventsInIdeas hm idea = addEventTriggers hm (concatMap findInIdea i
             addEventSource (const (HOI4EvtSrcIdeaOnAdd (id_id idea) (id_name_loc idea) (id_picture idea) (id_category idea))) (maybe [] findInStmts (id_on_add idea)) ++
             addEventSource (const (HOI4EvtSrcIdeaOnRemove (id_id idea) (id_name_loc idea) (id_picture idea) (id_category idea))) (maybe [] findInStmts (id_on_remove idea))
 
-findTriggeredEventsInCharacters :: HOI4EventTriggers -> [HOI4Character] -> HOI4EventTriggers
+findTriggeredEventsInCharacters :: HOI4EventTriggers -> [HOI4Advisor] -> HOI4EventTriggers
 findTriggeredEventsInCharacters hm hChar = addEventTriggers hm (concatMap findInCharacter hChar)
     where
-        findInCharacter :: HOI4Character -> [(Text, HOI4EventSource)]
+        findInCharacter :: HOI4Advisor -> [(Text, HOI4EventSource)]
         findInCharacter hChar =
-            addEventSource (const (HOI4EvtSrcCharacterOnAdd (chaTag hChar) (chaName hChar))) (maybe [] findInStmts (chaOn_add hChar)) ++
-            addEventSource (const (HOI4EvtSrcCharacterOnRemove (chaTag hChar) (chaName hChar))) (maybe [] findInStmts (chaOn_remove hChar))
+            addEventSource (const (HOI4EvtSrcCharacterOnAdd (adv_idea_token hChar) (adv_cha_id hChar) (adv_cha_name hChar))) (maybe [] findInStmts (adv_on_add hChar)) ++
+            addEventSource (const (HOI4EvtSrcCharacterOnRemove (adv_idea_token hChar) (adv_cha_id hChar) (adv_cha_name hChar))) (maybe [] findInStmts (adv_on_remove hChar))
 
 findTriggeredEventsInScriptedEffects :: HOI4EventTriggers -> [GenericStatement] -> HOI4EventTriggers
 findTriggeredEventsInScriptedEffects hm scr = foldl' findInScriptEffect hm scr -- needs editing

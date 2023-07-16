@@ -50,6 +50,17 @@ import Text.Shakespeare.I18N (Lang)
 
 import Data.HashMap.Strict(HashMap)
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashMap.Strict.InsOrd as HMO
+
+import Data.Attoparsec.Text (Parser, (<?>))
+import qualified Data.Attoparsec.Text as Ap
+import Data.Functor (($>))
+import Data.Char (isAlpha, isSpace)
+
+import Data.Attoparsec.Text (Parser, (<?>))
+import qualified Data.Attoparsec.Text as Ap
+import Data.Functor (($>))
+import Data.Char (isAlpha, isSpace)
 
 import Data.Attoparsec.Text (Parser, (<?>))
 import qualified Data.Attoparsec.Text as Ap

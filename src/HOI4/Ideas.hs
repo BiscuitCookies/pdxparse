@@ -6,6 +6,7 @@ module HOI4.Ideas (
         HOI4Idea (..)
     ,   parseHOI4Ideas
     ,   writeHOI4Ideas
+    ,   writeHOI4Designers
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -18,7 +19,6 @@ import Control.Monad.Trans (MonadIO (..))
 
 import Data.Char (toLower)
 import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
-import Data.Monoid ((<>))
 import Data.List (intersperse, foldl', intercalate)
 
 import Data.HashMap.Strict (HashMap)
@@ -43,9 +43,9 @@ import SettingsTypes ( PPT, Settings (..), Game (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile, withCurrentIndent
                      , hoistErrors, hoistExceptions
-                     , concatMapM, getGameInterface)
+                     , concatMapM
+                     , getGameInterface, getGameInterfaceIfPresent)
 import HOI4.Common -- everything
-import GHC.RTS.Flags (RTSFlags(costCentreFlags))
 
 -- | Take the idea group scripts from game data and parse them into idea group
 -- data structures.
@@ -107,7 +107,7 @@ parseHOI4Idea [pdx| $ideaName = %rhs |] category = case rhs of
                               , id_name_loc = idName_loc
                               , id_desc_loc = idDesc
                               , id_picture = idPicture
-                              , id_path = sourcePath </> T.unpack category -- so ideas are divided into maps for the cateogry, should I loc or not?
+                              , id_path = sourcePath -- </> T.unpack category -- so ideas are divided into maps for the cateogry, should I loc or not?
                               , id_category = category}))
                   parts
     GenericRhs txt [] -> if ideaName == "designer" || ideaName == "use_list_view" || ideaName == "law" then return Nothing else throwError "unrecognized form for idea (RHS) "
@@ -205,19 +205,33 @@ ideaAddSection iidea stmt
         ideaAddSection' iidea _
             = trace "unrecognised form for idea section" iidea
 
+writeHOI4Designers :: (HOI4Info g, MonadIO m) => PPT g m ()
+writeHOI4Designers = do
+    ideas <- getIdeaScripts
+    pathIDS <- parseHOI4IdeasPath ideas
+    let pathedIdea :: [Feature [HOI4Idea]]
+        pathedIdea = map (\ids -> Feature {
+                                        featurePath = Just "designers"
+                                    ,   featureId = Just (T.pack $ takeBaseName $ id_path $ head ids) <> Just ".txt"
+                                    ,   theFeature = Right ids })
+                              (HM.elems pathIDS)
+    writeFeatures "ideas"
+                  pathedIdea
+                  (ppIdeas True)
+
 writeHOI4Ideas :: (HOI4Info g, MonadIO m) => PPT g m ()
 writeHOI4Ideas = do
     ideas <- getIdeaScripts
     pathIDS <- parseHOI4IdeasPath ideas
     let pathedIdea :: [Feature [HOI4Idea]]
         pathedIdea = map (\ids -> Feature {
-                                        featurePath = Just $ id_path $ head ids
+                                        featurePath = Just "ideas"
                                     ,   featureId = Just (T.pack $ takeBaseName $ id_path $ head ids) <> Just ".txt"
                                     ,   theFeature = Right ids })
                               (HM.elems pathIDS)
     writeFeatures "ideas"
                   pathedIdea
-                  ppIdeas
+                  (ppIdeas False)
 
 parseHOI4IdeasPath :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
     HashMap String GenericScript -> PPT g m (HashMap FilePath [HOI4Idea])
@@ -243,10 +257,10 @@ parseHOI4IdeasPath scripts = do
                     Right nfocus -> nfocus)
                     enfs
 
-ppIdeas :: forall g m. (HOI4Info g, Monad m) =>  [HOI4Idea] -> PPT g m Doc
-ppIdeas nfs = do
+ppIdeas :: forall g m. (HOI4Info g, Monad m) => Bool -> [HOI4Idea] -> PPT g m Doc
+ppIdeas d nfs = do
     version <- gets (gameVersion . getSettings)
-    nfDoc <- mapM (scope HOI4Country . ppIdea) nfs -- Better to leave unsorted? (sortOn (sortName . nf_name_loc) nfs)
+    nfDoc <- traverseIf (scope HOI4Country . ppIdea d) nfs -- Better to leave unsorted? (sortOn (sortName . nf_name_loc) nfs)
     return . mconcat $
         [ "{{Version|", Doc.strictText version, "}}", PP.line
         , "{| class=\"mildtable\" ", PP.line
@@ -260,9 +274,13 @@ ppIdeas nfs = do
         ] ++ nfDoc ++
         [ "|}", PP.line
         ]
+    where
+        traverseIf f = traverse (\x -> if if d then pred x else not (pred x) then f x else return mempty)
+        pred x = id_category x `elem` ["tank_manufacturer", "naval_manufacturer", "aircraft_manufacturer", "materiel_manufacturer", "industrial_concern"
+                                    , "construction_firm", "construction_firm", "vehicle_restoration_advisor", "navy_restoration_advisor", "aircraft_restoration_advisor"]--OWB names
 
-ppIdea :: forall g m. (HOI4Info g, Monad m) => HOI4Idea -> PPT g m Doc
-ppIdea id = setCurrentFile (id_path id) $ do
+ppIdea :: forall g m. (HOI4Info g, Monad m) => Bool -> HOI4Idea -> PPT g m Doc
+ppIdea d id = setCurrentFile (id_path id) $ do
     let nfArg :: (HOI4Idea -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
         nfArg field fmt
             = maybe (return [])
@@ -278,16 +296,19 @@ ppIdea id = setCurrentFile (id_path id) $ do
                 (\field_content -> do
                     content_pp'd <- fmt field_content
                     return
-                        ["{{",extra,"|",PP.line
+                        ["<!-- ",extra, " -->"
                         ,content_pp'd
-                        ,"}}"
                         ,PP.line])
             (field id)
-    icon_pp <- getGameInterface "idea_unknown" (id_picture id)
+    icon_pp <- do
+            micon <- getGameInterfaceIfPresent ("GFX_idea_" <> id_id id)
+            case micon of
+                Nothing -> getGameInterface "idea_unknown" (id_picture id)
+                Just idicon -> return idicon
     name_pp <- getGameL10n $ id_name id
-    allowed_pp <- nfArg id_allowed ppScript
-    visible_pp <- nfArg id_visible ppScript
-    available_pp <- nfArg id_available ppScript
+    allowed_pp <- nfArgExtra "allowed" id_allowed ppScript
+    visible_pp <- nfArgExtra "visible" id_visible ppScript
+    available_pp <- nfArgExtra "available" id_available ppScript
     mod <- nfArg id_modifier ppStatement
     equipmod <- nfArg id_equipment_bonus ppStatement
     resmod <- nfArg id_research_bonus ppStatement
@@ -300,7 +321,7 @@ ppIdea id = setCurrentFile (id_path id) $ do
     (traitids, traitloc) <- case id_traits id of
         Just arr -> do
             let traitbare = mapMaybe getbaretraits arr
-                traitlist = map (\t-> "{{countrytrait|"<> t <> "|noname=1}}") traitbare
+                traitlist = map (\t-> "{{countrytrait|"<> t <> if d then "|noname=1}}" else "}}") traitbare
                 traitids = map Doc.strictText traitlist
             traitloc <- do
                 tloc <- traverse getGameL10n traitbare
@@ -321,15 +342,19 @@ ppIdea id = setCurrentFile (id_path id) $ do
         visible_pp ++
         available_pp ++
         [ "| effect = ",PP.line]++
-        (if id_category id `elem` ["tank_manufacturer", "naval_manufacturer", "aircraft_manufacturer", "materiel_manufacturer", "industrial_concern"] then
+        (if id_category id `elem` ["tank_manufacturer", "naval_manufacturer", "aircraft_manufacturer", "materiel_manufacturer", "industrial_concern"
+                                    , "construction_firm", "construction_firm", "vehicle_restoration_advisor", "navy_restoration_advisor", "aircraft_restoration_advisor"] then --OWB names
             resmod ++
             mod ++
-            tarmod
+            tarmod ++
+            equipmod ++
+            traitids
         else
             mod ++
             tarmod ++
-            resmod)++
-        equipmod ++
-        traitids ++
-        [traitmsg_pp, PP.line
+            resmod++
+            equipmod ++
+            traitids) ++
+        [--traitmsg_pp,
+        PP.line
         , "| cost = ", if id_category id == "country" then mempty else maybe "{{icon|political power|150}} }}" (\c -> "{{icon|political power|"<> plainNum c <>"}} }}") (id_cost id), PP.line]

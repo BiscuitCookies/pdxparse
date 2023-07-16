@@ -2,6 +2,7 @@
 Module      : HOI4.Misc
 Description : Feature handler for miscellaneous features in Hearts of Iron IV
 -}
+{-# LANGUAGE LambdaCase #-}
 module HOI4.Misc (
          parseHOI4CountryHistory
         ,parseHOI4Terrain
@@ -27,6 +28,7 @@ import System.FilePath (takeFileName)
 
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashMap.Strict.InsOrd as HMO
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -37,7 +39,9 @@ import SettingsTypes ( PPT
                      , IsGame (..), IsGameData (..), IsGameState (..)
 
                      , setCurrentFile, withCurrentFile
-                     , hoistErrors, hoistExceptions)
+                     , hoistErrors, hoistExceptions
+                     , indentUp, withCurrentIndent
+                     , concatMapM)
 import HOI4.Common -- everything
 import HOI4.SpecialHandlers ( modifiersTable)
 import HOI4.Messages (ScriptMessage (..))
