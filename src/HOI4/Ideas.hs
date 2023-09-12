@@ -14,6 +14,8 @@ import Debug.Trace (trace, traceM)
 import Control.Arrow ((&&&))
 import Control.Monad (foldM, forM)
 import Control.Monad.Except (ExceptT (..), MonadError (..))
+import Control.Monad.Trans (MonadIO (..))
+import Control.Monad.State (MonadState (..), gets)
 
 import Data.Char (toLower)
 import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
@@ -36,7 +38,7 @@ import MessageTools (iquotes, plainNum)
 import HOI4.Handlers (flagText, getStateLoc, plainMsg')
 import HOI4.SpecialHandlers (getLeaderTraits, getbaretraits)
 import QQ (pdx)
-import SettingsTypes ( PPT
+import SettingsTypes ( PPT, Settings (..), Game (..)
                      , IsGame (..), IsGameData (..), IsGameState (..)
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile, withCurrentIndent
