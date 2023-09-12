@@ -47,7 +47,6 @@ import Abstract (GenericStatement)
 import qualified Doc
 import MessageTools -- import everything
 import SettingsTypes (PPT, getLangs, GameData (..), IsGameData (..))
-import Graphics.Win32 (sC_KEYMENU)
 
 -- | Dummy type required by the Shakespeare machinery.
 data Script = Script

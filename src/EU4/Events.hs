@@ -9,7 +9,11 @@ module EU4.Events (
     ,   findTriggeredEventsInDecisions
     ,   findTriggeredEventsInOnActions
     ,   findTriggeredEventsInDisasters
+    ,   findTriggeredEventsInGenericScript
     ,   findTriggeredEventsInMissions
+    ,   findTriggeredEventsInProvinceTriggeredModifiers
+    ,   findTriggeredEventsInGovernmentMechanics
+    ,   findTriggeredEventsInImperialIncidents
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -20,7 +24,9 @@ import Control.Monad.Except (MonadError (..))
 import Control.Monad.State (MonadState (..), gets)
 import Control.Monad.Trans (MonadIO (..))
 
-import Data.List (intersperse, foldl')
+import Data.Array ((!))
+import Data.ByteString (ByteString)
+import Data.List (intersperse, foldl', sortOn)
 import Data.Maybe (isJust, isNothing, fromMaybe, fromJust, catMaybes)
 import Data.Monoid ((<>))
 
@@ -32,6 +38,9 @@ import qualified Data.Text.Lazy as TL
 
 import Text.PrettyPrint.Leijen.Text (Doc)
 import qualified Text.PrettyPrint.Leijen.Text as PP
+
+import Text.Regex.TDFA (Regex)
+import qualified Text.Regex.TDFA as RE
 
 import Abstract -- everything
 import qualified Doc
@@ -327,6 +336,15 @@ ppEventSource (EU4EvtSrcDisaster id trig weight) = do
         , " disaster"
         , formatWeight weight
         ]
+ppEventSource (EU4EvtSrcGeneric id trig) = do
+    idLoc <- getGameL10n id
+    locWithTitle <- getGameL10nIfPresent (id <> "_title")
+    return $ Doc.strictText $ mconcat [trig
+        , " <!-- "
+        , id
+        , " -->"
+        , iquotes't (fromMaybe idLoc locWithTitle)
+        ]
 ppEventSource (EU4EvtSrcMission missionId) = do
     title <- getGameL10n (missionId <> "_title")
     return $ Doc.strictText $ mconcat ["Completing the <!-- "
@@ -334,6 +352,19 @@ ppEventSource (EU4EvtSrcMission missionId) = do
         , " -->"
         , iquotes't title
         , " mission"
+        ]
+ppEventSource (EU4EvtSrcGovernmentMechanic id sectionId trig) = do
+    idLoc <- getGameL10n ("ability_" <> id)
+    sectionLoc <- getGameL10n sectionId
+    return $ Doc.strictText $ mconcat [trig
+        , " <!-- "
+        , sectionId
+        , " -->"
+        , iquotes't sectionLoc
+        , " in the government mechanic <!-- "
+        , id
+        , " -->"
+        , iquotes't idLoc
         ]
 
 ppTriggeredBy :: (EU4Info g, Monad m) => Text -> PPT g m Doc
@@ -347,9 +378,18 @@ ppTriggeredBy eventId = do
             let ts' = if length ts < 2 then
                     ts
                 else
-                    map (\d -> Doc.strictText $ "* " <> (Doc.doc2text d)) ts
+                    -- to give consistent results, the triggers are sorted while ignoring HTML comments in the sort(because they often contain an event ID)
+                    map (\d -> Doc.strictText $ "* " <> (Doc.doc2text d)) (sortOn removeComments ts)
             return $ mconcat $ [PP.line] ++ (intersperse PP.line ts')
         _ -> return $ Doc.strictText "(please describe trigger here)"
+    where
+        commentRE :: Regex
+        commentRE = RE.makeRegex ("<!--[^>]*-->"::ByteString)
+        removeComments :: Doc -> Text
+        removeComments s = case RE.matchOnceText commentRE (Doc.doc2text s) of
+            Just (pre, matcharr, post) -> mconcat
+                [pre, post, fst (matcharr ! 0)]
+            Nothing -> Doc.doc2text s
 
 -- | Pretty-print an event. If some essential parts are missing from the data,
 -- throw an exception.
@@ -474,7 +514,7 @@ pp_option evtid hidden triggered opt = do
                 ]
 
 findInStmt :: GenericStatement -> [(EU4EventWeight, Text)]
-findInStmt stmt@[pdx| $lhs = @scr |] | lhs == "country_event" || lhs == "province_event" = case getId scr of
+findInStmt stmt@[pdx| $lhs = @scr |] | lhs == "country_event" || lhs == "province_event" || lhs == "country_event_with_insight" = case getId scr of
     Just triggeredId -> [(Nothing, triggeredId)]
     _ -> (trace $ "Unrecognized event trigger: " ++ show stmt) $ []
     where
@@ -580,7 +620,7 @@ findTriggeredEventsInOnActions hm scr = foldl' findInAction hm scr
             --,("on_death_foreign_slave_ruler", "")
             --,("on_death_has_harem", "")
             --,("on_dependency_gained", "")
-            --,("on_diplomatic_annex", "")
+            ,("on_diplomatic_annex", "<!-- on_diplomatic_annex -->Diplomatically annexing a country")
             --,("on_dismantle_revolution", "")
 
             -- Note: Should probably be "An estate *becoming* more influential", but that doesn't seem to be the behavior in 1.31.3
@@ -595,6 +635,9 @@ findTriggeredEventsInOnActions hm scr = foldl' findInAction hm scr
             --,("on_flagship_captured", "")
             --,("on_flagship_destroyed", "")
             ,("on_four_year_pulse", "The [[List_of_event_lists#4_year_pulse|4 year pulse]]")
+            ,("on_four_year_pulse_2", "The [[List_of_event_lists#4_year_pulse|4 year pulse II]]")
+            ,("on_four_year_pulse_3", "The [[List_of_event_lists#4_year_pulse|4 year pulse III]]")
+            ,("on_four_year_pulse_4", "The [[List_of_event_lists#4_year_pulse|4 year pulse IV]]")
             --,("on_harmonized_buddhism", "")
             --,("on_harmonized_christian", "")
             --,("on_harmonized_dharmic", "")
@@ -606,20 +649,25 @@ findTriggeredEventsInOnActions hm scr = foldl' findInAction hm scr
             --,("on_harmonized_vajrayana", "")
             --,("on_harmonized_zoroastrian_group", "")
             ,("on_heir_death", "<!-- on_heir_death -->Heir dying")
+            ,("on_heir_disinherited", "<!-- on_heir_disinherited -->Heir disinherited")
             ,("on_heir_needed_theocracy", "<!-- on_heir_needed_theocracy -->A theocracy needing an heir")
+            ,("on_hre_dismantled", "<!-- on_hre_dismantled -->When dismantling the HRE")
             --,("on_hre_non_defense", "")
             --,("on_hre_religion_white_peace", "")
-            --,("on_integrate", "")
+            ,("on_integrate", "Diplomatically integrating a junior partner")
             --,("on_lock_hre_religion", "")
+            ,("on_main_war_won", "<!-- on_main_war_won -->Winning a war against ''From''") -- root = winning country, from = loser country
+            ,("on_main_war_lost", "<!-- on_main_war_lost -->Losing a war against ''From''") -- root = winning country, from = loser country
             ,("on_mandate_of_heaven_gained", "<!-- on_mandate_of_heaven_gained -->Our country becoming the [[Emperor of China]] instead of ''From''")
             ,("on_monarch_death", "<!-- on_monarch_death-->Curent ruler dying")
+            ,("on_new_age", "<!-- on_new_age -->When a new age starts")
             ,("on_new_consort", "<!-- on_new_consort -->Getting a new consort")
             ,("on_new_monarch", "<!-- on_new_monarch -->Getting a new ruler")
             --,("on_new_term_election", "")
             ,("on_overextension_pulse", "The overextension pulse")
             ,("on_peace_actor", "<!-- on_peace_actor -->Sending a peace offer")
             ,("on_peace_recipient", "<!-- on_peace_recipient -->Receiving a peace offer")
-            --,("on_province_owner_change", "")
+            ,("on_province_owner_change", "<!-- on_province_owner_change -->The owner of a province changes")
             --,("on_regent", "")
             ,("on_religion_change", "<!-- on_religion_change -->Changing religion")
             --,("on_remove_free_city", "")
@@ -637,7 +685,12 @@ findTriggeredEventsInOnActions hm scr = foldl' findInAction hm scr
             ,("on_thri_yearly_pulse_4", "The [[list_of_event_lists#3_year_pulse|three year pulse IV]]")
             ,("on_war_lost", "<!-- on_war_lost -->Losing a war against ''From''") -- # root = loser country, from = winner country
             ,("on_war_won", "<!-- on_war_won -->Winning a war against ''From''") -- root = winning country, from = loser country
-            --,("on_weak_heir_claim", "")
+            ,("on_yearly_pulse", "The [[list_of_event_lists#Yearly_pulse|yearly pulse I]]")
+            ,("on_yearly_pulse_2", "The [[list_of_event_lists#Yearly_pulse|yearly pulse II]]")
+            ,("on_yearly_pulse_3", "The [[list_of_event_lists#Yearly_pulse|yearly pulse III]]")
+            ,("on_yearly_pulse_4", "The [[list_of_event_lists#Yearly_pulse|yearly pulse IV]]")
+            ,("on_yearly_pulse_5", "The [[list_of_event_lists#Yearly_pulse|yearly pulse V]]")
+            ,("on_weak_heir_claim", "The rise to the throne of an heir with a weak claim")
             ]
 
 findTriggeredEventsInDisasters :: EU4EventTriggers -> [GenericStatement] -> EU4EventTriggers
@@ -658,3 +711,55 @@ findTriggeredEventsInMissions hm mtbs = foldl' (\h -> \m -> foldl' findInMission
     where
         findInMission :: EU4EventTriggers -> EU4Mission -> EU4EventTriggers
         findInMission hm m = addEventTriggers hm $ addEventSource (const (EU4EvtSrcMission (eu4m_id m))) (findInStmts (eu4m_effect m))
+
+findTriggeredEventsInGenericScript :: EU4EventTriggers -> HashMap Text Text -> [GenericStatement] -> EU4EventTriggers
+findTriggeredEventsInGenericScript hm sectionMap scr = foldl' findInGenericScript hm scr
+    where
+        findInGenericScript :: EU4EventTriggers -> GenericStatement -> EU4EventTriggers
+        findInGenericScript hm stmt@[pdx| $id = @scr |] = foldl' (findInGenericScript' id) hm scr
+        findInGenericScript hm stmt = trace ("Unknown top-level statement: " ++ show stmt) hm
+
+        findInGenericScript' :: Text -> EU4EventTriggers -> GenericStatement -> EU4EventTriggers
+        findInGenericScript' id hm [pdx| $section = @scr |] = addEventTriggers hm $ addEventSource (const (EU4EvtSrcGeneric id (HM.lookupDefault ("<pre>" <> section <> "</pre>") section sectionMap))) (findInStmts scr)
+        findInGenericScript' _ hm _ = hm
+
+findTriggeredEventsInProvinceTriggeredModifiers :: EU4EventTriggers -> [EU4ProvinceTriggeredModifier] -> EU4EventTriggers
+findTriggeredEventsInProvinceTriggeredModifiers hm modifiers = addEventTriggers hm (concatMap findInProvinceTriggeredModifier modifiers)
+    where
+        findInProvinceTriggeredModifier :: EU4ProvinceTriggeredModifier -> [(Text, EU4EventSource)]
+        findInProvinceTriggeredModifier modifier@EU4ProvinceTriggeredModifier{ptmodName = modName} =
+            addEventSource (const (EU4EvtSrcGeneric modName "Activation of the province triggered modifier")) (findInStmts (ptmodOnActivation modifier)) ++
+            addEventSource (const (EU4EvtSrcGeneric modName "Deactivation of the province triggered modifier")) (findInStmts (ptmodOnDeactivation modifier))
+
+findTriggeredEventsInGovernmentMechanics :: EU4EventTriggers -> [GenericStatement] -> EU4EventTriggers
+findTriggeredEventsInGovernmentMechanics hm scr = foldl' findInGovernmentMechanic hm scr
+    where
+        findInGovernmentMechanic :: EU4EventTriggers -> GenericStatement -> EU4EventTriggers
+        findInGovernmentMechanic hm stmt@[pdx| $id = @scr |] = foldl' (findInGovernmentMechanic' id) hm scr
+        findInGovernmentMechanic hm stmt = trace ("Unknown top-level statement in government mechanic: " ++ show stmt) hm
+
+        findInGovernmentMechanic' :: Text -> EU4EventTriggers -> GenericStatement -> EU4EventTriggers
+        findInGovernmentMechanic' id hm [pdx| interactions = @scr |] = foldl' (findInSection id "interaction") hm scr
+        findInGovernmentMechanic' id hm [pdx| powers = @scr |] = foldl' (findInSection id "power") hm scr
+        findInGovernmentMechanic' _ hm _ = hm
+
+        findInSection :: Text -> Text -> EU4EventTriggers -> GenericStatement -> EU4EventTriggers
+        findInSection id section hm [pdx| $sectionId = @scr |] = foldl' (findInSection' id section sectionId) hm scr
+        findInSection _ _ hm _ = hm
+
+        findInSection' :: Text -> Text -> Text -> EU4EventTriggers -> GenericStatement -> EU4EventTriggers
+        findInSection' id "power" sectionId hm [pdx| on_min_reached = @scr |] = addEventTriggers hm $ addEventSource (const (EU4EvtSrcGovernmentMechanic id sectionId "Reaching the minimum")) (findInStmts scr)
+        findInSection' id "power" sectionId hm [pdx| on_max_reached = @scr |] = addEventTriggers hm $ addEventSource (const (EU4EvtSrcGovernmentMechanic id sectionId "Reaching the maximum")) (findInStmts scr)
+        findInSection' id "interaction" sectionId hm [pdx| effect = @scr |] = addEventTriggers hm $ addEventSource (const (EU4EvtSrcGovernmentMechanic id sectionId "Using the interaction")) (findInStmts scr)
+        findInSection' _ _ _ hm _ = hm
+
+findTriggeredEventsInImperialIncidents :: EU4EventTriggers -> [GenericStatement] -> EU4EventTriggers
+findTriggeredEventsInImperialIncidents hm scr = foldl' findInImperialIncident hm scr
+    where
+        findInImperialIncident :: EU4EventTriggers -> GenericStatement -> EU4EventTriggers
+        findInImperialIncident hm stmt@[pdx| $id = @scr |] = foldl' (findInImperialIncident' id) hm scr
+        findInImperialIncident hm stmt = trace ("Unknown top-level statement in imperial incident: " ++ show stmt) hm
+
+        findInImperialIncident' :: Text -> EU4EventTriggers -> GenericStatement -> EU4EventTriggers
+        findInImperialIncident' id hm [pdx| event = $event |] = addEventTriggers hm [(event, EU4EvtSrcGeneric id "Used as a template for the imperial incident")]
+        findInImperialIncident' _ hm _ = hm

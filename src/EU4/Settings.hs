@@ -28,7 +28,7 @@ import System.IO (hPutStrLn, stderr)
 
 import Abstract -- everything
 import QQ (pdx)
-import FileIO (buildPath, readScript)
+import FileIO (buildPath, readScript, readFileRetry)
 import SettingsTypes ( PPT, Settings (..), Game (..), L10nScheme (..)
                      , IsGame (..), IsGameData (..), IsGameState (..)
                      , getGameL10nIfPresent
@@ -39,7 +39,7 @@ import EU4.Types -- everything
 import Yaml (LocEntry (..))
 
 -- Handlers
-import EU4.Decisions (parseEU4Decisions, writeEU4Decisions)
+import EU4.Decisions (parseEU4Decisions, writeEU4Decisions, findEstateActions)
 import EU4.IdeaGroups (parseEU4IdeaGroups, writeEU4IdeaGroups)
 import EU4.Modifiers ( parseEU4Modifiers, writeEU4Modifiers
                      , parseEU4OpinionModifiers, writeEU4OpinionModifiers
@@ -48,7 +48,8 @@ import EU4.Missions (parseEU4Missions , writeEU4Missions)
 import EU4.Events (parseEU4Events, writeEU4Events
                    , findTriggeredEventsInEvents, findTriggeredEventsInDecisions
                    , findTriggeredEventsInOnActions, findTriggeredEventsInDisasters
-                   , findTriggeredEventsInMissions)
+                   , findTriggeredEventsInGenericScript, findTriggeredEventsInMissions
+                   , findTriggeredEventsInProvinceTriggeredModifiers, findTriggeredEventsInGovernmentMechanics, findTriggeredEventsInImperialIncidents)
 import EU4.Extra (writeEU4Extra, writeEU4ExtraCountryScope, writeEU4ExtraProvinceScope, writeEU4ExtraModifier)
 
 -- | Temporary (?) fix for HAW and UHW both localizing to "Hawai'i'"
@@ -100,12 +101,13 @@ instance IsGame EU4 where
                 ,   eu4missionScripts = HM.empty
                 ,   eu4missions = HM.empty
                 ,   eu4eventTriggers = HM.empty
-                ,   eu4onactionsScripts = HM.empty
-                ,   eu4disasterScripts = HM.empty
+                ,   eu4genericScriptsForEventTriggers = HM.empty
                 ,   eu4geoData = HM.empty
                 ,   eu4provtrigmodifiers = HM.empty
                 ,   eu4provtrigmodifierScripts = HM.empty
                 ,   eu4tradeNodes = HM.empty
+                ,   eu4estateActions = HM.empty
+                ,   eu4scriptedEffectsForEstates = ""
                 ,   eu4extraScripts = HM.empty
                 ,   eu4extraScriptsCountryScope = HM.empty
                 ,   eu4extraScriptsProvinceScope = HM.empty
@@ -180,12 +182,9 @@ instance EU4Info EU4 where
     getEventTriggers = do
         EU4D ed <- get
         return (eu4eventTriggers ed)
-    getOnActionsScripts = do
+    getGenericScriptsForEventTriggers = do
         EU4D ed <- get
-        return (eu4onactionsScripts ed)
-    getDisasterScripts = do
-        EU4D ed <- get
-        return (eu4disasterScripts ed)
+        return (eu4genericScriptsForEventTriggers ed)
     getGeoData = do
         EU4D ed <- get
         return (eu4geoData ed)
@@ -198,6 +197,12 @@ instance EU4Info EU4 where
     getTradeNodes = do
         EU4D ed <- get
         return (eu4tradeNodes ed)
+    getEstateActions = do
+        EU4D ed <- get
+        return (eu4estateActions ed)
+    getScriptedEffectsForEstates = do
+        EU4D ed <- get
+        return (eu4scriptedEffectsForEstates ed)
     getExtraScripts = do
         EU4D ed <- get
         return (eu4extraScripts ed)
@@ -244,16 +249,16 @@ readEU4Scripts = do
         readEU4Script :: String -> PPT EU4 m (HashMap String GenericScript)
         readEU4Script category = do
             let sourceSubdir = case category of
-                    "policies" -> "common" </> "policies"
+                    "colonial_regions" -> "common" </> "colonial_regions"
+                    "disasters" -> "common" </> "disasters"
                     "ideagroups" -> "common" </> "ideas"
                     "modifiers" -> "common" </> "event_modifiers"
-                    "opinion_modifiers" -> "common" </> "opinion_modifiers"
                     "on_actions" -> "common" </> "on_actions"
-                    "disasters" -> "common" </> "disasters"
-                    "tradenodes" -> "common" </> "tradenodes"
-                    "trade_companies" -> "common" </> "trade_companies"
-                    "colonial_regions" -> "common" </> "colonial_regions"
+                    "opinion_modifiers" -> "common" </> "opinion_modifiers"
+                    "policies" -> "common" </> "policies"
                     "province_triggered_modifiers" -> "common" </> "province_triggered_modifiers"
+                    "trade_companies" -> "common" </> "trade_companies"
+                    "tradenodes" -> "common" </> "tradenodes"
                     _          -> category
                 sourceDir = buildPath settings sourceSubdir
             files <- liftIO (filterM (doesFileExist . buildPath settings . (sourceSubdir </>))
@@ -294,6 +299,16 @@ readEU4Scripts = do
                 findPrimary _ = Nothing
         processTradeNode stmt = (trace $ "Not handled in processTradeNode: " ++ show stmt) $ Nothing
 
+        readGenericScriptsForEventTriggers :: PPT EU4 m (HashMap String GenericScript)
+        readGenericScriptsForEventTriggers = do
+            scripts <- mapM readScriptFromFolder (HM.keys locationsForEventTriggers ++ HM.keys locationsForEventTriggersWithExtraHandling)
+            return $ HM.fromList scripts
+            where
+                readScriptFromFolder :: String -> PPT EU4 m (String, GenericScript)
+                readScriptFromFolder folder = do
+                    scriptsWithFilenames <- readEU4Script ("common" </> folder)
+                    return (folder, concat (HM.elems scriptsWithFilenames))
+
         getFileFromOpts (ProcessFile f) = [f]
         getFileFromOpts _ = []
 
@@ -310,9 +325,9 @@ readEU4Scripts = do
     modifiers <- readEU4Script "modifiers"
     opinion_modifiers <- readEU4Script "opinion_modifiers"
     missions <- readEU4Script "missions"
-    on_actions <- readEU4Script "on_actions"
-    disasters <- readEU4Script "disasters"
     provTrigModifiers <- readEU4Script "province_triggered_modifiers"
+    genericScriptsForEventTriggers <- readGenericScriptsForEventTriggers
+    scriptedEffectsForEstates <- liftIO (readFileRetry (buildPath settings "common/scripted_effects/01_scripted_effects_for_estates.txt"))
 
     extra <- mapM (readOneScript "extra") (concatMap getFileFromOpts (clargs settings))
     extraCountryScope <- mapM (readOneScript "extraCountryScope") (concatMap getCountryScopeFileFromOpts (clargs settings))
@@ -339,17 +354,70 @@ readEU4Scripts = do
         ,   eu4modifierScripts = modifiers
         ,   eu4opmodScripts = opinion_modifiers
         ,   eu4missionScripts = missions
-        ,   eu4onactionsScripts = on_actions
-        ,   eu4disasterScripts = disasters
+        ,   eu4genericScriptsForEventTriggers = genericScriptsForEventTriggers
         ,   eu4geoData = HM.union (foldl HM.union HM.empty geoData) (foldl HM.union HM.empty geoMapData)
         ,   eu4provtrigmodifierScripts = provTrigModifiers
         ,   eu4tradeNodes = HM.fromList (catMaybes (map processTradeNode (concatMap snd (HM.toList tradeNodeScripts))))
+        ,   eu4scriptedEffectsForEstates = scriptedEffectsForEstates
         ,   eu4extraScripts = foldl (flip (uncurry HM.insert)) HM.empty extra
         ,   eu4extraScriptsCountryScope = foldl (flip (uncurry HM.insert)) HM.empty extraCountryScope
         ,   eu4extraScriptsProvinceScope = foldl (flip (uncurry HM.insert)) HM.empty extraProvinceScope
         ,   eu4extraScriptsModifier = foldl (flip (uncurry HM.insert)) HM.empty extraModifier
         }
 
+locationsForEventTriggers :: HashMap String [(Text, Text)]
+locationsForEventTriggers =  HM.fromList [
+                ("diplomatic_actions",
+                    [("effect", "The diplomatic action")
+                    ,("pre_effect", "The diplomatic action")])
+                ,("estate_agendas",
+                    [("pre_effect", "pre_effect of the agenda")
+                    ,("immediate_effect", "Selecting the estate agenda")
+                    ,("on_invalid", "Invalidation of the estate agenda")
+                    ,("failing_effect", "Failing the estate agenda")
+                    ,("task_completed_effect", "Completing the estate agenda")])
+                ,("estate_crown_land", [("effect", "An estate interaction")])
+                ,("estate_privileges",
+                    [("on_cooldown_expires", "When the following estate privilege can be revoked:")
+                    ,("on_granted", "Granting the estate privilege")
+                    ,("on_granted_province", "Granting the estate privilege (for each province)")
+                    ,("on_invalid", "When the following estate privilege becomes invalid:")
+                    ,("on_invalid_province", "When the following estate privilege becomes invalid (for each province):")
+                    ,("on_revoked", "Revoking the estate privilege")
+                    ,("on_revoked_province", "Revoking the estate privilege (for each province)")
+                    ])
+                ,("government_reforms",
+                    [("effect", "Enacting the government reform")
+                    ,("removed_effect", "Revoking the government reform")
+                    ,("post_removed_effect", "After revoking the government reform")
+                    ])
+                ,("imperial_reforms",
+                    [("on_effect", "Enacting the imperial reform")
+                    ,("off_effect", "Revoking the imperial reform")])
+                ,("incidents", [("immediate_effect", "Start of the Shinto incident")])
+                ,("new_diplomatic_actions",
+                    [("on_accept", "Accepting the diplomatic action")
+                    ,("on_decline", "Declining the diplomatic action")])
+                ,("parliament_issues", [("effect", "Enacting the parliament issue")])
+                ,("peace_treaties", [("effect", "When a peace treaty with the folloing term gets signed:")])
+                ]
+locationsForEventTriggersWithExtraHandling :: HashMap String (EU4EventTriggers -> [GenericStatement] -> EU4EventTriggers)
+locationsForEventTriggersWithExtraHandling = HM.fromList
+    [("disasters", findTriggeredEventsInDisasters)
+    ,("government_mechanics", findTriggeredEventsInGovernmentMechanics)
+    ,("imperial_incidents", findTriggeredEventsInImperialIncidents)
+    ,("on_actions", findTriggeredEventsInOnActions)
+    ]
+
+findTriggeredEventsInUnhandledFiles :: EU4EventTriggers -> HashMap String GenericScript -> EU4EventTriggers
+findTriggeredEventsInUnhandledFiles hm foldersMap = HM.foldlWithKey' findTriggeredEventsInUnhandledFolder hm foldersMap
+    where
+        findTriggeredEventsInUnhandledFolder :: EU4EventTriggers -> String -> GenericScript -> EU4EventTriggers
+        findTriggeredEventsInUnhandledFolder hm folder script = case HM.lookup folder locationsForEventTriggers of
+            (Just sectionMap) -> findTriggeredEventsInGenericScript hm (HM.fromList sectionMap) script
+            Nothing -> case HM.lookup folder locationsForEventTriggersWithExtraHandling of
+              Just handler -> handler hm script
+              Nothing -> hm -- it should not get here as long as all the code uses the folders from locationsForEventTriggers
 
 -- | Interpret the script ASTs as usable data.
 parseEU4Scripts :: Monad m => PPT EU4 m ()
@@ -362,13 +430,14 @@ parseEU4Scripts = do
     decisions <- parseEU4Decisions =<< getDecisionScripts
     events <- parseEU4Events =<< getEventScripts
     missions <- parseEU4Missions =<< getMissionScripts
-    on_actions <- getOnActionsScripts
-    disasters <- getDisasterScripts
+    genericScriptsForEventTriggers <- getGenericScriptsForEventTriggers
+    scriptedEffectsForEstates <- getScriptedEffectsForEstates
     let te1 = findTriggeredEventsInEvents HM.empty (HM.elems events)
         te2 = findTriggeredEventsInDecisions te1 (HM.elems decisions)
-        te3 = findTriggeredEventsInOnActions te2 (concat (HM.elems on_actions))
-        te4 = findTriggeredEventsInDisasters te3 (concat (HM.elems disasters))
-        te5 = findTriggeredEventsInMissions te4 (HM.elems missions)
+        te3 = findTriggeredEventsInMissions te2 (HM.elems missions)
+        te4 = findTriggeredEventsInProvinceTriggeredModifiers te3 (HM.elems provTrigModifiers)
+        te5 = findTriggeredEventsInUnhandledFiles te4 genericScriptsForEventTriggers
+        estateActions = findEstateActions (HM.elems decisions) (HM.findWithDefault [] "estate_privileges" genericScriptsForEventTriggers) scriptedEffectsForEstates
     --traceM $ concat (map (\(k,v) -> (show k) ++ " -> " ++ show v ++ "\n") (HM.toList $ te5))
     modify $ \(EU4D s) -> EU4D $
             s { eu4events = events
@@ -379,6 +448,7 @@ parseEU4Scripts = do
             ,   eu4missions = missions
             ,   eu4eventTriggers = te5
             ,   eu4provtrigmodifiers = provTrigModifiers
+            ,   eu4estateActions = estateActions
             }
 
 -- | Output the game data as wiki text.

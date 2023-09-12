@@ -138,13 +138,13 @@ readPathScript filepath = do
             -- just pass on all other cases
             x -> x
 
-readScriptFromText :: Monad m => Text -> m GenericScript
+readScriptFromText :: Text -> GenericScript
 readScriptFromText contents = case Ap.parseOnly
     ( skipSpace
         *> genericScript
     ) contents of
-    Right result -> return result
-    Left err -> return []
+    Right result -> result
+    Left err -> trace ("Error \"" ++ err ++ "\" in readScriptFromText with the text:" ++ show contents) []
 
 ------------------------------
 -- Writing features to file --

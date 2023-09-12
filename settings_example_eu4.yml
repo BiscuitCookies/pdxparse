@@ -1,0 +1,49 @@
+settings:
+
+    # Windows: the drive where Steam keeps the game. If it's not C, uncomment this and change it
+    #steam_drive: "C"
+
+    # All platforms: the directory where Steam keeps the game. The default depends on your platform:
+    #   Linux: $HOME/.local/share
+    #   Mac OS: $HOME/Library/Application Support
+    #   Windows XP: C:\Program Files
+    #   Windows 7+: C:\Program Files (x86)
+    # For other platforms, or if it's non-standard, you'll need to specify it
+    # here. If you're on Windows, leave out the drive letter.
+    #steam_dir: "/home/pwb/.local/share" # absolute
+
+    # The subdirectory of steam_dir where Steam keeps its apps. You shouldn't need to change this.
+    # (For Windows, slashes are automatically changed to backslashes, so this ("Steam/steamapps/common") default works.)
+    #steam_apps: "Steam/steamapps/common"
+
+    # Which game we're looking at. This is the name of the directory under
+    # steam_dir where the game is kept.
+    # Required setting. Choose one of the following:
+    game: "Europa Universalis IV"
+    #game: "Hearts of Iron IV"
+    #game: "Stellaris" # not functional
+    #game: "Victoria 2" # not functional
+
+    # Language to extract in. Note that although the program can extract
+    # non-English localization strings from the game, only English messages
+    # are produced otherwise.
+    # Required setting.
+    language: "english"
+
+    # Game version (major patch number) (or mod version). Only used to add version templates.
+    # Required setting.
+    version: "1.35" #eu4
+    #version: "1.12.1" #hoi4
+
+    # All Platforms where mod files are kept
+    #   Windows non-steam: C:\Users\<Username>\Documents\Paradox Interactive\Hearts of Iron IV\mod\nameofmod (use / instead of \ )
+    #   Windows steam: C:\Program Files (x86)\Steam\steamapps\workshop\content\394360\<number of mod>
+    #   Mac OS: ~/Documents/Paradox Interactive/Hearts of Iron IV/mod/nameofmod
+    #   Linux: ~/.local/share/Paradox Interactive/Hearts of Iron IV/mod/nameofmod
+    #
+    # currently only supported for HOI4
+    #mod_path:
+
+    # The name of the mod you're trying to parse eg. "Kaiserreich"
+    # currently only supported for HOI4
+    #mod_name:

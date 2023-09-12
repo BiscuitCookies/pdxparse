@@ -1,0 +1,109 @@
+name: Haskell Release
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          - windows
+          - ubuntu
+          - macos
+
+    name: 'build_prod: ${{ matrix.os }}-latest'
+    runs-on: ${{ matrix.os }}-latest
+
+    steps:
+    - name: Configure Windows Pagefile
+      uses: al-cheb/configure-pagefile-action@v1.2
+      if: matrix.os == 'windows'
+      with:
+        maximum-size: 12GB
+    - uses: actions/checkout@v3
+    - name: Setup Haskell
+      uses: haskell/actions/setup@v2
+      id: setup
+      with:
+        ghc-version: '8.10.7'
+        cabal-version: '3.10.1.0'
+
+    - name: Configure the build
+      run: |
+        cabal configure
+        cabal freeze
+
+#    - name: Restore cached dependencies
+#      uses: actions/cache/restore@v3
+#      id: cache
+#      env:
+#        key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
+#      with:
+#        path: ${{ steps.setup.outputs.cabal-store }}
+#        key: ${{ env.key }}-freeze-${{ hashFiles('cabal.project.freeze') }}
+#        restore-keys: ${{ env.key }}-
+
+    - name: Install dependencies
+      run: cabal build all --only-dependencies
+# caching is disabled, because cabal.project.freeze changed with every build so I found no way to properly cache it
+# and a build happen so rarely that storing the cache is not worth it, because github will likely have deleted it before the next build
+#    # Cache dependencies already here, so that we do not have to rebuild them should the subsequent steps fail.
+#    - name: Save cached dependencies
+#      uses: actions/cache/save@v3
+#      # Caches are immutable, trying to save with the same key would error.
+#      if: ${{ steps.cache.outputs.cache-primary-key != steps.cache.outputs.cache-matched-key }}
+#      with:
+#        path: ${{ steps.setup.outputs.cabal-store }}
+#        key: ${{ steps.cache.outputs.cache-primary-key }}
+    - name: Build
+      run: |
+        cp settings_example_${{ vars.GAME }}.yml settings.yml
+        cabal install --install-method=copy --installdir=dist
+    - name: store windows build errors
+      if: failure() && ( matrix.os == 'windows' )
+      uses: actions/upload-artifact@v3
+      with:
+        name: fail-logs-${{ matrix.os }}
+        path: C:\cabal\logs\*\pdxparse*.log
+    - name: Include extra files
+      run: |
+        cp settings.yml dist/
+        cp README.md dist/
+    - name: Store binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: pdxparse-${{github.ref_name}}-${{ vars.GAME }}-${{ matrix.os }}
+        path: dist
+  release:
+    if: ${{ always() }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.ref }}
+    - name: Get tag annotation
+      id: tagannotation
+      run: |
+        echo "Ref name is $GITHUB_REF_NAME"
+        echo "annotation=$(git tag -l --format='%(contents)' $GITHUB_REF_NAME)"
+        echo "annotation=$(git tag -l --format='%(contents)' $GITHUB_REF_NAME)" >> "$GITHUB_OUTPUT"
+    - name: Download all workflow run artifacts
+      uses: actions/download-artifact@v3
+    - name: Zip artifacts
+      run: for folder in pdxparse-${{github.ref_name}}-${{ vars.GAME }}-*; do echo "creating ${folder}.zip ..."; zip -r ${folder}.zip $folder; done
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: ${{ steps.tagannotation.outputs.annotation }}
+        generate_release_notes: true
+        draft: true
+        files: pdxparse-${{github.ref_name}}-${{ vars.GAME }}-*.zip

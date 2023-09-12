@@ -14,6 +14,7 @@ module EU4.Types (
     ,   EU4Modifier (..), EU4OpinionModifier (..)
     ,   EU4MissionTreeBranch (..), EU4Mission (..)
     ,   EU4ProvinceTriggeredModifier (..)
+    ,   EU4EstateAction (..)
         -- * Low level types
     ,   MonarchPower (..)
     ,   EU4Scope (..)
@@ -54,6 +55,7 @@ data EU4Data = EU4Data {
     ,   eu4opmods :: HashMap Text EU4OpinionModifier
     ,   eu4missions :: HashMap Text EU4MissionTreeBranch
     ,   eu4eventTriggers :: EU4EventTriggers
+    ,   eu4genericScriptsForEventTriggers :: HashMap String GenericScript
     ,   eu4geoData :: HashMap Text EU4GeoType
     ,   eu4provtrigmodifiers :: HashMap Text EU4ProvinceTriggeredModifier
     ,   eu4eventScripts :: HashMap FilePath GenericScript
@@ -62,10 +64,10 @@ data EU4Data = EU4Data {
     ,   eu4modifierScripts :: HashMap FilePath GenericScript
     ,   eu4opmodScripts :: HashMap FilePath GenericScript
     ,   eu4missionScripts :: HashMap FilePath GenericScript
-    ,   eu4onactionsScripts :: HashMap FilePath GenericScript
-    ,   eu4disasterScripts :: HashMap FilePath GenericScript
     ,   eu4provtrigmodifierScripts :: HashMap FilePath GenericScript
     ,   eu4tradeNodes :: HashMap Int Text -- Province Id -> Non localized provice name
+    ,   eu4estateActions :: HashMap Text EU4EstateAction -- the key is the internal name of an estate action (e.g. RECRUIT_MINISTER_BRAHMINS)
+    ,   eu4scriptedEffectsForEstates :: Text -- the contents of common/scripted_effects/01_scripted_effects_for_estates.txt
     ,   eu4extraScripts :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
     ,   eu4extraScriptsCountryScope :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
     ,   eu4extraScriptsProvinceScope :: HashMap FilePath GenericScript -- Extra scripts parsed on the command line
@@ -120,10 +122,8 @@ class (IsGame g,
     getMissions :: Monad m => PPT g m (HashMap Text EU4MissionTreeBranch)
     -- | Get the (known) event triggers
     getEventTriggers :: Monad m => PPT g m EU4EventTriggers
-    -- | Get the on actions script files
-    getOnActionsScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
-    -- | Get the on disaster script files
-    getDisasterScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Scripts from otherwise unparsed locations which can trigger events
+    getGenericScriptsForEventTriggers :: Monad m => PPT g m (HashMap String GenericScript)
     -- | Get the parsed geographic data
     getGeoData :: Monad m => PPT g m (HashMap Text EU4GeoType)
     -- | Get the contents of all province triggered modifier script files.
@@ -132,6 +132,10 @@ class (IsGame g,
     getProvinceTriggeredModifiers :: Monad m => PPT g m (HashMap Text EU4ProvinceTriggeredModifier)
     -- | Get the trade nodes
     getTradeNodes :: Monad m => PPT g m (HashMap Int Text)
+    -- | Get the decisions which enact estate actions
+    getEstateActions :: Monad m => PPT g m (HashMap Text EU4EstateAction)
+    -- | Get the contents of the file common/scripted_effects/01_scripted_effects_for_estates.txt which can't be parsed normally
+    getScriptedEffectsForEstates :: Monad m => PPT g m Text
     -- | Get extra scripts parsed from command line arguments
     getExtraScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     getExtraScriptsCountryScope :: Monad m => PPT g m (HashMap FilePath GenericScript)
@@ -204,6 +208,8 @@ data EU4EventSource =
     | EU4EvtSrcOnAction Text EU4EventWeight         -- An effect from on_actions (args are the trigger and weight)
     | EU4EvtSrcDisaster Text Text EU4EventWeight    -- Effect of a disaster (args are id, trigger and weight)
     | EU4EvtSrcMission Text                         -- Effect of completing a mission (arg is the mission id)
+    | EU4EvtSrcGovernmentMechanic Text Text Text    -- Effect of a government mechanic (args are id, section id, trigger)
+    | EU4EvtSrcGeneric Text Text                    -- Some generic triggers (args are id and trigger)
     deriving Show
 
 type EU4EventTriggers = HashMap Text [EU4EventSource]
@@ -295,6 +301,14 @@ data EU4MissionTreeBranch = EU4MissionTreeBranch
     ,   eu4mtb_potential :: Maybe GenericScript
     ,   eu4mtb_missions :: [EU4Mission]
     } deriving (Show)
+
+data EU4EstateAction = EU4EstateAction
+    {
+        eaName :: Text
+    ,   eaDecision :: EU4Decision
+    ,   eaPrivilege :: Text -- the (non-localised) name of the privilege which enables the estate action
+    ,   eaScript :: GenericScript -- the scripted effect estate_action_
+    }
 
 ------------------------------
 -- Shared lower level types --

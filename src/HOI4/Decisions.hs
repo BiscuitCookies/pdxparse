@@ -202,7 +202,7 @@ ppdecisioncat decc = setCurrentFile (decc_path decc) $ do
 -- | Empty decision. Starts off Nothing/empty everywhere, except id and name
 -- (which should get filled in immediately).
 newDecision :: HOI4Decision
-newDecision = HOI4Decision undefined undefined Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing False Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing False Nothing Nothing False Nothing undefined undefined
+newDecision = HOI4Decision undefined undefined Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing False Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing False Nothing Nothing False Nothing Nothing False Nothing undefined undefined
 
 -- | Take the decisions scripts from game data and parse them into decision
 -- data structures.
@@ -342,18 +342,25 @@ decisionAddSection dec stmt
             "war_with_on_timeout" -> dec -- used to inform if a decison declares war when selected
             "fixed_random_seed" -> dec --bool, standard True
             "days_mission_timeout" -> case rhs of -- how long the mission takes to finish, and turns decision into mission
-                (floatRhs -> num)  -> dec { dec_days_remove = num }
+                (floatRhs -> num)  -> dec { dec_days_mission_timeout = num }
                 --_ -> trace "DEBUG: bad decisions days_mission_timeout" dec
-            "activation" -> dec -- checks for if a mission starts
-            "selectable_mission" -> dec --bool, standard false
+            "activation" -> case rhs of -- checks for if a mission starts
+                CompoundRhs [] -> dec -- empty, treat as if it wasn't there
+                CompoundRhs scr -> dec { dec_activation = Just scr }
+                _ -> trace "DEBUG: bad decisions activation" dec
+            "selectable_mission" -> case rhs of --bool, standard false
+                GenericRhs "yes" [] -> dec { dec_selectable_mission = True }
+                -- no is the default, so I don't think this is ever used
+                GenericRhs "no" [] -> dec { dec_selectable_mission = False }
+                _ -> trace "DEBUG: bad decisions selectable_mission" dec
             "timeout_effect" -> case rhs of -- effect for mission completing
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_timeout_effect = Just scr }
                 _ -> trace "DEBUG: bad decisions trimeout_effect" dec
-            "is_good" ->  case rhs of --bool, standard false but not really, says wether finishing the mission is good or bad
-                GenericRhs "yes" [] -> dec { dec_cancel_if_not_visible = True }
-                GenericRhs "no" [] -> dec { dec_cancel_if_not_visible = False }
-                _ -> trace "DEBUG: bad decisions cancel_if_not_visible" dec
+            "is_good" ->  case rhs of --bool, standard false, says wether finishing the mission is good or bad
+                GenericRhs "yes" [] -> dec { dec_is_good = True }
+                GenericRhs "no" [] -> dec { dec_is_good = False }
+                _ -> trace "DEBUG: bad decisions is_good" dec
             "targets" -> case rhs of -- weirdo array , checks countries for which decision can be targeted to, turn decisions into targeted decision
                 CompoundRhs [] -> dec -- empty, treat as if it wasn't there
                 CompoundRhs scr -> dec { dec_targets = Just scr }
@@ -439,13 +446,13 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
                         ,content_pp'd
                         ,PP.line])
                 (field dec)
-    let decNoArg :: (HOI4Decision -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
-        decNoArg field fmt
+    let decNoArg :: (HOI4Decision -> Maybe a) -> (a -> PPT g m Doc) -> Doc -> PPT g m [Doc]
+        decNoArg field fmt opttext
             = maybe (return [])
                 (\field_content -> do
                     content_pp'd <- fmt field_content
                     return
-                        [content_pp'd
+                        [opttext, content_pp'd
                         ,PP.line])
                 (field dec)
     targets <- case (dec_targets dec, dec_target_array dec, dec_state_target dec) of
@@ -463,10 +470,10 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
         (_, Just array, False) -> return ["| targets = ",Doc.strictText array, PP.line]
         _ -> return [""]
     ------
-    allow_pp'd <- decNoArg dec_allowed ppScript
-    targetRootTrigger_pp'd <- decNoArg dec_target_root_trigger ppScript -- checks ROOT
-    visible_pp'd <- decNoArg dec_visible ppScript
-    targetTrigger_pp'd <- decNoArg dec_target_trigger ppScript --checks FROM and ROOT and makes decision visible if true
+    allow_pp'd <- decNoArg dec_allowed ppScript "<!-- allowed -->"
+    targetRootTrigger_pp'd <- decNoArg dec_target_root_trigger ppScript "<!-- target_root_trigger -->" -- checks ROOT
+    visible_pp'd <- decNoArg dec_visible ppScript "<!-- visible -->"
+    targetTrigger_pp'd <- decNoArg dec_target_trigger ppScript "<!-- target_trigger -->" --checks FROM and ROOT and makes decision visible if true
     available_pp'd <- decArg "available" dec_available ppScript
     removeTrigger_pp'd <- decArg "remove_trigger" dec_remove_trigger ppScript --removes decision? and ends modifier effect and triggers remove_effect?
     cancelTrigger_pp'd <- decArg "cancel_trigger" dec_cancel_trigger ppScript -- cancels missions, triggers canceleffect
@@ -483,6 +490,7 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
             _ -> Nothing
         isFireOnlyOnce = dec_fire_only_once dec
         isGood = dec_is_good dec
+        isSelectableMission = dec_selectable_mission dec
         cancelIfNotVisible = dec_cancel_if_not_visible dec
         targetsDynamic = dec_targets_dynamic dec
     custom_cost_loc_pp'd <- case dec_custom_cost_text dec of
@@ -491,9 +499,9 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
                 return ["| cost = ", Doc.strictText custom_cost_text_loc, "<!-- custom cost -->" ,PP.line]
             _ -> return []
     custom_cost_trigger_pp'd  <- decArg "custom_cost_trigger" dec_custom_cost_trigger ppScript
-    activation_pp'd <- decNoArg dec_activation ppScript
-    modifier_pp'd <- setIsInEffect True (decNoArg dec_modifier ppStatement)
-    targetedModifier_pp'd <- setIsInEffect True (decNoArg dec_targeted_modifier ppScript)
+    activation_pp'd <- decNoArg dec_activation ppScript "<!-- activation -->"
+    modifier_pp'd <- setIsInEffect True (decNoArg dec_modifier ppStatement "")
+    targetedModifier_pp'd <- setIsInEffect True (decNoArg dec_targeted_modifier ppScript "")
     name_loc <- getGameL10n name
     icon_pp'd <- case dec_icon dec of
         Just (HOI4DecisionIconSimple txt) -> do
@@ -537,6 +545,9 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
         else []) ++
         ( if isFireOnlyOnce then
             ["| fire_only_once = yes", PP.line]
+        else []) ++
+        ( if isSelectableMission then
+            ["| selectable_mission = yes", PP.line]
         else []) ++
         ( if cancelIfNotVisible then
             ["| cancel_if_not_visible = yes", PP.line]

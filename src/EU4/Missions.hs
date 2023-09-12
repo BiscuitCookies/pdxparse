@@ -151,7 +151,7 @@ writeEU4Missions = do
                         Doc.strictText $ "===" <> eu4mtb_id mtb <> "===", PP.line, -- apparently there's no localization of the headline
                         "{{SVersion|", Doc.strictText version, "}}", PP.line
                     ] ++ (case potential of
-                        Just pot -> ["<!-- Only available if:", PP.line, pot, PP.line, "-->", PP.line]
+                        Just pot -> ["Only available if:", PP.line, pot, PP.line, PP.line]
                         _ -> [])
                      ++ [
                      -- table header

@@ -28,7 +28,7 @@ module MessageTools (
     ,   gainOrLose, gainsOrLoses
     ,   increasedOrDecreased, increaseOrDecrease
     ,   addOrRemove, addedOrRemoved
-    ,   addAOrAn
+    ,   addAOrAn, addAOrAnWithExtraText
     -- * Advisor text helpers
     ,   advisorDiscountText
     -- * Time formatting
@@ -271,10 +271,16 @@ addedOrRemoved n | n < 0     = "removed"
 -- | add "A " in front of the text or "An " if the first letter is a vowel
 --   if the first parameter is False, "a " or "an " is added instead
 addAOrAn :: Bool -> Text -> Text
-addAOrAn capitalize text = do
+addAOrAn capitalize text = addAOrAnWithExtraText capitalize text ""
+
+-- | add "A " in front of the text or "An " if the first letter is a vowel
+--   if the first parameter is False, "a " or "an " is added instead
+--   if extra is not empty, it is added between the A/An and the text
+addAOrAnWithExtraText :: Bool -> Text -> Text -> Text
+addAOrAnWithExtraText capitalize text extra = do
     let capitalizedA = if capitalize then "A" else "a"
     let aOrAn = if isVowel(T.head text) then T.append capitalizedA "n" else capitalizedA
-    T.concat [aOrAn, " ", text]
+    T.concat [aOrAn, ifThenElse (T.null extra) " " (" " <> extra <> " ") , text]
     where
         isVowel :: Char -> Bool
         isVowel x = x `elem` ("aeiouAEIOU" :: String)

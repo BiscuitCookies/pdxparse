@@ -67,6 +67,11 @@ import qualified Data.Attoparsec.Text as Ap
 import Data.Functor (($>))
 import Data.Char (isAlpha, isSpace)
 
+import Data.Attoparsec.Text (Parser, (<?>))
+import qualified Data.Attoparsec.Text as Ap
+import Data.Functor (($>))
+import Data.Char (isAlpha, isSpace)
+
 import Abstract () -- everything
 import Yaml (L10n, L10nLang,LocEntry (..))
 

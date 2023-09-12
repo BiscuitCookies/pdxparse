@@ -54,10 +54,10 @@ readL10n settings = do
     replaceexist <- doesDirectoryExist dirifYAMLmod
     replaceexistr <- doesDirectoryExist dirifYAMLmodr
     let dirifYAMLmod'
-          | replaceexist = dirifYAMLmod
-          | replaceexistr = dirifYAMLmodr
+          | replaceexist = [dirifYAMLmod]
+          | replaceexistr = [dirifYAMLmodr]
           | otherwise = []
-        dirs = [dirifYAMLmod'] ++ dirmod'++ [dir]
+        dirs = dirifYAMLmod' ++ dirmod'++ [dir]
 
     files <- concatMapM (readL10nDirs settings) dirs
     case l10nScheme settings of

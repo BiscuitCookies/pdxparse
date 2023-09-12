@@ -306,7 +306,7 @@ writeEU4ProvTrigModifiers = do
         pp_prov_trig_modifiers :: (EU4Info g, Monad m) => [EU4ProvinceTriggeredModifier] -> PPT g m Doc
         pp_prov_trig_modifiers mods = do
             version <- gets (gameVersion . getSettings)
-            modDoc <- mapM pp_prov_trig_modifier (sortOn (sortName . ptmodLocName) mods)
+            modDoc <- mapM pp_prov_trig_modifier (sortOn sortName mods)
             return $ mconcat $
                 [ "{{Version|", Doc.strictText version, "}}", PP.line
                 , "{| class=\"mildtable\"", PP.line
@@ -318,11 +318,13 @@ writeEU4ProvTrigModifiers = do
                 [ "|}", PP.line
                 ]
 
-        sortName (Just n) =
+        -- sort by lowercase localized name (without the) and then by name to get a constant sorting for triggered modifiers with the same localized name
+        sortName :: EU4ProvinceTriggeredModifier -> (Text, Text)
+        sortName (EU4ProvinceTriggeredModifier name (Just n) _ _ _ _ _ _ ) =
             let ln = T.toLower n
                 nn = T.stripPrefix "the " ln
-            in fromMaybe ln nn
-        sortName _ = ""
+            in (fromMaybe ln nn, name)
+        sortName (EU4ProvinceTriggeredModifier name _ _ _ _ _ _ _ ) = ("", name)
 
         pp_prov_trig_modifier :: (EU4Info g, Monad m) => EU4ProvinceTriggeredModifier -> PPT g m Doc
         pp_prov_trig_modifier mod = do

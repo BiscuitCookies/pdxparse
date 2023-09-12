@@ -5,6 +5,7 @@ Description : Feature handler for Europa Universalis IV decisions
 module EU4.Decisions (
         parseEU4Decisions
     ,   writeEU4Decisions
+    ,   findEstateActions
     ) where
 
 import Debug.Trace (trace, traceM)
@@ -15,6 +16,7 @@ import Control.Monad.Except (ExceptT (..), MonadError (..))
 import Control.Monad.State (MonadState (..), gets)
 import Control.Monad.Trans (MonadIO (..))
 
+import Data.List (foldl')
 import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
 
@@ -24,10 +26,12 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Text.PrettyPrint.Leijen.Text (Doc)
 import qualified Text.PrettyPrint.Leijen.Text as PP
+import Text.Regex.TDFA (Regex)
+import qualified Text.Regex.TDFA as RE
 
 import Abstract -- everything
 import qualified Doc
-import FileIO (Feature (..), writeFeatures)
+import FileIO (Feature (..), writeFeatures, readScriptFromText)
 import Messages -- everything
 import QQ (pdx)
 import SettingsTypes ( PPT, Settings (..), Game (..)
@@ -113,6 +117,7 @@ decisionAddSection dec [pdx| do_not_integrate = %_   |] = return dec -- maybe me
 decisionAddSection dec [pdx| do_not_core      = %_   |] = return dec -- maybe mention this in AI notes
 decisionAddSection dec [pdx| major            = %_   |] = return dec -- currently no field in the template for this
 decisionAddSection dec [pdx| provinces_to_highlight = %_   |] = return dec -- not interesting
+decisionAddSection dec [pdx| color            = %_   |] = return dec -- not interesting
 decisionAddSection dec [pdx| ai_importance    = %_   |]
             -- TODO: use logging instead of trace
         = -- trace "notice: ai_importance not yet implemented" $ -- TODO: Ignored for now
@@ -167,3 +172,54 @@ pp_decision dec = do
         ["}}" -- no line, causes unwanted extra space
         ,"<section end=", nameD, "/>"
         ]
+
+findInStmt :: Text -> GenericStatement -> [Text]
+findInStmt effect stmt@[pdx| $lhs = @scr |] | lhs == effect = case getId scr of
+    Just actionId -> [actionId]
+    _ -> trace ("Unrecognized estate action id: " ++ show stmt) []
+    where
+        getId :: [GenericStatement] -> Maybe Text
+        getId [] = Nothing
+        getId (stmt@[pdx| estate_action = ?!id |] : _) = case id of
+            Just (Left n) -> Just $ T.pack (show (n :: Int))
+            Just (Right t) -> Just t
+            _ -> trace ("Invalid estate action statement: " ++ show stmt) Nothing
+        getId (_ : ss) = getId ss
+
+findInStmt effect [pdx| %_ = @scr |] = findInStmts effect scr
+findInStmt _ _ = []
+
+findInStmts :: Text -> [GenericStatement] -> [Text]
+findInStmts effect = concatMap (findInStmt effect)
+
+-- | find decisions which enact estate actions and the privileges which enable the estate actions
+findEstateActions :: [EU4Decision] -> GenericScript -> Text -> HashMap Text EU4EstateAction
+findEstateActions evts privilegeScripts scriptedEffectsForEstates = addScripts (findInPrivileges (HM.fromList (concatMap findInDecision evts)) privilegeScripts) scriptedEffectsForEstates
+    where
+        findInDecision :: EU4Decision -> [(Text, EU4EstateAction)]
+        findInDecision dec = map (\actionName -> (actionName, EU4EstateAction actionName dec "" [])) (findInStmts "estate_action" (dec_effect dec))
+
+        findInPrivileges :: HashMap Text EU4EstateAction -> GenericScript -> HashMap Text EU4EstateAction
+        findInPrivileges allActions scr = foldl' findInPrivilege allActions scr
+
+        findInPrivilege :: HashMap Text EU4EstateAction -> GenericStatement -> HashMap Text EU4EstateAction
+        findInPrivilege allActions stmt@[pdx| $lhs = @scr |] = addPrivileges allActions lhs (findInStmts "enable_estate_action" scr)
+        findInPrivilege allActions _ = allActions
+
+        addPrivileges :: HashMap Text EU4EstateAction -> Text -> [Text] -> HashMap Text EU4EstateAction
+        addPrivileges allActions privilege unlockedActions = foldl' (addPrivilege privilege) allActions unlockedActions
+
+        addPrivilege :: Text -> HashMap Text EU4EstateAction -> Text -> HashMap Text EU4EstateAction
+        addPrivilege privilege allActions unlockedAction = HM.adjust (\ action -> action { eaPrivilege = privilege}) unlockedAction allActions
+
+        addScripts :: HashMap Text EU4EstateAction -> Text -> HashMap Text EU4EstateAction
+        addScripts allActions scriptedEffectsForEstates = HM.mapWithKey (addScript scriptedEffectsForEstates) allActions
+
+        addScript :: Text -> Text -> EU4EstateAction -> EU4EstateAction
+        addScript scriptedEffectsForEstates name action = action { eaScript = getScript ("estate_action_" <> name) scriptedEffectsForEstates}
+
+        getScript :: Text -> Text -> GenericScript
+        getScript effectName scriptedEffectsForEstates = do
+            let regex = RE.makeRegexOpts RE.defaultCompOpt{RE.multiline=False} RE.defaultExecOpt (effectName <> " = {((\n[^}][^\n]*)*)\n}")
+                (_before, match, after, effectText:_othersubmatches) = RE.match regex scriptedEffectsForEstates :: (Text, Text, Text, [Text])
+            readScriptFromText effectText

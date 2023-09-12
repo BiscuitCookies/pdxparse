@@ -21,12 +21,12 @@ import qualified Data.Version as V
 import Data.Yaml (FromJSON (..), Value (..), decodeFileEither, (.:), (.:?))
 
 import System.Console.GetOpt (OptDescr (..), ArgDescr (..), ArgOrder (..), getOpt, usageInfo)
-import System.Directory (getHomeDirectory)
-import System.Environment (getArgs)
+import System.Directory (getHomeDirectory, doesFileExist)
+import System.Environment (getArgs, getExecutablePath)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
 import qualified System.Info
-import System.FilePath ((</>))
+import System.FilePath ((</>), replaceFileName)
 
 import Control.Monad (when, forM_, unless)
 
@@ -124,7 +124,14 @@ readSettings = do
         putStrLn $ usageInfo "pdxparse" programOpts
         exitFailure
 
-    settingsFilePath <- getDataFileName "settings.yml"
+    -- if there is a settings.yml in the same folder as the executable, we use it
+    -- otherwise we use the one which cabal installed
+    globalSettingsPath <- getDataFileName "settings.yml"
+    exePath <- getExecutablePath
+    let settingsPathInExePath = replaceFileName exePath "settings.yml"
+    settingsExistsInExePath <- doesFileExist settingsPathInExePath
+
+    let settingsFilePath = if settingsExistsInExePath then settingsPathInExePath else globalSettingsPath
 
     -- Check if info args were specified. If so, honour them, then exit.
     when (Paths `elem` opts || Version `elem` opts || Help `elem` opts) $ do

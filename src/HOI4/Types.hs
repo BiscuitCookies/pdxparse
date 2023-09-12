@@ -411,6 +411,7 @@ data HOI4Decision = HOI4Decision
 
     ,   dec_days_mission_timeout :: Maybe Int
     ,   dec_activation :: Maybe GenericScript
+    ,   dec_selectable_mission :: Bool
     ,   dec_timeout_effect :: Maybe GenericScript
     ,   dec_cancel_if_not_visible :: Bool
 
