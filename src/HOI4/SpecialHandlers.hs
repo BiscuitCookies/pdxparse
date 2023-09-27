@@ -376,6 +376,7 @@ modifierMSG hidden targ stmt@[pdx| $mod = !num |] = let lmod = T.toLower mod in 
                     numericLoc loc' MsgModifierPcNegReduced stmt
                 Nothing -> preStatement stmt
         | ("state_resource_" `T.isPrefixOf` lmod && not ("state_resource_cost_" `T.isPrefixOf` lmod)) || --precision 0
+            ("country_resource_" `T.isPrefixOf` lmod && not ("country_resource_cost_" `T.isPrefixOf` lmod)) || --precision 0
             "temporary_state_resource_" `T.isPrefixOf` lmod -> do --precision 0
             mloc <- getGameL10nIfPresent lmod
             case mloc of
@@ -441,6 +442,7 @@ modifierMSG hidden targ stmt@[pdx| $mod = $var|] =  let lmod = T.toLower mod in 
                 Nothing -> preStatement stmt
         | "modifier_army_sub_" `T.isPrefixOf` lmod ||
             ("operation_" `T.isPrefixOf` lmod && "_outcome" `T.isSuffixOf` lmod) ||
+            ("country_resource_" `T.isPrefixOf` lmod && not ("country_resource_cost_" `T.isPrefixOf` lmod)) ||
             "_design_cost_factor" `T.isSuffixOf` lmod ||
             "state_resource_" `T.isPrefixOf` lmod ||
             "country_resource_cost_" `T.isPrefixOf` lmod ||
@@ -566,6 +568,7 @@ modifiersTable = HM.fromList
         ,("navy_advisor_cost_factor"        , ("MODIFIER_NAVY_ADVISOR_COST_FACTOR", MsgModifierPcNegReduced))
         ,("offensive_war_stability_factor"  , ("MODIFIER_STABILITY_OFFENSIVE_WAR_FACTOR", MsgModifierPcPosReduced))
         ,("defensive_war_stability_factor"  , ("MODIFIER_STABILITY_DEFENSIVE_WAR_FACTOR", MsgModifierPcPosReduced))
+        ,("unit_leader_as_advisor_cp_cost_factor" , ("MODIFIER_UNIT_LEADER_AS_ADVISOR_CP_COST_FACTOR", MsgModifierPcNegReduced)) --precision 1
         ,("improve_relations_maintain_cost_factor" , ("MODIFIER_IMPROVE_RELATIONS_MAINTAIN_COST_FACTOR", MsgModifierPcNegReduced))
         ,("party_popularity_stability_factor" , ("MODIFIER_STABILITY_POPULARITY_FACTOR", MsgModifierPcPosReduced))
         ,("political_power_cost"            , ("MODIFIER_POLITICAL_POWER_COST", MsgModifierColourNeg))
@@ -584,16 +587,17 @@ modifiersTable = HM.fromList
         ,("drift_defence_factor"            , ("MODIFIER_DRIFT_DEFENCE_FACTOR", MsgModifierPcPosReduced))
         ,("power_balance_daily"             , ("MODIFIER_POWER_BALANCE_DAILY", MsgModifierBop))
         ,("power_balance_weekly"            , ("MODIFIER_POWER_BALANCE_WEEKLY", MsgModifierBop))
-        ,("communism_drift"                 , ("communism_drift", MsgModifierColourPos))
-        ,("democratic_drift"                , ("democratic_drift", MsgModifierColourPos))
-        ,("fascism_drift"                   , ("fascism_drift", MsgModifierColourPos))
-        ,("neutrality_drift"                , ("neutrality_drift", MsgModifierColourPos))
+        ,("communism_drift"                 , ("communism_drift", MsgModifierColourPos)) --precision 2
+        ,("democratic_drift"                , ("democratic_drift", MsgModifierColourPos)) --precision 2
+        ,("fascism_drift"                   , ("fascism_drift", MsgModifierColourPos)) --precision 2
+        ,("neutrality_drift"                , ("neutrality_drift", MsgModifierColourPos)) --precision 2
         ,("communism_acceptance"            , ("communism_acceptance", MsgModifierColourPos))
         ,("democratic_acceptance"           , ("democratic_acceptance", MsgModifierColourPos))
         ,("fascism_acceptance"              , ("fascism_acceptance", MsgModifierColourPos))
         ,("neutrality_acceptance"           , ("neutrality_acceptance", MsgModifierColourPos))
 
             -- Diplomacy
+        ,("civil_war_involvement_tension"   , ("MODIFIER_CIVIL_WAR_INVOLVEMENT_TENSION", MsgModifierPcNegReduced)) -- precision 1
         ,("enemy_declare_war_tension"       , ("MODIFIER_ENEMY_DECLARE_WAR_TENSION", MsgModifierPcPosReduced))
         ,("enemy_justify_war_goal_time"     , ("MODIFIER_ENEMY_JUSTIFY_WAR_GOAL_TIME", MsgModifierPcPosReduced))
         ,("faction_trade_opinion_factor"    , ("MODIFIER_FACTION_TRADE_OPINION_FACTOR", MsgModifierPcReducedSign)) --precision 2 yellow
@@ -616,6 +620,7 @@ modifiersTable = HM.fromList
         ,("send_volunteers_tension"         , ("MODIFIER_SEND_VOLUNTEERS_TENSION_LIMIT", MsgModifierPcNegReduced))
         ,("air_volunteer_cap"               , ("MODIFIER_AIR_VOLUNTEER_CAP", MsgModifierColourPos))
         ,("embargo_threshold_factor"        , ("MODIFIER_EMBARGO_THRESHOLD_FACTOR", MsgModifierPcNegReduced))
+        ,("embargo_cost_factor"             , ("MODIFIER_EMBARGO_COST_FACTOR", MsgModifierPcNegReduced))
 
             -- autonomy
         ,("autonomy_gain"                   , ("MODIFIER_AUTONOMY_GAIN", MsgModifierColourPos))
@@ -831,6 +836,7 @@ modifiersTable = HM.fromList
         ,("army_breakthrough_against_minor_factor", ("MODIFIERS_ARMY_BREAKTHROUGH_AGAINST_MINOR_FACTOR", MsgModifierPcPosReduced))
         ,("army_defence_factor"             , ("MODIFIERS_ARMY_DEFENCE_FACTOR", MsgModifierPcPosReduced))
         ,("army_core_defence_factor"        , ("MODIFIERS_ARMY_CORE_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+        ,("army_strength_factor"            , ("MODIFIERS_ARMY_STRENGTH", MsgModifierPcPosReduced)) --precision 2
         ,("army_infantry_attack_factor"     , ("MODIFIER_ARMY_INFANTRY_ATTACK_FACTOR", MsgModifierPcPosReduced))
         ,("army_infantry_defence_factor"    , ("MODIFIER_ARMY_INFANTRY_DEFENCE_FACTOR", MsgModifierPcPosReduced))
         ,("army_armor_attack_factor"        , ("MODIFIER_ARMY_ARMOR_ATTACK_FACTOR", MsgModifierPcPosReduced))
@@ -859,6 +865,7 @@ modifiersTable = HM.fromList
         ,("dig_in_speed_factor"             , ("MODIFIER_DIG_IN_SPEED_FACTOR", MsgModifierPcPosReduced))
         ,("experience_gain_army_unit_factor" , ("MODIFIER_XP_GAIN_ARMY_UNIT_FACTOR", MsgModifierPcPosReduced)) --precision 1
         ,("experience_loss_factor"          , ("MODIFIER_EXPERIENCE_LOSS_FACTOR", MsgModifierPcNegReduced))
+        ,("initiative_factor"               , ("MODIFIER_INITIATIVE_FACTOR", MsgModifierPcPosReduced)) --precision 1
         ,("land_night_attack"               , ("MODIFIER_LAND_NIGHT_ATTACK", MsgModifierPcPosReduced))
         ,("max_dig_in"                      , ("MODIFIER_MAX_DIG_IN", MsgModifierColourPos))
         ,("max_dig_in_factor"               , ("MODIFIER_MAX_DIG_IN_FACTOR", MsgModifierPcPosReduced))
