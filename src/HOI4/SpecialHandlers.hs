@@ -1053,6 +1053,7 @@ modifiersTable = HM.fromList
         ,("reassignment_duration_factor"    , ("MODIFIER_REASSIGNMENT_DURATION_FACTOR", MsgModifierPcNegReduced))
         ,("sickness_chance"                 , ("MODIFIER_SICKNESS_CHANCE", MsgModifierPcNegReduced))
         ,("skill_bonus_factor"              , ("MODIFIER_UNIT_LEADER_SKILL_BONUS_FACTOR", MsgModifierPcPosReduced))
+        ,("terrain_trait_xp_gain_factor"    , ("MODIFIER_TERRAIN_TRAIT_XP_GAIN_FACTOR", MsgModifierPcPosReduced)) --precision 2
         ,("wounded_chance_factor"           , ("MODIFIER_WOUNDED_CHANCE_FACTOR", MsgModifierPcNegReduced))
         ,("shore_bombardment_bonus"         , ("MODIFIER_SHORE_BOMBARDMENT", MsgModifierPcPosReduced))
 
