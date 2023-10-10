@@ -39,7 +39,7 @@ import SettingsTypes ( PPT, Settings (..)
                      , withCurrentIndent, getGameInterface
                      , getGameL10n, getGameL10nIfPresent
                      , setCurrentFile, withCurrentFile
-                     , hoistErrors, hoistExceptions, getGameInterfaceIfPresent, concatMapM)
+                     , hoistErrors, hoistExceptions, getGameInterfaceIfPresent, concatMapM, indentUp)
 import HOI4.Common -- everything
 ----------------
 -- Characters --
@@ -662,6 +662,17 @@ ppIdea fp (id, cha) = setCurrentFile fp $ do
                         ,content_pp'd
                         ,PP.line])
             (field id)
+    let idArg :: Text -> (HOI4Advisor -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
+        idArg fieldname field fmt
+            = maybe (return [])
+                (\field_content -> do
+                    content_pp'd <- fmt field_content
+                    return
+                        ["* When ", Doc.strictText fieldname, ": "
+                        ,PP.line
+                        ,content_pp'd
+                        ,PP.line])
+                (field id)
     icon_pp <- do
         case cha_portrait cha of
             Just port -> do
@@ -679,6 +690,8 @@ ppIdea fp (id, cha) = setCurrentFile fp $ do
     allowed_pp <- nfArgExtra "allowed" adv_allowed ppScript
     visible_pp <- nfArgExtra "visible" adv_visible ppScript
     available_pp <- nfArgExtra "available" adv_available ppScript
+    onadd <- idArg "added" adv_on_add (indentUp . ppScript)
+    onremove <- idArg "removed" adv_on_remove (indentUp . ppScript)
     mod <- nfArg adv_modifier ppStatement
     --equipmod <- nfArg adv_equipment_bonus ppStatement
     resmod <- nfArg adv_research_bonus ppStatement
@@ -726,4 +739,6 @@ ppIdea fp (id, cha) = setCurrentFile fp $ do
         [ traitids,--traitmsg_pp,
         PP.line]++
         (if adv_can_be_fired id then [""] else ["* {{color|R|Advisor can't be fired}}",PP.line])++
+        onadd ++
+        onremove ++
         [ "| cost = ",  maybe (if adv_advisor_slot id == "political_advisor" || adv_advisor_slot id == "theorist" then "{{icon|political power|150}} }}" else "{{icon|political power|50}} }}") (\c -> "{{icon|political power|"<> plainNum c <>"}} }}") (adv_cost id), PP.line]

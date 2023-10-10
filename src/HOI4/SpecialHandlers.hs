@@ -836,7 +836,8 @@ modifiersTable = HM.fromList
         ,("army_breakthrough_against_minor_factor", ("MODIFIERS_ARMY_BREAKTHROUGH_AGAINST_MINOR_FACTOR", MsgModifierPcPosReduced))
         ,("army_defence_factor"             , ("MODIFIERS_ARMY_DEFENCE_FACTOR", MsgModifierPcPosReduced))
         ,("army_core_defence_factor"        , ("MODIFIERS_ARMY_CORE_DEFENCE_FACTOR", MsgModifierPcPosReduced))
-        ,("army_strength_factor"            , ("MODIFIERS_ARMY_STRENGTH", MsgModifierPcPosReduced)) --precision 2
+        ,("army_defence_against_major_factor", ("MODIFIERS_ARMY_DEFENCE_AGAINST_MAJOR_FACTOR", MsgModifierPcPosReduced))
+        ,("army_strength_factor"            , ("MODIFIER_ARMY_STRENGTH", MsgModifierPcPosReduced)) --precision 2
         ,("army_infantry_attack_factor"     , ("MODIFIER_ARMY_INFANTRY_ATTACK_FACTOR", MsgModifierPcPosReduced))
         ,("army_infantry_defence_factor"    , ("MODIFIER_ARMY_INFANTRY_DEFENCE_FACTOR", MsgModifierPcPosReduced))
         ,("army_armor_attack_factor"        , ("MODIFIER_ARMY_ARMOR_ATTACK_FACTOR", MsgModifierPcPosReduced))

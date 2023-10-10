@@ -494,7 +494,7 @@ parseHOI4ModifierDefinition stmt@[pdx| %left = %right |] = case right of
                 "number" -> Just (mdid, MsgModifierColourNeg)
                 "percentage" -> Just (mdid, MsgModifierPcNegReduced)
                 "percentage_in_hundred" -> Just (mdid, MsgModifierPcNeg)
-                "yes_no" -> Just (mdid, MsgModifierYesNo)
+                "yes_no" -> Just (mdid, MsgModifierNoYes)
                 _ -> Nothing
             _ -> Nothing
 

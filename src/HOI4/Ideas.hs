@@ -44,7 +44,7 @@ import SettingsTypes ( PPT, Settings (..), Game (..)
                      , setCurrentFile, withCurrentFile, withCurrentIndent
                      , hoistErrors, hoistExceptions
                      , concatMapM
-                     , getGameInterface, getGameInterfaceIfPresent)
+                     , getGameInterface, getGameInterfaceIfPresent, indentUp)
 import HOI4.Common -- everything
 
 -- | Take the idea group scripts from game data and parse them into idea group
@@ -300,6 +300,17 @@ ppIdea d id = setCurrentFile (id_path id) $ do
                         ,content_pp'd
                         ,PP.line])
             (field id)
+    let idArg :: Text -> (HOI4Idea -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
+        idArg fieldname field fmt
+            = maybe (return [])
+                (\field_content -> do
+                    content_pp'd <- fmt field_content
+                    return
+                        ["* When ", Doc.strictText fieldname, ": "
+                        ,PP.line
+                        ,content_pp'd
+                        ,PP.line])
+                (field id)
     icon_pp <- do
             micon <- getGameInterfaceIfPresent ("GFX_idea_" <> id_id id)
             case micon of
@@ -313,6 +324,8 @@ ppIdea d id = setCurrentFile (id_path id) $ do
     equipmod <- nfArg id_equipment_bonus ppStatement
     resmod <- nfArg id_research_bonus ppStatement
     tarmod <- nfArg id_targeted_modifier ppScript
+    onadd <- idArg "added" id_on_add (indentUp . ppScript)
+    onremove <- idArg "removed" id_on_remove (indentUp . ppScript)
     traitmsg <- case id_traits id of
         Just arr -> do
             let traitbare = mapMaybe getbaretraits arr
@@ -322,7 +335,7 @@ ppIdea d id = setCurrentFile (id_path id) $ do
         Just arr -> do
             let traitbare = mapMaybe getbaretraits arr
                 traitlist = map (\t-> "{{countrytrait|"<> t <> if d then "|noname=1}}" else "}}") traitbare
-                traitids = map Doc.strictText traitlist
+                traitids = map Doc.strictText traitlist ++ [PP.line]
             traitloc <- do
                 tloc <- traverse getGameL10n traitbare
                 return $ T.intercalate "<br>" tloc
@@ -348,13 +361,16 @@ ppIdea d id = setCurrentFile (id_path id) $ do
             mod ++
             tarmod ++
             equipmod ++
-            traitids
+            traitids ++
+            onadd ++
+            onremove
         else
             mod ++
             tarmod ++
             resmod++
             equipmod ++
-            traitids) ++
+            traitids ++
+            onadd ++
+            onremove) ++
         [--traitmsg_pp,
-        PP.line
-        , "| cost = ", if id_category id == "country" then mempty else maybe "{{icon|political power|150}} }}" (\c -> "{{icon|political power|"<> plainNum c <>"}} }}") (id_cost id), PP.line]
+         "| cost = ", if id_category id == "country" then mempty else maybe "{{icon|political power|150}} }}" (\c -> "{{icon|political power|"<> plainNum c <>"}} }}") (id_cost id), PP.line]
