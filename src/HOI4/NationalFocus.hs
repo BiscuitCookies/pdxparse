@@ -249,6 +249,7 @@ parseHOI4NationalFocusesPath scripts = do
         mapTree scr = case scr of
             [pdx| focus_tree = @focus |] -> focus
             [pdx| shared_focus = @_ |] -> [scr]
+            [pdx| joint_focus = @_ |] -> [scr]
             _ -> []
 
 ppNationalFocuses :: forall g m. (HOI4Info g, Monad m) => [HOI4NationalFocus] -> PPT g m Doc
