@@ -44,7 +44,7 @@ import HOI4.Common -- everything
 -- | Empty national focus. Starts off Nothing/empty everywhere, except id and name
 -- (which should get filled in immediately).
 newHOI4NationalFocus :: HOI4NationalFocus
-newHOI4NationalFocus = HOI4NationalFocus "(Unknown)" "(Unknown)" Nothing Nothing "GFX_goal_unknown" undefined Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined
+newHOI4NationalFocus = HOI4NationalFocus "(Unknown)" "(Unknown)" Nothing Nothing "GFX_goal_unknown" undefined Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined
 
 -- | Take the decisions scripts from game data and parse them into decision
 -- data structures.
@@ -89,7 +89,7 @@ parseHOI4NationalFocus [pdx| %left = %right |] = case right of
         IntLhs _ -> throwError "int lhs at top level"
         AtLhs _ -> return (Right Nothing)
         GenericLhs id [] ->
-            if not (id == "focus" || id == "shared_focus") then
+            if not (id == "focus" || id == "shared_focus" || id == "joint_focus") then
                 return (Right Nothing)
             else
                 withCurrentFile $ \file -> do
@@ -179,6 +179,21 @@ nationalFocusAddSection nf stmt
                     nf
                 CompoundRhs scr -> nf { nf_bypass = Just scr }
                 _-> trace "bad nf bypass" nf
+            "completion_reward_joint_originator" -> case rhs of
+                CompoundRhs [] ->
+                    nf
+                CompoundRhs scr -> nf { nf_joint_complete_origin = Just scr }
+                _-> trace "bad nf joint reward orginator" nf
+            "completion_reward_joint_member" -> case rhs of
+                CompoundRhs [] ->
+                    nf
+                CompoundRhs scr -> nf { nf_joint_complete_member = Just scr }
+                _-> trace "bad nf joint reward member" nf
+            "joint_trigger" -> case rhs of
+                CompoundRhs [] ->
+                    nf
+                CompoundRhs scr -> nf { nf_joint_trigger = Just scr }
+                _-> trace "bad nf joint trigger" nf
             "cancel" -> nf
             "cancelable" -> nf --bool
             "historical_ai" -> nf
@@ -193,7 +208,11 @@ nationalFocusAddSection nf stmt
                 CompoundRhs scr -> nf {nf_select_effect = Just scr}
                 _-> trace ("bad nf select_effect in: " ++ show stmt) nf
             "ai_will_do" -> nf --Do we want to deal with aistuff with focus' ?
-            "complete_tooltip" -> nf
+            "complete_tooltip" ->  case rhs of
+                CompoundRhs [] ->
+                    nf
+                CompoundRhs scr -> nf { nf_complete_tooltip = Just scr }
+                _-> trace "bad nf complete tooltip" nf
             "offset" -> nf
             "relative_position_id" -> nf
             "text_icon" -> nf -- unknown what it does for now. AAT
@@ -294,6 +313,16 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
                         ,"}}"
                         ,PP.line])
             (field nf)
+        nfArgClari :: Doc -> (HOI4NationalFocus -> Maybe a) -> (a -> PPT g m Doc) -> PPT g m [Doc]
+        nfArgClari extra field fmt
+            = maybe (return [])
+                (\field_content -> do
+                    content_pp'd <- fmt field_content
+                    return
+                        [extra, PP.line
+                        ,content_pp'd
+                        ,PP.line])
+            (field nf)
     icon_pp <- do
         micon <- getGameInterfaceIfPresent ("GFX_focus_" <> nf_id nf)
         case micon of
@@ -303,6 +332,10 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
     allowBranch_pp <- ppAllowBranch $ nf_allow_branch nf
     mutuallyExclusive_pp <- ppMutuallyExclusive $ nf_mutually_exclusive nf
     available_pp <- nfArg nf_available ppScript
+    joint_trigger_pp <- nfArgClari "<!-- joint_trigger -->" nf_joint_trigger ppScript
+    joint_reward_member_pp <- nfArgClari "Reward for joint member:" nf_joint_complete_member ppScript
+    joint_reward_origin_pp <- nfArgClari "Reward for country that completed:" nf_joint_complete_origin ppScript
+    joint_complete_tool_pp <- nfArgClari "<!-- Tooltip shown for completion ->Completion tooltip:" nf_complete_tooltip ppScript
     bypass_pp <- nfArgExtra "bypass" nf_bypass ppScript
     completionReward_pp <- setIsInEffect True $ nfArg nf_completion_reward ppScript
     selectEffect_pp <- setIsInEffect True $ nfArgExtra "select" nf_select_effect ppScript
@@ -316,9 +349,13 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
         prerequisite_pp ++
         mutuallyExclusive_pp ++
         available_pp ++
+        joint_trigger_pp ++
         bypass_pp ++
         [ "| ", PP.line]++
         completionReward_pp ++
+        joint_reward_origin_pp ++
+        joint_reward_member_pp ++
+        joint_complete_tool_pp ++
         selectEffect_pp
 
 ppPrereq :: (HOI4Info g, Monad m) => [GenericScript] -> PPT g m [Doc]

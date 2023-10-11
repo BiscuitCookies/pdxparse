@@ -489,7 +489,10 @@ data HOI4NationalFocus = HOI4NationalFocus
     ,   nf_select_effect :: Maybe GenericScript
     ,   nf_ai_will_do :: Maybe Text
     ,   nf_completion_reward :: Maybe GenericScript
-    ,   nf_complete_tooltip :: Maybe Text
+    ,   nf_complete_tooltip :: Maybe GenericScript
+    ,   nf_joint_complete_origin :: Maybe GenericScript
+    ,   nf_joint_complete_member :: Maybe GenericScript
+    ,   nf_joint_trigger :: Maybe GenericScript
     ,   nf_path :: FilePath -- ^ Source file
     } deriving (Show)
 
