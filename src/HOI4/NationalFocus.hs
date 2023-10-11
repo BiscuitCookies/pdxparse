@@ -335,7 +335,7 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
     joint_trigger_pp <- nfArgClari "<!-- joint_trigger -->" nf_joint_trigger ppScript
     joint_reward_member_pp <- nfArgClari "Reward for joint member:" nf_joint_complete_member ppScript
     joint_reward_origin_pp <- nfArgClari "Reward for country that completed:" nf_joint_complete_origin ppScript
-    joint_complete_tool_pp <- nfArgClari "<!-- Tooltip shown for completion ->Completion tooltip:" nf_complete_tooltip ppScript
+    complete_tool_pp <- nfArgClari "<!-- Tooltip shown for completion ->Completion tooltip:" nf_complete_tooltip ppScript
     bypass_pp <- nfArgExtra "bypass" nf_bypass ppScript
     completionReward_pp <- setIsInEffect True $ nfArg nf_completion_reward ppScript
     selectEffect_pp <- setIsInEffect True $ nfArgExtra "select" nf_select_effect ppScript
@@ -355,7 +355,7 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
         completionReward_pp ++
         joint_reward_origin_pp ++
         joint_reward_member_pp ++
---        joint_complete_tool_pp ++
+--        complete_tool_pp ++
         selectEffect_pp
 
 ppPrereq :: (HOI4Info g, Monad m) => [GenericScript] -> PPT g m [Doc]
