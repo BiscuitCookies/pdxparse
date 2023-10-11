@@ -81,11 +81,12 @@ parseHOI4Characters scripts = do
             let chaselem = HM.elems chas
                 chastoken = mapMaybe (\c -> case cha_advisor c of
                     Just adv ->
-                        let a = a { adv_cha_name = cha_name c,adv_cha_id = cha_id c, adv_cha_portrait = cha_portrait c} in
-                        Just $ map (\a -> (adv_idea_token a, a)) adv
+                        Just $ map (\a ->
+                            (adv_idea_token a, advisorNamed a c)) adv
                     _ -> Nothing)
                     chaselem
             return $ HM.fromList $ concat chastoken
+        advisorNamed a c = a { adv_cha_name = cha_name c,adv_cha_id = cha_id c, adv_cha_portrait = cha_portrait c}
 
 character :: (HOI4Info g, IsGameData (GameData g), MonadError Text m) =>
     GenericStatement -> PPT g m (Either Text (Maybe HOI4Character))
