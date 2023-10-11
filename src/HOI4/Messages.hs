@@ -262,7 +262,7 @@ data ScriptMessage
     | MsgHasTemplate {scriptMessageWhat :: Text}
     | MsgOccupationLaw {scriptMessageWhat :: Text}
     | MsgDiplomaticRelation {scriptMessageWhat :: Text, scriptMessageWhom :: Text}
-    | MsgGiveResourceRights {scriptMessageWho :: Text, scriptMessageWhat :: Text}
+    | MsgGiveResourceRights {scriptMessageWho :: Text, scriptMessageWhere :: Text, scriptMessageWhat :: Text}
     | MsgTrait {scriptMessageYn :: Bool}
     | MsgTraitIdeo {scriptMessageYn :: Bool, scriptMessageWhat :: Text}
     | MsgTraitChar {scriptMessageWho :: Text, scriptMessageYn :: Bool}
@@ -543,6 +543,7 @@ data ScriptMessage
     | MsgDropCosmeticTag
     | MsgSetCompliance {scriptMessageAmt :: Double}
     | MsgSetPoliticalPower {scriptMessageAmt :: Double}
+    | MsgSetResistance {scriptMessageAmt :: Double}
     | MsgSetStability {scriptMessageAmt :: Double}
     | MsgSetWarSupport {scriptMessageAmt :: Double}
     | MsgAddLogistics {scriptMessageAmt :: Double}
@@ -1329,12 +1330,12 @@ instance RenderMessage Script ScriptMessage where
                 [ _what
                 , _whom
                 ]
-        MsgGiveResourceRights {scriptMessageWhat = _what, scriptMessageWho = _who}
+        MsgGiveResourceRights {scriptMessageWhere = _where, scriptMessageWho = _who, scriptMessageWhat = _what}
             -> mconcat
                 [ "Give "
                 , _who
-                , " rights to the resources in "
-                ,  _what
+                , " rights to the ", _what ,"resources in "
+                ,  _where
                 ]
         MsgTrait {scriptMessageYn = _yn}
             -> mconcat
@@ -2980,7 +2981,7 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ "Change capital to "
                 , _what
-                , ifThenElseT (T.null _where) "" "<!-- ",_where," -->"
+                , ifThenElseT (T.null _where) "" ("<!-- " <> _where <> " -->")
                 ]
         MsgSetCharacterName {scriptMessageWhat = _what}
             -> mconcat
@@ -3349,6 +3350,11 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ "Set base {{icon|political power|1}} to "
                 , toMessage (bold (plainNumMin _amt))
+                ]
+        MsgSetResistance {scriptMessageAmt = _amt}
+            -> mconcat
+                [ "Set resistance to "
+                , toMessage (bold (plainPcMin _amt))
                 ]
         MsgSetStability {scriptMessageAmt = _amt}
             -> mconcat

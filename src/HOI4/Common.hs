@@ -125,6 +125,7 @@ handlersNumeric = Tr.fromList
         ,("reset_province_name"              , numeric MsgResetProvinceName)
         ,("set_compliance"                   , numeric MsgSetCompliance)
         ,("set_political_power"              , numeric MsgSetPoliticalPower)
+        ,("set_resistance"                   , numeric MsgSetResistance)
         ,("set_stability"                    , numeric MsgSetStability)
         ,("set_war_support"                  , numeric MsgSetWarSupport)
         ,("add_logistics"                    , numeric MsgAddLogistics)

@@ -33,7 +33,7 @@ settings:
     # Game version (major patch number) (or mod version). Only used to add version templates.
     # Required setting.
     #version: "1.33" #eu4
-    version: "1.12.1" #hoi4
+    version: "1.13" #hoi4
 
     # All Platforms where mod files are kept
     #   Windows non-steam: C:\Users\<Username>\Documents\Paradox Interactive\Hearts of Iron IV\mod\nameofmod (use / instead of \ )

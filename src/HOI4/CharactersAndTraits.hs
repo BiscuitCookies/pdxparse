@@ -376,6 +376,8 @@ parseHOI4UnitLeaderTrait [pdx| $id = @effects |]
             "type" -> ult
             "unit_trigger" -> ult -- what triggers are needed for it to gain xp?
             "unit_type" -> ult -- what unit types it applies to?
+            "any_parent" -> ult -- unknown what it does for now. AAT
+            "parent" -> ult -- unknown what it does for now. AAT
             _ -> trace ("Urecognized statement in unit_leader lhs -> scr: " ++ show stmt) ult
          -- Must be an effect
         addSection ult stmt@[pdx| $lhs = !num |] = case lhs of

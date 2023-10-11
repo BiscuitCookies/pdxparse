@@ -143,6 +143,8 @@ nationalFocusAddSection nf stmt
                 StringRhs txt ->
                     let txtd = if "GFX_" `T.isPrefixOf` txt then txt else "GFX_" <> txt in
                     nf { nf_icon = txtd}
+                CompoundRhs _ ->
+                    nf { nf_icon = "Multiple Pictures possible, check script."}
                 _-> trace ("bad nf icon in: " ++ show stmt) nf
             "cost" -> case rhs of
                 (floatRhs -> Just num) -> nf {nf_cost = num}
@@ -193,10 +195,13 @@ nationalFocusAddSection nf stmt
             "complete_tooltip" -> nf
             "offset" -> nf
             "relative_position_id" -> nf
+            "text_icon" -> nf -- unknown what it does for now. AAT
             "dynamic" -> nf
             other -> trace ("unknown national focus section: " ++ show other ++ " for " ++ show stmt) nf
         nationalFocusAddSection' nf _
             = trace "unrecognised form for national focus section" nf
+
+
 
 writeHOI4NationalFocuses :: (HOI4Info g, MonadIO m) => PPT g m ()
 writeHOI4NationalFocuses = do

@@ -461,6 +461,11 @@ data HOI4OpinionModifier = HOI4OpinionModifier
     ,   omodTarget :: Maybe Bool
     } deriving (Show)
 
+--data HOI4NationalFocusIcon
+--    = HOI4NationalFocusIconSimple Text
+--    | HOI4NationalFocusIconScript GenericScript
+--    deriving Show
+
 data HOI4NationalFocus = HOI4NationalFocus
     {   nf_id :: Text
     ,   nf_name_loc :: Text
@@ -514,8 +519,8 @@ data HOI4Advisor = HOI4Advisor
 
 data HOI4Character = HOI4Character
     {   cha_id          :: Text
-    ,   cha_loc_name    :: Text
     ,   cha_name        :: Text
+    ,   cha_loc_name    :: Text
     ,   cha_portrait    :: Maybe Text
 --    ,   chaId :: Maybe Int -- ^ legacy character id system is sometimes still used,
                          --   negative numbers count as not being there

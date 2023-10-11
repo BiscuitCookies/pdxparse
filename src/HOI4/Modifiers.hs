@@ -4,7 +4,7 @@ Description : Country, ruler, dynamic and opinion modifiers
 -}
 module HOI4.Modifiers (
 --        parseHOI4Modifiers, writeHOI4Modifiers,
-        parseHOI4OpinionModifiers, writeHOI4OpinionModifiers
+        parseHOI4OpinionModifiers, writeHOI4OpinionModifiers, writeHOI4OpinionModifiers'
     ,   parseHOI4DynamicModifiers, writeHOI4DynamicModifiers
     ,   parseHOI4Modifiers
     ) where
@@ -16,7 +16,7 @@ import Control.Monad.Trans (MonadIO (..))
 import Control.Monad.State (gets)
 
 import Data.Foldable (fold)
-import Data.Maybe (isJust, fromJust, fromMaybe, catMaybes)
+import Data.Maybe (isJust, fromJust, fromMaybe, catMaybes, mapMaybe)
 import Data.Monoid ((<>))
 import Data.List ( sortOn, intersperse, foldl', intercalate )
 import Data.Set (toList, fromList)
@@ -36,7 +36,8 @@ import SettingsTypes ( PPT, Settings (..){-, Game (..)-}
                      , hoistErrors, hoistExceptions
                      , getGameInterface)
 import HOI4.Types -- everything
-import HOI4.Common (extractStmt, matchExactText, ppMany)
+-- everything
+import HOI4.Common (extractStmt, matchExactText, ppMany, HOI4OpinionModifier (HOI4OpinionModifier))
 import FileIO (Feature (..), writeFeatures)
 import Text.PrettyPrint.Leijen.Text (Doc)
 import qualified Text.PrettyPrint.Leijen.Text as PP
@@ -46,6 +47,7 @@ import MessageTools
 
 import Debug.Trace (trace, traceM)
 import HOI4.SpecialHandlers (modifierMSG)
+import System.FilePath (takeBaseName)
 
 parseHOI4OpinionModifiers :: (IsGameState (GameState g), IsGameData (GameData g), Monad m) =>
     HashMap String GenericScript -> PPT g m (HashMap Text HOI4OpinionModifier)
@@ -146,6 +148,45 @@ writeHOI4OpinionModifiers = do
                            , theFeature = Right (HM.elems opinionModifiers)
                            }]
                   ppOpinionModifiers
+
+writeHOI4OpinionModifiers' :: (HOI4Info g, MonadIO m) => PPT g m ()
+writeHOI4OpinionModifiers' = do
+    opinionModifiers <- getOpinionModifierScripts
+    pathOmod <- parseHOI4NationalFocusesPath opinionModifiers
+    let pathedOmods :: [Feature [HOI4OpinionModifier]]
+        pathedOmods = map (\omods -> Feature {
+                                    featurePath = Just "templates"
+                                ,   featureId = Just (T.pack $ takeBaseName $ omodPath $ head omods) <> Just ".txt"
+                                ,   theFeature = Right omods })
+                            (HM.elems pathOmod)
+    writeFeatures "opinion_modifiers"
+                  pathedOmods
+                  ppOpinionModifiers
+
+parseHOI4NationalFocusesPath :: (IsGameData (GameData g), IsGameState (GameState g), Monad m) =>
+    HashMap String GenericScript -> PPT g m (HashMap FilePath [HOI4OpinionModifier])
+parseHOI4NationalFocusesPath scripts = do
+    tryParse <- hoistExceptions $
+        HM.traverseWithKey
+            (\sourceFile scr ->
+                setCurrentFile sourceFile $ mapM parseHOI4OpinionModifier $ concatMap (\case
+                [pdx| opinion_modifiers = @mods |] -> mods
+                _ -> scr)
+                scr)
+            scripts
+    case tryParse of
+        Left err -> do
+            traceM $ "Completely failed parsing national focus: " ++ T.unpack err
+            return HM.empty
+        Right nfFilesOrErrors ->
+            return $ HM.filter (not . null) $ flip HM.mapWithKey nfFilesOrErrors $ \sourceFile enfs ->
+                mapMaybe (\case
+                    Left err -> do
+                        traceM $ "Error parsing national focus in " ++ sourceFile
+                                 ++ ": " ++ T.unpack err
+                        Nothing
+                    Right nfocus -> nfocus)
+                    enfs
 
 -- Based on https://hoi4.paradoxwikis.com/Template:Opinion
 ppOpinionModifiers :: (HOI4Info g, Monad m) => [HOI4OpinionModifier] -> PPT g m Doc

@@ -1831,10 +1831,12 @@ newRM :: RandomMod
 newRM = RandomMod [] []
 
 randomList :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
-randomList stmt@[pdx| %_ = @scr |] = if all chk scr then -- Ugly solution for vars in random list
-        fmtRandomList $ map entry scr
+randomList stmt@[pdx| %_ = @scr |] =
+    let (_,scre) = extractStmt (matchLhsText "seed") scr in -- ugly solution to dealing with seed type in random_list
+    if all chk scre then -- Ugly solution for vars in random list
+        fmtRandomList $ map entry scre
     else
-        fmtRandomVarList $ map entryv scr
+        fmtRandomVarList $ map entryv scre
     where
         chk [pdx| !weight = @scr |] = True
         chk [pdx| %var = @scr |] = False
@@ -1914,6 +1916,7 @@ hasDlc [pdx| %_ = ?dlc |]
             ,("Battle for the Bosporus", "bftb")
             ,("No Step Back", "nsb")
             ,("By Blood Alone", "bba")
+            ,("Arms Against Tyranny", "aat")
             ]
         dlc_icon = maybe "" iconText mdlc_key
 hasDlc stmt = preStatement stmt
@@ -2508,6 +2511,10 @@ createWargoal stmt@[pdx| %_ = @scr |] =
                 statesloc <- traverse getStateLoc states
                 return cwg { wg_generator = Just (WGGeneratorArr states)
                             ,wg_states = statesloc }
+            IntRhs intstate -> do
+                statesloc <- getStateLoc intstate
+                return cwg { wg_generator = Just (WGGeneratorArr [intstate])
+                            ,wg_states = [statesloc] }
             GenericRhs vartag [vstate] ->
                 return cwg { wg_generator = Just (WGGeneratorVar vstate)} --Need to deal with existing variables here
             GenericRhs vstate _ ->
@@ -2871,7 +2878,7 @@ data SetPolitics = SetPolitics
         }
 
 newSP :: SetPolitics
-newSP = SetPolitics undefined Nothing Nothing Nothing Nothing Nothing Nothing
+newSP = SetPolitics "<!-- Check Script -->" Nothing Nothing Nothing Nothing Nothing Nothing
 setPolitics :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 setPolitics stmt@[pdx| %_ = @scr |]
     = msgToPP =<< pp_sp =<< foldM addLine newSP scr
@@ -3135,6 +3142,9 @@ freeBuildingSlots stmt@[pdx| %_ = @scr |]
         addLine fbs [pdx| size > !amt |] =
             let comp = "more than" in
             return fbs { fbs_comp = comp, fbs_size = amt}
+        addLine fbs [pdx| size = !amt |] =
+            let comp = "more than" in
+            return fbs { fbs_comp = comp, fbs_size = amt}
         addLine fbs [pdx| include_locked = %_ |] =
             return fbs { fbs_include_locked = True }
         addLine fbs stmt
@@ -3143,7 +3153,7 @@ freeBuildingSlots stmt@[pdx| %_ = @scr |]
             buildloc <- getGameL10n $ fbs_building fbs
             let buildicon = iconText $ fbs_building fbs
                 buildiconloc = buildicon <> " " <> buildloc
-            return $ MsgFreeBuildingSlots (fbs_comp fbs) (fbs_size fbs)  buildiconloc (fbs_include_locked fbs)
+            return $ MsgFreeBuildingSlots (fbs_comp fbs) (fbs_size fbs) buildiconloc (fbs_include_locked fbs)
 freeBuildingSlots stmt = preStatement stmt
 
 addAutonomyRatio :: forall g m. (HOI4Info g, Monad m) =>
@@ -3373,6 +3383,7 @@ addResource stmt@[pdx| %_ = @scr |]
         addLine ar [pdx| amount = !num |] = return ar { ar_amount = Just num }
         addLine ar [pdx| amount = $txt |] = return ar { ar_amountvar = Just txt }
         addLine ar [pdx| state = !num |] = return ar { ar_state = Just num }
+        addLine ar [pdx| show_state_in_tooltip = %_ |] = return ar
         addLine ar [pdx| $other = %_ |] = trace ("unknown section in add_resource: " ++ show other) $ return ar
         addLine ar stmt = trace ("unknown form in add_resource: " ++ show stmt) $ return ar
         pp_ar ar = do
@@ -3539,10 +3550,11 @@ data GiveRights = GiveRights
         {   gr_receiver :: Text
         ,   gr_state :: Maybe Int
         ,   gr_statevar :: Maybe Text
+        ,   gr_resource :: Maybe [Text]
         }
 
 newGR :: GiveRights
-newGR = GiveRights undefined Nothing Nothing
+newGR = GiveRights undefined Nothing Nothing Nothing
 giveResourceRights :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 giveResourceRights stmt@[pdx| %_ = @scr |]
     = msgToPP =<< ppGR =<< foldM addLine newGR scr
@@ -3551,20 +3563,31 @@ giveResourceRights stmt@[pdx| %_ = @scr |]
         addLine gr [pdx| receiver = ?txt |] = return gr { gr_receiver = txt }
         addLine gr [pdx| state = !num |] = return gr { gr_state = Just num }
         addLine gr [pdx| state = ?txt |] = return gr { gr_statevar = Just txt }
+        addLine gr [pdx| resources = @scr |] =
+            let ress = mapMaybe getbareRess scr in
+            return gr { gr_resource = Just ress }
         addLine gr [pdx| $other = %_ |] = trace ("unknown section in give_resource_rights: " ++ show other) $ return gr
         addLine gr stmt = trace ("unknown form in give_resource_rights: " ++ show stmt) $ return gr
         ppGR :: GiveRights -> PPT g m ScriptMessage
         ppGR gr = do
             flag_loc <- flagText (Just HOI4Country) (gr_receiver gr)
+            resloc <- case gr_resource gr of
+                Just resl -> do
+                    reslloc <- traverse getGameL10n resl
+                    return $ T.intercalate ", " resl <> " "
+                _ -> return mempty
             case (gr_state gr, gr_statevar gr) of
                 (Just state, _) -> do
                     state_loc <- getStateLoc state
-                    return $ MsgGiveResourceRights flag_loc state_loc
+                    return $ MsgGiveResourceRights flag_loc state_loc resloc
                 (_, Just state) -> do
                     mstate <- eGetState (Left state)
                     let state_loc = fromMaybe "<!-- Check Script -->" mstate
-                    return $ MsgGiveResourceRights flag_loc state_loc
+                    return $ MsgGiveResourceRights flag_loc state_loc resloc
                 _ -> return $ preMessage stmt
+
+        getbareRess (StatementBare (GenericLhs e [])) = Just e
+        getbareRess stmt = trace ("Unknown in give_resource_rights array statement: " ++ show stmt) Nothing
 giveResourceRights stmt = preStatement stmt
 
 --------------------------------------
