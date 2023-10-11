@@ -75,6 +75,7 @@ parseHOI4NationalFocuses scripts = HM.unions . HM.elems <$> do
         mapTree scr = case scr of
             [pdx| focus_tree = @focus |] -> focus
             [pdx| shared_focus = @_ |] -> [scr]
+            [pdx| joint_focus = @_ |] -> [scr]
             _ -> []
 
 -- | Parse a statement in an national focus file. Some statements aren't
