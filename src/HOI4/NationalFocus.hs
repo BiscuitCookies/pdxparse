@@ -355,7 +355,7 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
         completionReward_pp ++
         joint_reward_origin_pp ++
         joint_reward_member_pp ++
-        joint_complete_tool_pp ++
+--        joint_complete_tool_pp ++
         selectEffect_pp
 
 ppPrereq :: (HOI4Info g, Monad m) => [GenericScript] -> PPT g m [Doc]
