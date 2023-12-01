@@ -277,7 +277,7 @@ ppIdeas d nfs = do
     where
         traverseIf f = traverse (\x -> if if d then pred x else not (pred x) then f x else return mempty)
         pred x = id_category x `elem` ["tank_manufacturer", "naval_manufacturer", "aircraft_manufacturer", "materiel_manufacturer", "industrial_concern"
-                                    , "construction_firm", "construction_firm", "vehicle_restoration_advisor", "navy_restoration_advisor", "aircraft_restoration_advisor"]--OWB names
+                                    , "engineering_firm", "construction_firm", "vehicle_restoration_advisor", "navy_restoration_advisor", "aircraft_restoration_advisor"]--OWB names
 
 ppIdea :: forall g m. (HOI4Info g, Monad m) => Bool -> HOI4Idea -> PPT g m Doc
 ppIdea d id = setCurrentFile (id_path id) $ do
