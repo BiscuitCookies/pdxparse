@@ -332,9 +332,9 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
     allowBranch_pp <- ppAllowBranch $ nf_allow_branch nf
     mutuallyExclusive_pp <- ppMutuallyExclusive $ nf_mutually_exclusive nf
     available_pp <- nfArg nf_available ppScript
-    joint_trigger_pp <- nfArgClari "<!-- joint_trigger -->" nf_joint_trigger ppScript
+    joint_trigger_pp <- nfArgClari "<!-- joint_trigger -->Requirements for joint rewards:" nf_joint_trigger ppScript
     joint_reward_member_pp <- nfArgClari "Reward for joint member:" nf_joint_complete_member ppScript
-    joint_reward_origin_pp <- nfArgClari "Reward for country that completed:" nf_joint_complete_origin ppScript
+    joint_reward_origin_pp <- nfArgClari "Reward for joint country that completed:" nf_joint_complete_origin ppScript
     complete_tool_pp <- nfArgClari "<!-- Tooltip shown for completion ->Completion tooltip:" nf_complete_tooltip ppScript
     bypass_pp <- nfArgExtra "bypass" nf_bypass ppScript
     completionReward_pp <- setIsInEffect True $ nfArg nf_completion_reward ppScript

@@ -202,7 +202,7 @@ ppdecisioncat decc = setCurrentFile (decc_path decc) $ do
 -- | Empty decision. Starts off Nothing/empty everywhere, except id and name
 -- (which should get filled in immediately).
 newDecision :: HOI4Decision
-newDecision = HOI4Decision undefined undefined Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing False Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing False Nothing Nothing False Nothing Nothing False Nothing undefined undefined
+newDecision = HOI4Decision undefined undefined Nothing Nothing Nothing Nothing Nothing Nothing False Nothing Nothing False Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing False Nothing False Nothing Nothing False Nothing Nothing Nothing Nothing undefined undefined
 
 -- | Take the decisions scripts from game data and parse them into decision
 -- data structures.
@@ -381,9 +381,9 @@ decisionAddSection dec stmt
             "war_with_target_on_remove" -> dec --bool, standard false
             "war_with_target_on_timeout" -> dec --bool, standard false
             "state_target" -> case rhs of --bool, standard false , targeted decison uses targets for states
-                GenericRhs "yes" [] -> dec { dec_state_target = True }
+                GenericRhs "no" [] -> dec
                 -- no is the default, so I don't think this is ever used
-                GenericRhs "no" [] -> dec { dec_state_target = False }
+                GenericRhs trgt [] -> dec { dec_state_target = Just trgt }
                 _ -> trace "DEBUG: bad decisions state_target" dec
             "on_map_mode" -> dec
             "modifier" -> case rhs of -- effects that apply when decision is active (timer/mission?)
@@ -456,18 +456,25 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
                         ,PP.line])
                 (field dec)
     targets <- case (dec_targets dec, dec_target_array dec, dec_state_target dec) of
-        (Just array, _, True) -> do
+        (Just array, _, Just trgt) -> do
             let targetlist = mapMaybe extractTargetsStates array
             targetlistloc <- traverse getStateLoc targetlist
             let targetdoc = [Doc.ppString (intercalate ", " $ map T.unpack targetlistloc)]
-            return $ ["| targets = "] ++ targetdoc ++ [PP.line]
-        (Just array, _, False) -> do
+            trgtlmt <- if trgt == "yes" then return $ Doc.strictText "" else do
+                trgtloc <- getGameL10n trgt
+                return $ Doc.strictText ("Limited to " <> trgtloc <> "<!-- Requires editing --> states ")
+            return $ ["| targets = " <> trgtlmt] ++ targetdoc ++ [PP.line]
+        (Just array, _, Nothing) -> do
             let targetlist = mapMaybe extractTargets array
             targetlistloc <- traverse (flagText (Just HOI4Country)) targetlist
             let targetdoc = [Doc.ppString (intercalate ", " $ map T.unpack targetlistloc)]
             return $ ["| targets = "] ++ targetdoc ++ [PP.line]
-        (_, Just array, True) -> return ["| targets = States ",Doc.strictText array, PP.line]
-        (_, Just array, False) -> return ["| targets = ",Doc.strictText array, PP.line]
+        (_, Just array, Just trgt) -> do
+            trgtlmt <- if trgt == "yes" then return $ Doc.strictText "" else do
+                trgtloc <- getGameL10n trgt
+                return $ Doc.strictText ("Limited to " <> trgtloc <> "<!-- Requires editing --> states ")
+            return ["| targets = ", trgtlmt,Doc.strictText array, "<!-- requires editing -->", PP.line]
+        (_, Just array, Nothing) -> return ["| targets = ",Doc.strictText array, PP.line]
         _ -> return [""]
     ------
     allow_pp'd <- decNoArg dec_allowed ppScript "<!-- allowed -->"
@@ -594,7 +601,7 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
         extractTargets stmt = trace ("Unknown in targets array statement: " ++ show stmt) Nothing
         extractTargetsStates (StatementBare (IntLhs e)) = Just e
         extractTargetsStates [pdx| state = !e |] = Just e
-        extractTargetsStates stmt = trace ("Unknown in targets array statement: " ++ show stmt) Nothing
+        extractTargetsStates stmt = trace ("Unknown in targets states array statement: " ++ show stmt) Nothing
 
 
 ppActivatedBy :: (HOI4Info g, Monad m) => Text -> PPT g m [Doc]

@@ -1412,7 +1412,7 @@ data CreateOperative = CreateOperative
         }
 
 newCO :: CreateOperative
-newCO = CreateOperative undefined "" Nothing Nothing False
+newCO = CreateOperative False "" Nothing Nothing False
 
 createOperativeLeader :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 createOperativeLeader stmt@[pdx| %_ = @scr |]
