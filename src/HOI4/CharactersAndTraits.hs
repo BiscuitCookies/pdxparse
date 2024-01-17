@@ -524,8 +524,8 @@ ppUnitLeaderTrait uTrait = do
     traiticon <- do
         gfx <- getGameInterfaceIfPresent ("GFX_trait_" <> ult_id uTrait)
         case gfx of
-            Just icon -> return ""
-            Nothing -> return ", [\"icon\"] = \"Trait unknown\""
+            Just icon -> return $ ", [\"icon\"] = \"" <> icon <> "\""
+            Nothing -> return ", [\"icon\"] = \"trait_unknown\""
     mod_pp <- if null allmod then return [] else do
         mod_pp' <- withCurrentIndent $ \_ -> modifierMSG' allmod
         a <- imsg2doc mod_pp'
@@ -564,7 +564,7 @@ ppUnitLeaderTrait uTrait = do
     return . mconcat $
         [ "[\"", Doc.strictText $ T.toLower (ult_id uTrait), "\"] = { [\"name\"] = \"",Doc.strictText locName, "\""
         , trait_desc'
-        , traiticon
+        ,  Doc.strictText traiticon
         , if (not . all null) [mod_pp, sumod, attack, defense, plan, logi, maneuv, coord, traitxp] then
              ", [\"mods\"] = [===[" else ""
         ] ++
