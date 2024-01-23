@@ -40,6 +40,7 @@ import Control.Monad.State (StateT (..), gets)
 
 import Control.Applicative (Alternative (..))
 
+import Data.Array ((!))
 import Data.Foldable (fold)
 import Data.Maybe (isNothing, fromJust, listToMaybe, fromMaybe)
 
@@ -47,6 +48,9 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Text.Shakespeare.I18N (Lang)
 --import qualified Text.PrettyPrint.Leijen.Text as PP
+
+import Text.Regex.TDFA (Regex)
+import qualified Text.Regex.TDFA as RE
 
 import Data.HashMap.Strict(HashMap)
 import qualified Data.HashMap.Strict as HM
@@ -465,7 +469,7 @@ iconText = "£" *> Ap.takeWhile1 (Ap.inClass "a-zA-Z._0-9|-")
     <* Ap.option 'e' (Ap.satisfy (not . \c -> isAlpha c || Ap.isHorizontalSpace c)) -- can be end of line or a special character directly after the key
 
 removeFormat :: Text -> Either String Text
-removeFormat = Ap.parseOnly removeCol
+removeFormat = Ap.parseOnly removeCol . stripMissionColor
 
 removeCol :: Parser Text
 removeCol = mconcat <$> many removeCol'
@@ -475,6 +479,13 @@ removeCol' = Ap.takeWhile1 (not . \c -> '§' == c )
          <|> Ap.char '§'
             *> (Ap.anyChar $> mempty)
     <?> "color character"
+
+stripMissionColor :: Text -> Text
+stripMissionColor loc_title = case RE.matchOnceText strip_color_RE loc_title of
+    Just (pre, matcharr, post) -> fst (matcharr ! 2)
+    _                          -> loc_title
+    where
+        strip_color_RE = RE.makeRegex("^\\[(Root.GetPreviewColor[^]]*)\\](.*)\\[Root.GetPreviewColor[^]]*_end]$"::Text)::Regex
 
 -- | Get the localization string for a given key. If it doesn't exist, use the
 -- key itself.

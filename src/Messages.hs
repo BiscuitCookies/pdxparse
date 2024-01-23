@@ -118,6 +118,7 @@ data ScriptMessage
     | MsgLibertyDesireMod
     | MsgProvMod
     | MsgPermanentProvMod
+    | MsgProvTriggeredMod
     | MsgRulerMod
     | MsgTradeMod
     | MsgAddMod {scriptMessageModid :: Text, scriptMessageName :: Text, scriptMessageDays :: Double}
@@ -186,6 +187,7 @@ data ScriptMessage
     | MsgCapital
     | MsgAllCountries
     | MsgAllNeighborCountries
+    | MsgAllNeighborProvinces
     | MsgAllSubjectCountries
     | MsgElse
     | MsgElseIf
@@ -406,8 +408,12 @@ data ScriptMessage
     | MsgChangeReligion {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgChangeRulerSameReligion {scriptMessageWhom :: Text}
     | MsgChangeRulerReligion {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
+    | MsgChangeConsortSameReligion {scriptMessageWhom :: Text}
+    | MsgChangeConsortReligion {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgRulerReligionIs {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgRulerReligionIsSame {scriptMessageWhom :: Text}
+    | MsgConsortReligionIs {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
+    | MsgConsortReligionIsSame {scriptMessageWhom :: Text}
     | MsgRulerCultureIs {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgRulerCultureIsSame {scriptMessageWhom :: Text}
     | MsgIsCoreOf {scriptMessageWhom :: Text}
@@ -478,6 +484,7 @@ data ScriptMessage
     | MsgRemoveOpinionMod {scriptMessageModid :: Text, scriptMessageWhat :: Text, scriptMessageWhom :: Text}
     | MsgReverseRemoveOpinionMod {scriptMessageModid :: Text, scriptMessageWhat :: Text, scriptMessageWhom :: Text}
     | MsgAddTreasury {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
+    | MsgAddYearsOfEstateLandIncome {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
     | MsgAddYearsOfIncome {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
     | MsgNewHeir
     | MsgNewHeirAttribs
@@ -663,7 +670,7 @@ data ScriptMessage
     | MsgIsInColonialRange {scriptMessageWhom :: Text}
     | MsgConstructingGreatProject {scriptMessageWhat :: Text}
     | MsgConstructing {scriptMessageWhat :: Text}
-    | MsgStartConstructingGreatProject {scriptMessageWhat :: Text}
+    | MsgStartConstructingGreatProject {scriptMessageIcon :: Text, scriptMessageWhom :: Text}
     | MsgCancelConstruction
     | MsgYearsOfIncome {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
     | MsgLibertyDesire {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
@@ -736,7 +743,7 @@ data ScriptMessage
     | MsgAddClaimOn {scriptMessageWhere :: Text}
     | MsgAddAcceptedCulture {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgRemoveAcceptedCulture {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
-    | MsgAddAcceptedCultureOrDipPower {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
+    | MsgAddAcceptedCultureOrDipPower {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageFree :: Bool}
     | MsgAddBuilding {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgAddHarmonizedReligion {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgAddHeirPersonality {scriptMessageAncestor :: Bool, scriptMessageIcon :: Text, scriptMessageWhat :: Text}
@@ -747,6 +754,7 @@ data ScriptMessage
     | MsgHeirHasPersonality {scriptMessageAncestor :: Bool, scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgConsortHasPersonality { scriptMessageAncestor :: Bool, scriptMessageIcon :: Text, scriptMessageWhat :: Text }
     | MsgAddCenterOfReformation {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
+    | MsgRemoveCenterOfReformation {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgAddTruceWith {scriptMessageWho :: Text}
     | MsgGainSailors {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
     | MsgGainSailorsFrac {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
@@ -785,11 +793,16 @@ data ScriptMessage
     | MsgAddTrustMutual {scriptMessageWhom :: Text, scriptMessageAmt :: Double}
     | MsgSaveEventTargetAs {scriptMessageName :: Text}
     | MsgSaveGlobalEventTargetAs {scriptMessageName :: Text}
+    | MsgClearGlobalEventTarget {scriptMessageName :: Text}
     | MsgHasSavedEventTarget {scriptMessageName :: Text}
+    | MsgHasSavedGlobalEventTarget {scriptMessageName :: Text}
     | MsgRemoveClaim {scriptMessageWho :: Text}
     | MsgTribalAllegiance {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
     | MsgGainTribalAllegiance {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
     | MsgArmySizePc {scriptMessageAmt :: Double}
+    | MsgBuildInfantry {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageSpeed :: Double, scriptMessageCost :: Double}
+    | MsgBuildCavalry {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageSpeed :: Double, scriptMessageCost :: Double}
+    | MsgBuildArtillery {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageSpeed :: Double, scriptMessageCost :: Double}
     | MsgBuildHeavyShips {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageSpeed :: Double, scriptMessageCost :: Double}
     | MsgBuildLightShips {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageSpeed :: Double, scriptMessageCost :: Double}
     | MsgBuildGalleys {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageSpeed :: Double, scriptMessageCost :: Double}
@@ -831,6 +844,8 @@ data ScriptMessage
     | MsgRemoveAdvisorAdmEffect
     | MsgDivorceConsortEffect
     | MsgADMTechAs {scriptMessageIcon :: Text, scriptMessageWho :: Text}
+    | MsgDIPTechAs {scriptMessageIcon :: Text, scriptMessageWho :: Text}
+    | MsgMILTechAs {scriptMessageIcon :: Text, scriptMessageWho :: Text}
     | MsgAddGovernmentReform {scriptMessageWhat :: Text}
     | MsgRemoveGovernmentReform {scriptMessageWhat :: Text}
     | MsgAddCOTLevel {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
@@ -898,6 +913,7 @@ data ScriptMessage
     | MsgHasSpyNetworkFrom { scriptMessageIcon :: Text, scriptMessageWho :: Text, scriptMessageAmt :: Double }
     | MsgHasSpyNetworkIn { scriptMessageIcon :: Text, scriptMessageWho :: Text, scriptMessageAmt :: Double }
     | MsgDefineGeneral { scriptMessageIcon :: Text }
+    | MsgDefineHeirToGeneral { scriptMessageIcon :: Text }
     | MsgDefineRulerToGeneral { scriptMessageIcon :: Text }
     | MsgDefineConquistador { scriptMessageIcon :: Text }
     | MsgDefineAdmiral { scriptMessageIcon :: Text }
@@ -920,14 +936,14 @@ data ScriptMessage
     | MsgConsortADM { scriptMessageIcon :: Text, scriptMessageAmt :: Double }
     | MsgConsortDIP { scriptMessageIcon :: Text, scriptMessageAmt :: Double }
     | MsgConsortMIL { scriptMessageIcon :: Text, scriptMessageAmt :: Double }
-    | MsgLandLeaderFire {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
-    | MsgLandLeaderShock {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
-    | MsgLandLeaderManeuver {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
-    | MsgLandLeaderSiege {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
-    | MsgNavalLeaderFire {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
-    | MsgNavalLeaderShock {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
-    | MsgNavalLeaderManeuver {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
-    | MsgNavalLeaderSiege {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
+    | MsgLandLeaderFire {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageAddToBase :: Bool}
+    | MsgLandLeaderShock {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageAddToBase :: Bool}
+    | MsgLandLeaderManeuver {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageAddToBase :: Bool}
+    | MsgLandLeaderSiege {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageAddToBase :: Bool}
+    | MsgNavalLeaderFire {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageAddToBase :: Bool}
+    | MsgNavalLeaderShock {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageAddToBase :: Bool}
+    | MsgNavalLeaderManeuver {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageAddToBase :: Bool}
+    | MsgNavalLeaderSiege {scriptMessageIcon :: Text, scriptMessageAmt :: Double, scriptMessageAddToBase :: Bool}
     | MsgCountryOrNonSovereignSubjectHolds {scriptMessageWhom :: Text}
     | MsgCountryOrSubjectHolds {scriptMessageWhom :: Text}
     | MsgGlobalSailorsModifier {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
@@ -1348,6 +1364,7 @@ data ScriptMessage
     | MsgSelectPrimaryCult {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgChangePrimaryCult {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgUnlockEstatePrivilege {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
+    | MsgHasUnlockedEstatePrivilege {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgUnlockGovernmentReform {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgKillUnits {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageWho :: Text, scriptMessageAmt :: Double}
     | MsgConstructBuilding {scriptMessageIcon :: Text, scriptMessageWhat :: Text, scriptMessageSpeed :: Double, scriptMessageCost :: Double}
@@ -1432,6 +1449,17 @@ data ScriptMessage
     | MsgHasParliamentIssueUnlocked {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgHasNotEnactedParliamentAction {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
     | MsgTooltip {scriptMessageWhat :: Text}
+    | MsgAddRandomDev {scriptMessageIcon :: Text, scriptMessageAmt :: Double}
+    | MsgFor {scriptMessageAmt :: Double}
+    | MsgDisableTradingPolicy {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
+    | MsgEnableTradingPolicy {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
+    | MsgHasAiPersonality {scriptMessageIcon :: Text, scriptMessageWhat :: Text}
+    | MsgSetDynasty {scriptMessageWhat :: Text}
+    | MsgSetDynastySameAs {scriptMessageWhom :: Text}
+    | MsgJoinAllDefensiveWarsOf {scriptMessageWhom :: Text}
+    | MsgSetDefenderOfTheFaithAsReligion {scriptMessageWhat :: Text, scriptMessageWhom :: Text}
+    | MsgSetDefenderOfTheFaith {scriptMessageWhat :: Text, scriptMessageWhom :: Text}
+    | MsgIronman {scriptMessageYn :: Bool}
 -- | Whether to default to English localization.
 useEnglish :: [Text] -> Bool
 useEnglish [] = True
@@ -1899,6 +1927,8 @@ instance RenderMessage Script ScriptMessage where
             -> "liberty desire modifier"
         MsgProvMod
             -> "province modifier"
+        MsgProvTriggeredMod
+            -> "triggered province modifier"
         MsgPermanentProvMod
             -> "permanent province modifier"
         MsgRulerMod
@@ -2152,6 +2182,8 @@ instance RenderMessage Script ScriptMessage where
             -> "All countries in the world:"
         MsgAllNeighborCountries
             -> "All neighbouring countries:"
+        MsgAllNeighborProvinces
+            -> "All neighbouring provinces:"
         MsgEveryActiveTradeNode
             -> "Every trade node with a merchant present:"
         MsgEveryAlly
@@ -2675,6 +2707,18 @@ instance RenderMessage Script ScriptMessage where
             -> mconcat
                 [ _icon
                 , " Administrative technology is at least that of "
+                , _who
+                ]
+        MsgDIPTechAs {scriptMessageIcon = _icon, scriptMessageWho = _who}
+            -> mconcat
+                [ _icon
+                , " Diplomatic technology is at least that of "
+                , _who
+                ]
+        MsgMILTechAs {scriptMessageIcon = _icon, scriptMessageWho = _who}
+            -> mconcat
+                [ _icon
+                , " Military technology is at least that of "
                 , _who
                 ]
         MsgArmyTradition {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
@@ -3324,6 +3368,18 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , _what
                 ]
+        MsgChangeConsortSameReligion {scriptMessageWhom = _whom}
+            -> mconcat
+                [ "Change consort religion to that of "
+                , _whom
+                ]
+        MsgChangeConsortReligion {scriptMessageIcon = _icon, scriptMessageWhat = _what}
+            -> mconcat
+                [ "Change consort religion to "
+                , _icon
+                , " "
+                , _what
+                ]
         MsgRulerReligionIsSame {scriptMessageWhom = _whom}
             -> mconcat
                 [ "Ruler religion is the same as that of "
@@ -3332,6 +3388,18 @@ instance RenderMessage Script ScriptMessage where
         MsgRulerReligionIs {scriptMessageIcon = _icon, scriptMessageWhat = _what}
             -> mconcat
                 [ "Ruler religion is "
+                , _icon
+                , " "
+                , _what
+                ]
+        MsgConsortReligionIsSame {scriptMessageWhom = _whom}
+            -> mconcat
+                [ "Consort's religion is the same as that of "
+                , _whom
+                ]
+        MsgConsortReligionIs {scriptMessageIcon = _icon, scriptMessageWhat = _what}
+            -> mconcat
+                [ "Consort's religion is "
                 , _icon
                 , " "
                 , _what
@@ -3795,6 +3863,17 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , toMessage (colourNum True _amt)
                 , " ducats"
+                ]
+        MsgAddYearsOfEstateLandIncome {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+            -> mconcat
+                [ gainOrLose _amt
+                , " "
+                , _icon
+                , " ducats equal to "
+                , toMessage (colourNum True _amt)
+                , " "
+                , plural (round _amt) "year" "years"
+                , " of income (scaled by the land share of all estates)."
                 ]
         MsgAddYearsOfIncome {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
             -> mconcat
@@ -4611,13 +4690,7 @@ instance RenderMessage Script ScriptMessage where
                 , " a former colonial nation"
                 ]
         MsgIsFreeOrTributaryTrigger {scriptMessageYn = _yn}
-            -> mconcat
-                [ "Is"
-                , toMessage (ifThenElseT _yn "" " ''neither''")
-                , " independent "
-                , toMessage (ifThenElseT _yn "or" "''nor''")
-                , " a tributary"
-                ]
+            -> toMessage (ifThenElseT _yn "{{is_free_or_tributary_trigger}}" "{{is_subject_other_than_tributary_trigger}}")
         MsgIsNomad {scriptMessageYn = _yn}
             -> mconcat
                 [ "Is"
@@ -4958,10 +5031,11 @@ instance RenderMessage Script ScriptMessage where
                 [ "Is constructing a "
                 , _what
                 ]
-        MsgStartConstructingGreatProject {scriptMessageWhat = _what}
+        MsgStartConstructingGreatProject {scriptMessageWhom = _what}
             -> mconcat
-                [ "Begin constructing the "
+                [ "Begin constructing the [["
                 , _what
+                , "]]"
                 ]
         MsgCancelConstruction
             -> "Cancel construction"
@@ -5382,9 +5456,14 @@ instance RenderMessage Script ScriptMessage where
                 , _what
                 , " as an accepted culture"
                 ]
-        MsgAddAcceptedCultureOrDipPower {scriptMessageIcon = _icon, scriptMessageWhat = _what}
+        MsgAddAcceptedCultureOrDipPower {scriptMessageIcon = _icon, scriptMessageWhat = _what, scriptMessageFree = _free}
             -> mconcat
-                [ _icon
+                [ if _free then "Gain " else ""
+                , if _free then _icon else ""
+                , if _free then " {{green|+1}} Max promoted culture until "  else ""
+                , if _free then toMessage(iquotes _what) else ""
+                , if _free then " is demoted. " else ""
+                , _icon
                 , " Gain "
                 , toMessage(iquotes _what)
                 , " as an accepted culture. If the culture is already an accepted culture, or if there are not enough slots, gain "
@@ -5469,6 +5548,14 @@ instance RenderMessage Script ScriptMessage where
                 , " "
                 , _what
                 , " Center of Reformation"
+                ]
+        MsgRemoveCenterOfReformation {scriptMessageIcon = _icon, scriptMessageWhat = _what}
+            -> mconcat
+                [ "Removes the "
+                , _icon
+                , " "
+                , _what
+                , " Center of Reformation from this province"
                 ]
         MsgAddTruceWith {scriptMessageWho = _who}
             -> mconcat
@@ -5727,9 +5814,21 @@ instance RenderMessage Script ScriptMessage where
                 , _name
                 , "</tt>"
                 ]
+        MsgClearGlobalEventTarget {scriptMessageName = _name}
+            -> mconcat
+                [ "Clear global event target <tt>"
+                , _name
+                , "</tt>"
+                ]
         MsgHasSavedEventTarget {scriptMessageName = _name}
             -> mconcat
                 [ "An event target named <tt>"
+                , _name
+                , "</tt> has been saved"
+                ]
+        MsgHasSavedGlobalEventTarget {scriptMessageName = _name}
+            -> mconcat
+                [ "A global event target named <tt>"
                 , _name
                 , "</tt> has been saved"
                 ]
@@ -5758,6 +5857,48 @@ instance RenderMessage Script ScriptMessage where
                 [ "Army size is at least "
                 , toMessage (reducedNum plainPc _amt)
                 , " of force limit"
+                ]
+        MsgBuildInfantry {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageSpeed = _speed, scriptMessageCost = _cost}
+            -> mconcat
+                [ "Build "
+                , _icon
+                , " "
+                , toMessage (plainNum _amt)
+                , " infantry "
+                , plural _amt "regiment" "regiments"
+                , " at "
+                , toMessage (reducedNum plainPc _cost)
+                , " of normal cost, taking "
+                , toMessage (reducedNum plainPc _speed)
+                , " of normal time"
+                ]
+        MsgBuildCavalry {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageSpeed = _speed, scriptMessageCost = _cost}
+            -> mconcat
+                [ "Build "
+                , _icon
+                , " "
+                , toMessage (plainNum _amt)
+                , " cavalry "
+                , plural _amt "regiment" "regiments"
+                , " at "
+                , toMessage (reducedNum plainPc _cost)
+                , " of normal cost, taking "
+                , toMessage (reducedNum plainPc _speed)
+                , " of normal time"
+                ]
+        MsgBuildArtillery {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageSpeed = _speed, scriptMessageCost = _cost}
+            -> mconcat
+                [ "Build "
+                , _icon
+                , " "
+                , toMessage (plainNum _amt)
+                , " artillery "
+                , plural _amt "regiment" "regiments"
+                , " at "
+                , toMessage (reducedNum plainPc _cost)
+                , " of normal cost, taking "
+                , toMessage (reducedNum plainPc _speed)
+                , " of normal time"
                 ]
         MsgBuildHeavyShips {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageSpeed = _speed, scriptMessageCost = _cost}
             -> mconcat
@@ -6263,6 +6404,12 @@ instance RenderMessage Script ScriptMessage where
                 , _icon
                 , " general with:"
                 ]
+        MsgDefineHeirToGeneral { scriptMessageIcon = _icon }
+            -> mconcat
+                [ "Make heir a "
+                , _icon
+                , " general with:"
+                ]
         MsgDefineRulerToGeneral { scriptMessageIcon = _icon }
             -> mconcat
                 [ "Make ruler a "
@@ -6403,60 +6550,60 @@ instance RenderMessage Script ScriptMessage where
                 , " military skill is at least "
                 , toMessage (roundNum _amt)
                 ]
-        MsgLandLeaderFire {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+        MsgLandLeaderFire {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageAddToBase = _addToBase}
             -> mconcat
                 [ _icon
                 , " "
-                , toMessage $ bold (roundNum _amt)
+                , toMessage $ bold (roundNumSign _addToBase _amt )
                 , " fire"
                 ]
-        MsgLandLeaderShock {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+        MsgLandLeaderShock {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageAddToBase = _addToBase}
             -> mconcat
                 [ _icon
                 , " "
-                , toMessage $ bold (roundNum _amt)
+                , toMessage $ bold (roundNumSign _addToBase _amt)
                 , " shock"
                 ]
-        MsgLandLeaderManeuver {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+        MsgLandLeaderManeuver {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageAddToBase = _addToBase}
             -> mconcat
                 [ _icon
                 , " "
-                , toMessage $ bold (roundNum _amt)
+                , toMessage $ bold (roundNumSign _addToBase _amt)
                 , " maneuver"
                 ]
-        MsgLandLeaderSiege {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+        MsgLandLeaderSiege {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageAddToBase = _addToBase}
             -> mconcat
                 [ _icon
                 , " "
-                , toMessage $ bold (roundNum _amt)
+                , toMessage $ bold (roundNumSign _addToBase _amt)
                 , " siege"
                 ]
-        MsgNavalLeaderFire {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+        MsgNavalLeaderFire {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageAddToBase = _addToBase}
             -> mconcat
                 [ _icon
                 , " "
-                , toMessage $ bold (roundNum _amt)
+                , toMessage $ bold (roundNumSign _addToBase _amt)
                 , " fire"
                 ]
-        MsgNavalLeaderShock {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+        MsgNavalLeaderShock {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageAddToBase = _addToBase}
             -> mconcat
                 [ _icon
                 , " "
-                , toMessage $ bold (roundNum _amt)
+                , toMessage $ bold (roundNumSign _addToBase _amt)
                 , " shock"
                 ]
-        MsgNavalLeaderManeuver {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+        MsgNavalLeaderManeuver {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageAddToBase = _addToBase}
             -> mconcat
                 [ _icon
                 , " "
-                , toMessage $ bold (roundNum _amt)
+                , toMessage $ bold (roundNumSign _addToBase _amt)
                 , " maneuver"
                 ]
-        MsgNavalLeaderSiege {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+        MsgNavalLeaderSiege {scriptMessageIcon = _icon, scriptMessageAmt = _amt, scriptMessageAddToBase = _addToBase}
             -> mconcat
                 [ _icon
                 , " "
-                , toMessage $ bold (roundNum _amt)
+                , toMessage $ bold (roundNumSign _addToBase _amt)
                 , " siege"
                 ]
         MsgCountryOrNonSovereignSubjectHolds {scriptMessageWhom = _whom}
@@ -6636,8 +6783,7 @@ instance RenderMessage Script ScriptMessage where
                 ]
         MsgLeaderTradition {scriptMessageNaval = _yn, scriptMessageAmt = _amt}
             -> mconcat
-                [ "With "
-                , toMessage (plainNum _amt)
+                [ toMessage (plainNum _amt)
                 , " "
                 , toMessage (ifThenElseT _yn "naval" "army")
                 , " tradition"
@@ -8154,7 +8300,7 @@ instance RenderMessage Script ScriptMessage where
                 , " a march"
                 ]
         MsgIsSubjectOtherThanTributary
-            -> "Is a non-tributary subject"
+            -> "{{is_subject_other_than_tributary_trigger}}"
         MsgSpawnScaledRebels {scriptMessageRtype = _rtype, scriptMessageLeader = _leader, scriptMessageYn = _large}
             -> mconcat
                 [ _rtype
@@ -8679,7 +8825,7 @@ instance RenderMessage Script ScriptMessage where
                 ]
         MsgAddProvinceTriggeredModifier {scriptMessageWhat = _what}
             -> mconcat
-                [ "Gain province modifier "
+                [ "Gain triggered province modifier "
                 , _what
                 , " until the end of the campaign, providing the following effects:"
                 ]
@@ -8936,6 +9082,11 @@ instance RenderMessage Script ScriptMessage where
                 [ "Unlock the "
                 , toMessage (iquotes _what)
                 , " estate privilege"
+                ]
+        MsgHasUnlockedEstatePrivilege {scriptMessageWhat = _what}
+            -> mconcat
+                [ "Has unlocked the estate privilege "
+                , toMessage (iquotes _what)
                 ]
         MsgUnlockGovernmentReform {scriptMessageWhat = _what}
             -> mconcat
@@ -9552,6 +9703,72 @@ instance RenderMessage Script ScriptMessage where
                 [ "''Tooltip: "
                 , toMessage (quotes (T.replace "\n" "<br />" _what))
                 , "''"
+                ]
+        MsgAddRandomDev {scriptMessageIcon = _icon, scriptMessageAmt = _amt}
+            -> mconcat
+                [ gainOrLose _amt
+                , " "
+                , _icon
+                , " "
+                , toMessage (colourNum True _amt)
+                , " random development"
+                ]
+        MsgFor {scriptMessageAmt = _amt}
+            -> mconcat
+                [ "Repeat the following effects "
+                , toMessage (bold (plainNum _amt))
+                , " times:"
+                ]
+        MsgDisableTradingPolicy {scriptMessageWhat = _what}
+            -> mconcat
+                [ "Disable the [[trade policy]] "
+                , toMessage (iquotes _what)
+                ]
+        MsgEnableTradingPolicy {scriptMessageWhat = _what}
+            -> mconcat
+                [ "Enable the [[trade policy]] "
+                , toMessage (iquotes _what)
+                ]
+        MsgHasAiPersonality {scriptMessageIcon = _icon, scriptMessageWhat = _what}
+            -> mconcat
+                [ "Has the AI personality "
+                , _icon
+                , " "
+                , _what
+                ]
+        MsgSetDynasty {scriptMessageWhat = _whom}
+            -> mconcat
+                [ "Change dynasty to "
+                , toMessage (iquotes _whom)
+                ]
+        MsgSetDynastySameAs {scriptMessageWhom = _what}
+            -> mconcat
+                [ "Change dynasty to that of "
+                , _what
+                ]
+        MsgJoinAllDefensiveWarsOf {scriptMessageWhom = _what}
+            -> mconcat
+                [ "Join all defensive wars of "
+                , _what
+                ]
+        MsgSetDefenderOfTheFaith {scriptMessageWhat = _what, scriptMessageWhom = _whom}
+            -> mconcat
+                [ _whom
+                , " becomes {{icon|dotf}} Defender of the Faith of the "
+                , _what
+                , " religion"
+                ]
+        MsgSetDefenderOfTheFaithAsReligion {scriptMessageWhat = _what, scriptMessageWhom = _whom}
+            -> mconcat
+                [ _whom
+                , " becomes {{icon|dotf}} Defender of the Faith of the religion of "
+                , _what
+                ]
+        MsgIronman {scriptMessageYn  = _yn}
+            -> mconcat
+                [ "The game is"
+                , ifThenElseT _yn "" " ''not''"
+                , " {{icon|ironman}} ironman"
                 ]
 
     renderMessage _ _ _ = error "Sorry, non-English localisation not yet supported."

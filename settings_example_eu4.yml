@@ -32,7 +32,7 @@ settings:
 
     # Game version (major patch number) (or mod version). Only used to add version templates.
     # Required setting.
-    version: "1.35" #eu4
+    version: "1.36" #eu4
     #version: "1.12.1" #hoi4
 
     # All Platforms where mod files are kept

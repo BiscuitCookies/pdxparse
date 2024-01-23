@@ -2,7 +2,7 @@
 module MessageTools (
     -- * Numbers
     -- ** Plain formatting
-        plainNum, plainNumMin, roundNum, plainNumSign
+        plainNum, plainNumMin, roundNum, roundNumSign, plainNumSign
     ,   roundNumNoSpace
     ,   plainPc, plainPcMin, roundPc, plainPcSign
     -- ** Coloured formatting
@@ -151,6 +151,11 @@ roundNum' is_pc pos_plus n =
 -- thousands separators.
 roundNum :: Double -> Doc
 roundNum = roundNum' False False
+
+-- | Format a number, but make sure it's an integer by rounding it off. Add
+-- thousands separators and optionally a sign
+roundNumSign :: Bool -> Double -> Doc
+roundNumSign = roundNum' False
 
 -- | Format a number, but make sure it's an integer by rounding it off. Don't
 -- add thousands separators.

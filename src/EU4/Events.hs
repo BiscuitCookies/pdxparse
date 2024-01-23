@@ -491,7 +491,7 @@ pp_option evtid hidden triggered opt = do
         Just name_loc -> ok name_loc
         Nothing -> if hidden
             then ok "(Dummy option for hidden event)"
-            else throwError $ "some required option sections missing in " <> evtid <> " - dumping: " <> T.pack (show opt)
+            else trace ("unnamed option section in " <> T.unpack evtid) ok "(unnamed option)"
     where
         ok name_loc = let mtrigger = eu4opt_trigger opt in do
             effects_pp'd <- setIsInEffect True (ppScript (fromMaybe [] (eu4opt_effects opt)))
@@ -514,7 +514,7 @@ pp_option evtid hidden triggered opt = do
                 ]
 
 findInStmt :: GenericStatement -> [(EU4EventWeight, Text)]
-findInStmt stmt@[pdx| $lhs = @scr |] | lhs == "country_event" || lhs == "province_event" || lhs == "country_event_with_insight" = case getId scr of
+findInStmt stmt@[pdx| $lhs = @scr |] | lhs == "country_event" || lhs == "province_event" || lhs == "country_event_with_insight" || lhs == "country_event_with_effect_insight" || lhs == "country_event_with_option_insight" = case getId scr of
     Just triggeredId -> [(Nothing, triggeredId)]
     _ -> (trace $ "Unrecognized event trigger: " ++ show stmt) $ []
     where

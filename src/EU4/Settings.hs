@@ -22,7 +22,7 @@ import Data.Maybe (listToMaybe, catMaybes)
 import Data.Text (Text, toLower)
 import Data.Monoid ((<>))
 
-import System.Directory (getDirectoryContents, doesFileExist)
+import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist)
 import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr)
 
@@ -261,10 +261,19 @@ readEU4Scripts = do
                     "tradenodes" -> "common" </> "tradenodes"
                     _          -> category
                 sourceDir = buildPath settings sourceSubdir
-            files <- liftIO (filterM (doesFileExist . buildPath settings . (sourceSubdir </>))
-                                     =<< getDirectoryContents sourceDir)
-            results <- forM files $ \filename -> readOneScript category (sourceSubdir </> filename)
-            return $ foldl (flip (uncurry HM.insert)) HM.empty results
+            sourceDirExists <- liftIO $ doesDirectoryExist sourceDir
+            if sourceDirExists then
+                readEU4Script' category sourceDir sourceSubdir
+            else
+                trace ("Warning: Folder " ++ sourceDir ++ " does not exist")
+                return HM.empty
+            where
+                readEU4Script' :: String -> String -> String -> PPT EU4 m (HashMap String GenericScript)
+                readEU4Script' category sourceDir sourceSubdir = do
+                    files <- liftIO (filterM (doesFileExist . buildPath settings . (sourceSubdir </>))
+                                            =<< getDirectoryContents sourceDir)
+                    results <- forM files $ \filename -> readOneScript category (sourceSubdir </> filename)
+                    return $ foldl (flip (uncurry HM.insert)) HM.empty results
 
         getOnlyLhs :: GenericStatement -> Maybe Text
         getOnlyLhs (Statement (GenericLhs lhs _) _ _) = Just (toLower lhs)

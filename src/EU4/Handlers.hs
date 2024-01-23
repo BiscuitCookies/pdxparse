@@ -150,6 +150,7 @@ module EU4.Handlers (
     ,   totalStats
     ,   removeTradeModifier
     ,   hasCompletedIdeaGroupOfCategory
+    ,   setDefenderOftheFaith
     ,   createSubject
     ,   hasBuildingTrigger
     ,   addLatestBuilding
@@ -165,7 +166,10 @@ module EU4.Handlers (
     ,   handleEstateActionCoolDown
     ,   handleEstateAction
     ,   hasGovernmentReforTier
+    ,   giveClaims
+    ,   addAcceptedCultureOrDipPower
     ,   handleDynamicEffect
+    ,   handleForLoop
     -- testing
     ,   isPronoun
     ,   flag
@@ -201,7 +205,7 @@ import qualified Data.Trie as Tr
 import qualified Text.PrettyPrint.Leijen.Text as PP
 
 import Data.List (foldl', intersperse)
-import Data.Maybe (isJust, isNothing, fromMaybe, mapMaybe)
+import Data.Maybe (isJust, isNothing, fromMaybe, mapMaybe, catMaybes)
 
 import Control.Applicative (liftA2)
 import Control.Arrow (first)
@@ -748,10 +752,14 @@ scriptIconTable = HM.fromList
     ,("estate_church", "clergy")
     ,("estate_cossacks", "cossacks")
     ,("estate_dhimmi", "dhimmi")
+    ,("estate_eunuchs", "eunuchs")
+    ,("estate_ghulams", "ghilman")
     ,("estate_jains", "jains")
+    ,("estate_janissaries", "janissaries")
     ,("estate_maratha", "marathas")
     ,("estate_nobles", "nobles")
     ,("estate_nomadic_tribes", "tribes")
+    ,("estate_qizilbash", "qizilbash")
     ,("estate_rajput", "rajputs")
     ,("estate_vaisyas", "vaishyas")
     ,("grand_captain", "grand captain")
@@ -881,6 +889,13 @@ scriptIconTable = HM.fromList
     ,("well_advised_personality", "well advised")
     ,("well_connected_personality", "well connected")
     ,("zealot_personality", "zealot")
+    -- AI personalities
+    ,("ai_balanced"    , "personality balanced")
+    ,("ai_capitalist"  , "personality capitalist")
+    ,("ai_colonialist" , "personality colonialist")
+    ,("ai_diplomat"    , "personality diplomat")
+    ,("ai_militarist"  , "personality militarist")
+    ,("human"          , "personality human")
     -- AI attitudes
     ,("attitude_allied"      , "ally attitude")
     ,("attitude_defensive"   , "defensive attitude")
@@ -1195,7 +1210,7 @@ iconOrFlag _ flagmsg expectScope stmt@[pdx| %_ = $vartag:$var |] = do
     case mwhoflag of
         Just whoflag -> msgToPP . flagmsg $ whoflag
         Nothing -> preStatement stmt
-iconOrFlag iconmsg flagmsg expectScope [pdx| $head = $name |] = msgToPP =<< do
+iconOrFlag iconmsg flagmsg expectScope [pdx| $head = ?name |] = msgToPP =<< do
     nflag <- flag expectScope name -- laziness means this might not get evaluated
 --   when (T.toLower name == "prev") . withCurrentFile $ \f -> do
 --       traceM $ f ++ ": iconOrFlag: " ++ T.unpack head ++ " = " ++ T.unpack name
@@ -1294,6 +1309,8 @@ numericOrTagIcon :: (EU4Info g, Monad m) =>
 numericOrTagIcon iconkey numMsg _ [pdx| %_ = !num |]
     = msgToPP $ numMsg (iconText iconkey) num
 numericOrTagIcon iconkey _ tagMsg scr@[pdx| %_ = $_ |]
+    = withFlagAndIcon iconkey tagMsg (Just EU4Country) scr
+numericOrTagIcon iconkey _ tagMsg scr@[pdx| %_ = $_:$_ |]
     = withFlagAndIcon iconkey tagMsg (Just EU4Country) scr
 numericOrTagIcon  _ _ _ stmt = plainMsg $ pre_statement' stmt
 
@@ -1473,11 +1490,15 @@ tryLocAndLocMod atom = do
         locTable :: HashMap Text Text
         locTable = HM.fromList
             [("female_advisor_chance", "MODIFIER_FEMALE_ADVISOR_CHANCE")
+            ,("artillery_power", "ARTILLERY_POWER")
             ,("cavalry_power", "CAVALRY_POWER")
             ,("development_cost", "DEVELOPMENT_COST")
             ,("discipline", "MODIFIER_DISCIPLINE")
+            ,("global_tax_modifier", "GLOBAL_TAX_MODIFIER")
             ,("global_trade_goods_size_modifier", "MODIFIER_GLOBAL_TRADE_GOODS_SIZE_MODIFIER")
             ,("infantry_power", "INFANTRY_POWER")
+            ,("land_morale", "LAND_MORALE")
+            ,("movement_speed", "MODIFIER_MOVEMENT_SPEED")
             ,("missionaries" , "MISSIONARY_CONSTRUCTIONS") -- ?
             ,("ship_durability", "MODIFIER_SHIP_DURABILITY")
             ,("tolerance_heathen", "MODIFIER_TOLERANCE_HEATHEN")
@@ -1600,6 +1621,8 @@ getEffectArg tArg stmt@[pdx| %_ = @scr |] = case scr of
         [[pdx| $arg = %val |]] | T.toLower arg == tArg -> Just val
         [[pdx| $arg = %val |], [pdx| custom_tooltip = %_ |]] | T.toLower arg == tArg -> Just val
         [[pdx| custom_tooltip = %_ |], [pdx| $arg = %val |]] | T.toLower arg == tArg -> Just val
+        [[pdx| $arg = %val |], [pdx| modifier_tooltip = %_ |]] | T.toLower arg == tArg -> Just val
+        [[pdx| $arg = %val |], [pdx| modifier_tooltip = %_ |], [pdx| effect_tooltip = %_ |]] | T.toLower arg == tArg -> Just val
         _ -> Nothing
 getEffectArg _ _ = Nothing
 
@@ -1886,8 +1909,8 @@ opinion msgIndef msgDur stmt@[pdx| %_ = @scr |]
         addLine op [pdx| modifier      = ?label       |] = op { op_modifier = Just label }
         addLine op [pdx| years         = !n           |] = op { op_years = Just n }
         -- following two for add_mutual_opinion_modifier_effect
-        addLine op [pdx| scope_country = $tag         |] = op { op_who = Just (Left tag) }
-        addLine op [pdx| scope_country = $vartag:$var |] = op { op_who = Just (Right (vartag, var)) }
+        addLine op [pdx| target = $tag         |] = op { op_who = Just (Left tag) }
+        addLine op [pdx| target = $vartag:$var |] = op { op_who = Just (Right (vartag, var)) }
         addLine op [pdx| opinion_modifier = ?label    |] = op { op_modifier = Just label }
         addLine op _ = op
         pp_add_opinion op = case (op_who op, op_modifier op) of
@@ -2631,6 +2654,9 @@ data UnitType
     deriving (Show)
 
 instance Param UnitType where
+    toParam (textRhs -> Just "infantry")  = Just UnitInfantry
+    toParam (textRhs -> Just "cavalry")  = Just UnitCavalry
+    toParam (textRhs -> Just "artillery")  = Just UnitArtillery
     toParam (textRhs -> Just "heavy_ship") = Just UnitHeavyShip
     toParam (textRhs -> Just "light_ship") = Just UnitLightShip
     toParam (textRhs -> Just "galley")     = Just UnitGalley
@@ -2691,6 +2717,9 @@ foldCompound "addUnitConstruction" "UnitConstruction" "uc"
     ,CompField "speed" [t|Double|] (Just [|1|]) False
     ,CompField "cost" [t|Double|] (Just [|1|]) False]
     [| return $ (case _type of
+            UnitInfantry -> MsgBuildInfantry (iconText "infantry")
+            UnitCavalry -> MsgBuildCavalry (iconText "cavalry")
+            UnitArtillery -> MsgBuildHeavyShips (iconText "artillery")
             UnitHeavyShip -> MsgBuildHeavyShips (iconText "heavy ship")
             UnitLightShip -> MsgBuildLightShips (iconText "light ship")
             UnitGalley    -> MsgBuildGalleys    (iconText "galley")
@@ -2793,16 +2822,16 @@ foldCompound "addLegitimacyEquivalent" "AddLegitimacyEquivalent" "le"
 
 foldCompound "totalStats" "TotalStats" "ts"
     [("_ruler_or_heir", [t|Text|])]
-    [CompField "stats" [t|Double|] Nothing True
+    [CompField "amount" [t|Double|] Nothing True
     ,CompField "custom_tooltip" [t|Text|] Nothing False --ignored
     ,CompField "who" [t|Text|] Nothing False --should either be empty or root
     ]
     [| do
         rulerOrHeirLoc <- getGameL10n _ruler_or_heir
         case _who of
-                Nothing -> return $ MsgTotalStats rulerOrHeirLoc _stats
-                Just "ROOT" -> return $ MsgTotalStats rulerOrHeirLoc _stats
-                Just unexpected_who -> trace ("Expected root as who= in totalStats, but found " ++ T.unpack unexpected_who) return $ MsgTotalStats rulerOrHeirLoc _stats
+                Nothing -> return $ MsgTotalStats rulerOrHeirLoc _amount
+                Just "ROOT" -> return $ MsgTotalStats rulerOrHeirLoc _amount
+                Just unexpected_who -> trace ("Expected root as who= in totalStats, but found " ++ T.unpack unexpected_who) return $ MsgTotalStats rulerOrHeirLoc _amount
     |]
 
 foldCompound "removeTradeModifier" "RemoveTradeModifier" "rtm"
@@ -2875,6 +2904,21 @@ foldCompound "createSubject" "CreateSubject" "cs"
             _ -> return $ (trace $ ("either who or subject must be set in create_subject: " ++ show stmt)) $ preMessage stmt
     |]
 
+foldCompound "setDefenderOftheFaith" "SetDefenderOftheFaith" "sdotf"
+    []
+    [CompField "who" [t|Text|] Nothing True
+    ,CompField "religion" [t|Text|] Nothing True
+    ]
+    [| do
+        whoLoc <- flagText (Just EU4Country) _who
+        if isTag _religion || isPronoun _religion then do
+            religionLoc <- flagText (Just EU4Country) _religion
+            return $ MsgSetDefenderOfTheFaithAsReligion religionLoc whoLoc
+        else do
+            religionLoc <- getGameL10n _religion
+            return $ MsgSetDefenderOfTheFaith religionLoc whoLoc
+    |]
+
 -- War
 
 data DeclareWarWithCB = DeclareWarWithCB
@@ -2931,6 +2975,7 @@ hasDlc [pdx| %_ = ?dlc |]
             ,("Origins", "org")
             ,("Lions of the North", "lon")
             ,("Domination", "dom")
+            ,("King of Kings", "kok")
             ]
         dlc_icon = maybe "" iconText mdlc_key
 hasDlc stmt = preStatement stmt
@@ -3538,13 +3583,18 @@ data MilitaryLeader = MilitaryLeader
         ,   ml_fire :: Maybe Double
         ,   ml_manuever :: Maybe Double
         ,   ml_siege :: Maybe Double
+        ,   ml_add_shock :: Maybe Double
+        ,   ml_add_fire :: Maybe Double
+        ,   ml_add_manuever :: Maybe Double
+        ,   ml_add_siege :: Maybe Double
         ,   ml_name :: Maybe Text
         ,   ml_female :: Maybe Bool
         ,   ml_trait :: Maybe Text
+        ,   ml_culture :: Maybe Text
         }
         deriving Show
 newML :: MilitaryLeader
-newML = MilitaryLeader Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+newML = MilitaryLeader Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 -- Also used for hasLeaderWith
 pp_mil_leader_attrib :: forall g m. (EU4Info g, Monad m) => Bool -> MilitaryLeader -> PPT g m (Maybe (IndentedMessage, MilitaryLeader))
@@ -3559,17 +3609,29 @@ pp_mil_leader_attrib naval ml =
             msg <- msgToPP' $ MsgLeaderTradition naval trad
             return (Just (msg, ml { ml_tradition = Nothing }))
         pp_mil_leader_attrib' ml@MilitaryLeader { ml_shock = Just shock } = do
-            msg <- msgToPP' $ msgShock shock
+            msg <- msgToPP' $ msgShock shock False
             return (Just (msg, ml { ml_shock = Nothing }))
         pp_mil_leader_attrib' ml@MilitaryLeader { ml_fire = Just fire } = do
-            msg <- msgToPP' $ msgFire fire
+            msg <- msgToPP' $ msgFire fire False
             return (Just (msg, ml { ml_fire = Nothing }))
         pp_mil_leader_attrib' ml@MilitaryLeader { ml_manuever = Just manuever } = do
-            msg <- msgToPP' $ msgManuever manuever
+            msg <- msgToPP' $ msgManuever manuever False
             return (Just (msg, ml { ml_manuever = Nothing }))
         pp_mil_leader_attrib' ml@MilitaryLeader { ml_siege = Just siege } = do
-            msg <- msgToPP' $ msgSiege siege
+            msg <- msgToPP' $ msgSiege siege False
             return (Just (msg, ml { ml_siege = Nothing }))
+        pp_mil_leader_attrib' ml@MilitaryLeader { ml_add_shock = Just shock } = do
+            msg <- msgToPP' $ msgShock shock True
+            return (Just (msg, ml { ml_add_shock = Nothing }))
+        pp_mil_leader_attrib' ml@MilitaryLeader { ml_add_fire = Just fire } = do
+            msg <- msgToPP' $ msgFire fire True
+            return (Just (msg, ml { ml_add_fire = Nothing }))
+        pp_mil_leader_attrib' ml@MilitaryLeader { ml_add_manuever = Just manuever } = do
+            msg <- msgToPP' $ msgManuever manuever True
+            return (Just (msg, ml { ml_add_manuever = Nothing }))
+        pp_mil_leader_attrib' ml@MilitaryLeader { ml_add_siege = Just siege } = do
+            msg <- msgToPP' $ msgSiege siege True
+            return (Just (msg, ml { ml_add_siege = Nothing }))
         pp_mil_leader_attrib' ml@MilitaryLeader { ml_name = Just name } = do
             msg <- msgToPP' $ MsgNamed name
             return (Just (msg, ml { ml_name = Nothing }))
@@ -3580,6 +3642,10 @@ pp_mil_leader_attrib naval ml =
             text <- getGameL10n trait
             msg <- msgToPP' $ MsgMilitaryLeaderTrait text
             return (Just (msg, ml { ml_trait = Nothing }))
+        pp_mil_leader_attrib' ml@MilitaryLeader { ml_culture = Just culture } = do
+            text <- getGameL10n culture
+            msg <- msgToPP' $ MsgNewDynMemberCulture text
+            return (Just (msg, ml { ml_culture = Nothing }))
         pp_mil_leader_attrib' _ = return Nothing
     in
         pp_mil_leader_attrib' ml
@@ -3599,12 +3665,22 @@ defineMilitaryLeader icon naval headline stmt@[pdx| %_ = @scr |] = do
             = ml { ml_manuever = floatRhs rhs }
         addLine ml [pdx| siege = %rhs |]
             = ml { ml_siege = floatRhs rhs }
+        addLine ml [pdx| add_shock = %rhs |]
+            = ml { ml_add_shock = floatRhs rhs }
+        addLine ml [pdx| add_fire = %rhs |]
+            = ml { ml_add_fire = floatRhs rhs }
+        addLine ml [pdx| add_manuever = %rhs |]
+            = ml { ml_add_manuever = floatRhs rhs }
+        addLine ml [pdx| add_siege = %rhs |]
+            = ml { ml_add_siege = floatRhs rhs }
         addLine ml [pdx| name = %name |]
             = ml { ml_name = textRhs name }
         addLine ml [pdx| female = yes |]
             = ml { ml_female = Just True }
         addLine ml [pdx| trait = %trait |]
             = ml { ml_trait = textRhs trait }
+        addLine ml [pdx| culture = %culture |]
+            = ml { ml_culture = textRhs culture }
         addLine ml line = (trace $ ("Unhandled military leader condition in " ++ currentFile ++ ": " ++ show line)) $ ml
 
         pp_mil_leader :: MilitaryLeader -> PPT g m IndentedMessages
@@ -4448,6 +4524,41 @@ handleEstateAction stmt = case getEffectArg "estate_action" stmt of
                 Just estateAction -> ppMany (eaScript estateAction)
         _ -> trace ("warning: Not handled by handleEstateAction: " ++ show stmt) $ preStatement stmt
 
+
+foldCompound "giveClaims" "GiveClaims" "gic"
+    []
+    [CompField "province" [t|Int|] Nothing False
+    ,CompField "id" [t|Int|] Nothing False
+    ,CompField "area" [t|Text|] Nothing False
+    ,CompField "region" [t|Text|] Nothing False
+    ]
+    [| do
+        -- normally there should only be one parameter, but in the unlikely case
+        -- that there is more than one, we join them with an english message. A localised message would be better,
+        -- but this case doesn't exit yet in the game files. Returning just one message would be easier, but
+        -- then a wiki editor might miss the fact that the effect adds multiple claims
+        provMsg <- maybeM getProvLoc _province
+        idMsg <- maybeM getProvLoc _id
+        regionMsg <- maybeM (fmap ("the region " <>) . getGameL10n) _region
+        areaMsg <- maybeM (fmap ("the area " <>) . getGameL10n) _area
+        let messages = catMaybes [idMsg, provMsg, regionMsg, areaMsg]
+        return $ MsgGainPermanentClaimProvince (T.intercalate ", " messages)
+    |]
+
+foldCompound "addAcceptedCultureOrDipPower" "AddAcceptedCultureOrDipPower" "acodp"
+    []
+    [CompField "free" [t|Text|] Nothing False
+    ,CompField "dip_reward" [t|Text|] Nothing False -- ignored, because this only influences the tooltip and not the actual reward
+    ,CompField "new_line" [t|Text|] Nothing False -- ignored, because it is just a newline in the tooltip
+    ,CompField "culture" [t|Text|] Nothing True
+    ]
+    [| do
+        culture <- getGameL10n _culture
+        let dip_reward = isJust _dip_reward
+        let free = isJust _free
+        return $ MsgAddAcceptedCultureOrDipPower (iconText "max promoted cultures") culture free
+    |]
+
 -------------------------------------------
 -- Handler for simple_dynamic_effect --
 -------------------------------------------
@@ -4515,6 +4626,35 @@ foldCompound "handleDynamicEffect" "DynamicEffect" "dynEff"
                     fixedPrefix = T.dropWhile (\c -> c == '*' || c == ' ') effectText
                 return $ MsgGenericText fixedPrefix
     |]
+
+-------------------------------------------
+-- Handler for the for loop --
+-------------------------------------------
+handleForLoop :: (EU4Info g, Monad m) => StatementHandler g m
+handleForLoop stmt@[pdx| %_ = @stmts |] = do
+    let (amountStmt, rest) = extractStmt (matchLhsText "amount") stmts
+        (effectStmt, rest') = extractStmt (matchLhsText "effect") rest
+        (tooltipStmt, rest'') = case rest' of
+            [] -> (Nothing, [])
+            _ -> extractStmt (matchLhsText "custom_tooltip") rest'
+    case rest'' of
+        [] -> case amountStmt of
+            Just [pdx| %_ = !amount |] -> case effectStmt of
+                Just [pdx| %_ = ?effectText |] -> do
+                    let effectStmt2 = readScriptFromText effectText
+                    effectMsgs <- ppMany effectStmt2
+                    case tooltipStmt of
+                        Just [pdx| %_ = ?tooltipText |] -> do
+                            tooltipLoc <- getGameL10n tooltipText
+                            withCurrentIndent $ \i ->
+                                return $ (i, MsgTooltip tooltipLoc) : (i, MsgFor amount) : effectMsgs
+                        _ -> do
+                            withCurrentIndent $ \i ->
+                                return $  (i, MsgFor amount) : effectMsgs
+                _ -> preStatement stmt
+            _ -> preStatement stmt
+        unhandledStatements -> trace ("handleForLoop: Unhandled statements " ++ show unhandledStatements) $ preStatement stmt
+handleForLoop stmt = preStatement stmt
 
 ----------------------------------------------------
 -- Handler for has_reached_government_reform_tier --

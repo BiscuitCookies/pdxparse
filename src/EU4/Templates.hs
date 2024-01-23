@@ -32,6 +32,8 @@ class Param t where
     toParam :: GenericRhs -> Maybe t
 instance Param Double where
     toParam = floatRhs
+instance Param Int where
+    toParam = floatRhs
 instance Param Text where
     toParam = textRhs
 

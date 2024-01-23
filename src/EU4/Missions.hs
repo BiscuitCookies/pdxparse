@@ -108,7 +108,7 @@ parseEU4MissionTree [pdx| $serid = @scr |] = withCurrentFile $ \file -> do
         handleMission :: (IsGameState (GameState g), MonadError Text m) =>
             EU4Mission -> GenericStatement -> PPT g m EU4Mission
         handleMission m [pdx| icon = $rhs |] = do -- <gfx> The icon to use for the mission
-            return m { eu4m_icon = rhs }
+            return m { eu4m_icon = missionIcon rhs }
         handleMission m [pdx| generic = %rhs |] = return m -- <bool> Whether this mission is considered generic.
         handleMission m [pdx| position = !pos |] = -- <int> Which row the mission appears in. 1 is top.
             return m { eu4m_position = pos }
@@ -129,6 +129,13 @@ parseEU4MissionTree [pdx| $serid = @scr |] = withCurrentFile $ \file -> do
         requiredMission (StatementBare (GenericLhs rm [])) = return rm
         requiredMission stmt = throwError $ T.pack ("Unknown required_mission element: " ++ (show stmt))
 
+        -- | Table of icon keys to wiki filenames
+        missionIconTable :: HashMap Text Text
+        missionIconTable = HM.fromList
+            [("jerusalem", "mission_jerusalem")
+            ]
+        missionIcon :: Text -> Text
+        missionIcon key = HM.lookupDefault key key missionIconTable
 parseEU4MissionTree _ = return $ Left "Unsupported/invalid top-level LHS"
 
 
