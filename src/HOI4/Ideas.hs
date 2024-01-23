@@ -217,7 +217,7 @@ writeHOI4Designers = do
                               (HM.elems pathIDS)
     writeFeatures "ideas"
                   pathedIdea
-                  (ppIdeas True)
+                  (ppIdeas True) -- Find way to skip file if no designers are found?
 
 writeHOI4Ideas :: (HOI4Info g, MonadIO m) => PPT g m ()
 writeHOI4Ideas = do
