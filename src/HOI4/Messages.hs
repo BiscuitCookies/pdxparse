@@ -234,7 +234,7 @@ data ScriptMessage
     | MsgIf
     | MsgLimit
     | MsgPrioritize {scriptMessageWhat :: Text}
-    | MsgOrignalTagToCheck {scriptMessageWho :: Text}
+    | MsgOriginalTagToCheck {scriptMessageWho :: Text}
     | MsgWhile
     | MsgFor
     | MsgRandom
@@ -407,7 +407,7 @@ data ScriptMessage
     | MsgTransferStateTo {scriptMessageWho :: Text, scriptMessageWhat :: Text}
     | MsgHasWarWith {scriptMessageWhom :: Text, scriptMessageWhat :: Text}
     | MsgHasWarTogetherWith {scriptMessageWhom :: Text, scriptMessageWhat :: Text}
-    | MsgOrignalTag {scriptMessageWhom :: Text, scriptMessageWhat :: Text}
+    | MsgOriginalTag {scriptMessageWhom :: Text, scriptMessageWhat :: Text}
     | MsgMakeWhitePeace {scriptMessageWhom :: Text, scriptMessageWhat :: Text}
     -- flagyesno messages
     | MsgCountryStartResistance {scriptMessageWho :: Text, scriptMessageWhat :: Text}
@@ -1198,7 +1198,7 @@ instance RenderMessage Script ScriptMessage where
                 [ "Prioritizing the "
                 , _what
                 ]
-        MsgOrignalTagToCheck {scriptMessageWho = _who}
+        MsgOriginalTagToCheck {scriptMessageWho = _who}
             -> mconcat
                 [ "originally "
                 , _who
@@ -2383,7 +2383,7 @@ instance RenderMessage Script ScriptMessage where
                 , _whom
                 , ifThenElseT (T.null _what) "" "<!-- ",_what," -->"
                 ]
-        MsgOrignalTag {scriptMessageWhom = _whom, scriptMessageWhat = _what}
+        MsgOriginalTag {scriptMessageWhom = _whom, scriptMessageWhat = _what}
             -> mconcat
                 [ "Original country is "
                 , _whom

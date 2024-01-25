@@ -527,6 +527,7 @@ ppdecision dec = setCurrentFile (dec_path dec) $ do
         ["<section begin=", nameD, "/>", PP.line
         ,"{{Decision", PP.line
         ,"| version = ", Doc.strictText version, PP.line
+        ,"| collapse = no", PP.line
         ,"| decision_id = ", nameD, PP.line
         ,"| decision_name = ", Doc.strictText name_loc, PP.line
         , Doc.strictText icon_pp'd
