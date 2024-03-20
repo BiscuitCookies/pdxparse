@@ -57,6 +57,8 @@ import HOI4.Events (parseHOI4Events, writeHOI4Events
 import HOI4.CharactersAndTraits (parseHOI4Characters, writeHOI4Characters
                                 , parseHOI4CountryLeaderTraits, parseHOI4UnitLeaderTraits
                                 ,writeHOI4CountryLeaderTraits,writeHOI4UnitLeaderTraits)
+
+import HOI4.TechAndEquipment (parseHOI4TechnologiesPath, writeHOI4Technologies)
 import HOI4.Misc (parseHOI4CountryHistory
                  , parseHOI4Terrain, parseHOI4Ideology
                  , parseHOI4Effects, parseHOI4Triggers
@@ -136,6 +138,8 @@ instance IsGame HOI4 where
                 ,   hoi4modifierdefinitions = HM.empty
                 ,   hoi4bopScripts = HM.empty
                 ,   hoi4bops = HM.empty
+                ,   hoi4techScripts = HM.empty
+                ,   hoi4techs = HM.empty
                 ,   hoi4lockeys = []
                 ,   hoi4modkeys = []
 
@@ -297,6 +301,12 @@ instance HOI4Info HOI4 where
     getBops = do
         HOI4D ed <- get
         return (hoi4bops ed)
+    getTechnologyScripts = do
+        HOI4D ed <- get
+        return (hoi4techScripts ed)
+    getTechnologies = do
+        HOI4D ed <- get
+        return (hoi4techs ed)
     getLocKeys = do
         HOI4D ed <- get
         return (hoi4lockeys ed)
@@ -370,6 +380,7 @@ readHOI4Scripts = do
                     "scripted_trigger" -> "common" </> "scripted_triggers"
                     "modifier_definitions" -> "common" </> "modifier_definitions"
                     "bop" -> "common" </> "bop"
+                    "technologies" -> "common" </> "technologies"
                     _          -> category
                 sourceDir = buildPath settings sourceSubdir
             direxist <- liftIO $ doesDirectoryExist sourceDir
@@ -404,6 +415,7 @@ readHOI4Scripts = do
 
     moddefs <- readHOI4Script "modifier_definitions"
     bopscript <- readHOI4Script "bop"
+    techscript <- readHOI4Script "technologies"
     lockeys <- gets (gameL10nKeys . getSettings)
 
     modify $ \(HOI4D s) -> HOI4D $ s {
@@ -431,6 +443,7 @@ readHOI4Scripts = do
         ,   hoi4modifierdefinitionScripts = moddefs
 
         ,   hoi4bopScripts = bopscript
+        ,   hoi4techScripts = techscript
         ,   hoi4lockeys = lockeys
         }
 
@@ -459,6 +472,7 @@ parseHOI4Scripts = do
     scriptedtriggers <- parseHOI4Triggers =<< getScriptedTriggerScripts
     moddef <- parseHOI4ModifierDefinitions =<< getModifierDefintionScripts
 --    bops <- parseHOI4BopRanges =<< getBopScripts
+    techspathed <- parseHOI4TechnologiesPath =<< getTechnologyScripts
     modkeys <- parseHOI4LocKeys =<< getLocKeys
 {-
     let te1 = findTriggeredEventsInEvents HM.empty (HM.elems events)
@@ -504,6 +518,7 @@ parseHOI4Scripts = do
 
             ,   hoi4modifierdefinitions = moddef
 --            ,   hoi4bops = bops
+            ,   hoi4techs = techspathed
             ,   hoi4modkeys = modkeys
             }
 
@@ -520,17 +535,9 @@ writeHOI4Scripts = do
 --        writeHOI4Decisions
 --        liftIO $ putStrLn "Writing national focuses."
 --        writeHOI4NationalFocuses
+        liftIO $ putStrLn "Writing technologies."
+        writeHOI4Technologies
 --        liftIO $ putStrLn "Writing opinion modifiers."
 --        writeHOI4OpinionModifiers
 --        liftIO $ putStrLn "Writing dynamic modifiers."
 --        writeHOI4DynamicModifiers
-        liftIO $ putStrLn "Writing designers."
-        writeHOI4Designers
-        liftIO $ putStrLn "Writing ideas."
-        writeHOI4Ideas
-        liftIO $ putStrLn "Writing characters."
-        writeHOI4Characters
-        liftIO $ putStrLn "Writing country leader traits."
-        writeHOI4CountryLeaderTraits
-        liftIO $ putStrLn "Writing unit leader traits."
-        writeHOI4UnitLeaderTraits

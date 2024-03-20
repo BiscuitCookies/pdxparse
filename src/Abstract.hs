@@ -259,7 +259,7 @@ floatLit :: Parser Double
 floatLit = Ap.signed (do
     d <- Ap.option 0 Ap.decimal
     Ap.char '.'
-    res <- many Ap.digit
+    res <- Ap.many1 Ap.digit
     let decimal :: Double = read $ "0." <> res
     pure $ fromIntegral d + decimal)
     <* (do
