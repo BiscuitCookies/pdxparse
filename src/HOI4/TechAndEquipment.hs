@@ -255,8 +255,8 @@ ppTechnology tech = setCurrentFile (tech_filepath tech) $ do
             , "| ", Doc.strictText (T.pack $ show $ round (tech_cost tech * 80)), " days",PP.line
             , "| ", PP.line
             , "| ", italic $ Doc.strictText desc,PP.line
-            , "| ", PP.line
-            , "<!-- research effects here -->", techEffDoc,PP.line,PP.line]
+            , "| <!-- research effects here -->", PP.line
+            , techEffDoc,PP.line,PP.line]
 
 ppTechEffects :: forall g m. (HOI4Info g, Monad m) => Text -> [Text] -> [Text] -> PPT g m Doc
 ppTechEffects tech equip units = if all null [equip, units] then return . mconcat $ [] else do
