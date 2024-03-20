@@ -252,7 +252,7 @@ ppTechnology tech = setCurrentFile (tech_filepath tech) $ do
             , "| style=\"width:1px; text-align: center;\" | [[File:", Doc.strictText gfx, ".png|", Doc.strictText (tech_loc tech),"]]", PP.line
             , "! ", Doc.strictText (tech_loc tech), "<!-- ", Doc.strictText (tech_id tech), " -->", PP.line
             , "| ", Doc.strictText (T.pack $ show $ tech_start_year tech), PP.line
-            , "| ", Doc.strictText (T.pack $ show $ round (tech_cost tech * 100)), " days",PP.line
+            , "| ", Doc.strictText (T.pack $ show $ round (tech_cost tech * 80)), " days",PP.line
             , "| ", PP.line
             , "| ", italic $ Doc.strictText desc,PP.line
             , "| ", PP.line
