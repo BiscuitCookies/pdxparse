@@ -426,7 +426,7 @@ readHOI4Scripts = do
     unitleadertraitScripts <- readHOI4Script "unit_leader_trait"
 
     terrainScripts <- readHOI4Script "terrain"
-    unittagScripts <- readHOI4Script "unit_tag"
+    unittagScripts <- readHOI4Script "unit_tags"
     unitScripts <- readHOI4Script "units"
     ideologyScripts <- readHOI4Script "ideology"
 
