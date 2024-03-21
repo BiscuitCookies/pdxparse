@@ -58,7 +58,7 @@ import HOI4.CharactersAndTraits (parseHOI4Characters, writeHOI4Characters
                                 , parseHOI4CountryLeaderTraits, parseHOI4UnitLeaderTraits
                                 ,writeHOI4CountryLeaderTraits,writeHOI4UnitLeaderTraits)
 
-import HOI4.TechAndEquipment (parseHOI4TechnologiesPath, writeHOI4Technologies)
+import HOI4.TechAndEquipment (parseHOI4TechnologiesPath, writeHOI4Technologies, parseHOI4UnitTags, parseHOI4Units)
 import HOI4.Misc (parseHOI4CountryHistory
                  , parseHOI4Terrain, parseHOI4Ideology
                  , parseHOI4Effects, parseHOI4Triggers
@@ -126,6 +126,10 @@ instance IsGame HOI4 where
                 ,   hoi4unitleadertraits = HM.empty
                 ,   hoi4terrainScripts = HM.empty
                 ,   hoi4terrain = []
+                ,   hoi4unittagScripts = HM.empty
+                ,   hoi4unittag = []
+                ,   hoi4unitScripts = HM.empty
+                ,   hoi4unit = []
                 ,   hoi4ideologyScripts = HM.empty
                 ,   hoi4ideology = HM.empty
                 ,   hoi4chartoken = HM.empty
@@ -268,6 +272,18 @@ instance HOI4Info HOI4 where
     getTerrain = do
         HOI4D ed <- get
         return (hoi4terrain ed)
+    getUnitTagScripts = do
+        HOI4D ed <- get
+        return (hoi4unittagScripts ed)
+    getUnitTag = do
+        HOI4D ed <- get
+        return (hoi4unittag ed)
+    getUnitScripts = do
+        HOI4D ed <- get
+        return (hoi4unitScripts ed)
+    getUnit = do
+        HOI4D ed <- get
+        return (hoi4unit ed)
     getIdeologyScripts = do
         HOI4D ed <- get
         return (hoi4ideologyScripts ed)
@@ -375,6 +391,8 @@ readHOI4Scripts = do
                     "country_leader_trait" -> "common" </> "country_leader"
                     "unit_leader_trait" -> "common" </> "unit_leader"
                     "terrain" -> "common" </> "terrain"
+                    "unit_tags" -> "common" </> "unit_tags"
+                    "units" -> "common" </> "units"
                     "ideology" -> "common" </> "ideologies"
                     "scripted_effect" -> "common" </> "scripted_effects"
                     "scripted_trigger" -> "common" </> "scripted_triggers"
@@ -408,6 +426,8 @@ readHOI4Scripts = do
     unitleadertraitScripts <- readHOI4Script "unit_leader_trait"
 
     terrainScripts <- readHOI4Script "terrain"
+    unittagScripts <- readHOI4Script "unit_tag"
+    unitScripts <- readHOI4Script "units"
     ideologyScripts <- readHOI4Script "ideology"
 
     scripted_effects <- readHOI4Script "scripted_effect"
@@ -435,6 +455,8 @@ readHOI4Scripts = do
         ,   hoi4unitleadertraitScripts = unitleadertraitScripts
 
         ,   hoi4terrainScripts = terrainScripts
+        ,   hoi4unittagScripts = unittagScripts
+        ,   hoi4unitScripts = unitScripts
         ,   hoi4ideologyScripts = ideologyScripts
 
         ,   hoi4scriptedeffectScripts = scripted_effects
@@ -467,6 +489,8 @@ parseHOI4Scripts = do
     countryleadertraits <- parseHOI4CountryLeaderTraits =<< getCountryLeaderTraitScripts
     unitleadertraits <- parseHOI4UnitLeaderTraits =<< getUnitLeaderTraitScripts
     terrain <- parseHOI4Terrain =<< getTerrainScripts
+    unittag <- parseHOI4UnitTags =<< getUnitTagScripts
+    unit <- parseHOI4Units =<< getUnitScripts
     ideology <- parseHOI4Ideology =<< getIdeologyScripts
     scriptedeffects <- parseHOI4Effects =<< getScriptedEffectScripts
     scriptedtriggers <- parseHOI4Triggers =<< getScriptedTriggerScripts
@@ -511,6 +535,8 @@ parseHOI4Scripts = do
             ,   hoi4chartoken = chartoken
 
             ,   hoi4terrain = terrain
+            ,   hoi4unittag = unittag
+            ,   hoi4unit = unit
             ,   hoi4ideology = ideology
 
             ,   hoi4scriptedeffects = scriptedeffects

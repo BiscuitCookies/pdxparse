@@ -82,6 +82,10 @@ data HOI4Data = HOI4Data {
     ,   hoi4unitleadertraits :: HashMap Text HOI4UnitLeaderTrait
     ,   hoi4terrainScripts :: HashMap FilePath GenericScript
     ,   hoi4terrain :: [Text]
+    ,   hoi4unittagScripts :: HashMap FilePath GenericScript
+    ,   hoi4unittag :: [Text]
+    ,   hoi4unitScripts :: HashMap FilePath GenericScript
+    ,   hoi4unit :: [Text]
     ,   hoi4ideologyScripts :: HashMap FilePath GenericScript
     ,   hoi4ideology :: HashMap Text Text
     ,   hoi4chartoken :: HashMap Text HOI4Advisor
@@ -185,6 +189,14 @@ class (IsGame g,
     getTerrainScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the terrain parsed
     getTerrain :: Monad m => PPT g m [Text]
+    -- | Get unittags script
+    getUnitTagScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the unittags parsed
+    getUnitTag :: Monad m => PPT g m [Text]
+    -- | Get unit script
+    getUnitScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
+    -- | Get the unit parsed
+    getUnit :: Monad m => PPT g m [Text]
     -- | Get leader traits script
     getIdeologyScripts :: Monad m => PPT g m (HashMap FilePath GenericScript)
     -- | Get the leader traits parsed
@@ -583,14 +595,18 @@ data HOI4Technology = HOI4Technology
     ,   tech_icon :: Text
     ,   tech_dependecies :: Maybe [Text]
     ,   tech_equipment :: Maybe [Text]
+    ,   tech_modules :: Maybe [Text]
     ,   tech_units :: Maybe [Text]
-    ,   tech_globalmod :: Maybe [Text]
-    ,   tech_unitmod :: Maybe [Text]
+    ,   tech_globalmod :: Maybe [GenericStatement] -- ^ global modifiers
+    ,   tech_unitmod :: Maybe [GenericStatement] -- ^ modifiers for units
+    ,   tech_catmod :: Maybe [GenericStatement] -- ^ modifiers for categories
+    ,   tech_buildings :: Maybe [GenericScript]
     ,   tech_cost :: Double
     ,   tech_start_year :: Int
     ,   tech_doctrine :: Bool
     ,   tech_on_complete_limit :: Maybe GenericScript
     ,   tech_on_complete :: Maybe GenericScript
+    ,   tech_sortrest :: Maybe [GenericStatement]
     ,   tech_filepath :: FilePath
     } deriving (Show)
 
