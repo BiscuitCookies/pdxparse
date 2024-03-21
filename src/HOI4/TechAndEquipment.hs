@@ -87,7 +87,7 @@ parseHOI4Units :: (IsGameState (GameState g), IsGameData (GameData g), Monad m) 
 parseHOI4Units scripts = do
     tryParse <- hoistExceptions $
         HM.traverseWithKey
-            (\sourceFile scr -> setCurrentFile sourceFile $ mapM processUnitTags $ concatMap getcat scr)
+            (\sourceFile scr -> setCurrentFile sourceFile $ mapM processUnits $ concatMap getcat scr)
             scripts
     case tryParse of
         Left err -> do
@@ -109,7 +109,7 @@ parseHOI4Units scripts = do
 processUnits :: (IsGameState (GameState g), IsGameData (GameData g), MonadError Text m) =>
     GenericStatement -> PPT g m (Either Text (Maybe Text))
 processUnits (StatementBare _) = throwError "bare statement at top level"
-processUnits [pdx| %left = %right |] = case right of
+processUnits stmt@[pdx| %left = %right |] = case right of
     CompoundRhs parts -> case left of
         CustomLhs _ -> throwError "internal error: custom lhs"
         IntLhs _ -> throwError "int lhs at top level"
@@ -346,8 +346,8 @@ ppTechnology tech = setCurrentFile (tech_filepath tech) $ do
             buildingtech = fromMaybe [] (tech_buildings tech)
             globaltech = fromMaybe [] (tech_globalmod tech)
             sorttech = fromMaybe [] (tech_sortrest tech)
+        unitscheck <- getUnit
         units <- do
-            unitscheck <- getUnit
             return $ mapMaybe (\case
                             stmt@[pdx| $rhs = @scr |] -> if rhs `elem` unitscheck then Just stmt else Nothing
                             _ -> Nothing ) sorttech
@@ -384,7 +384,7 @@ ppTechEffects tech equip modul units buildings unitmod catmod globals = if all n
             unitDoc++
             buildingDoc)
     unitcatmodDoc <- (if null unitmod && null catmod then return [] else do
-        unitmodDoc <- if null unitmod then return [] else unitthing (head units)
+        unitmodDoc <- if null unitmod then return [] else unitmodthing (head units)
         catmodDoc <- concatMapM catmodthing catmod
         return $
             ["|-", PP.line
