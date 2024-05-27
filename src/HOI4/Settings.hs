@@ -566,4 +566,14 @@ writeHOI4Scripts = do
 --        liftIO $ putStrLn "Writing opinion modifiers."
 --        writeHOI4OpinionModifiers
 --        liftIO $ putStrLn "Writing dynamic modifiers."
---        writeHOI4DynamicModifiers
+--        writeHOI4DynamicModifiers        
+        liftIO $ putStrLn "Writing designers."
+        writeHOI4Designers
+        liftIO $ putStrLn "Writing ideas."
+        writeHOI4Ideas
+        liftIO $ putStrLn "Writing characters."
+        writeHOI4Characters
+        liftIO $ putStrLn "Writing country leader traits."
+        writeHOI4CountryLeaderTraits
+        liftIO $ putStrLn "Writing unit leader traits."
+        writeHOI4UnitLeaderTraits
