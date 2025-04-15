@@ -253,7 +253,7 @@ icon what = case HM.lookup what scriptIconFileTable of
     _ ->  if isPronoun what then
             ""
         else
-            template "icon" [HM.findWithDefault what what scriptIconTable]
+            template "icon" [HM.findWithDefault what what scriptIconTable, "1"]
 iconText :: Text -> Text
 iconText = Doc.doc2text . icon
 
