@@ -21,11 +21,11 @@ jobs:
 
     steps:
     - name: Configure Windows Pagefile
-      uses: al-cheb/configure-pagefile-action@v1.2
+      uses: al-cheb/configure-pagefile-action@v1.4
       if: matrix.os == 'windows'
       with:
         maximum-size: 12GB
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup Haskell
       uses: haskell/actions/setup@v2
       id: setup
@@ -66,7 +66,7 @@ jobs:
         cabal install --install-method=copy --installdir=dist
     - name: store windows build errors
       if: failure() && ( matrix.os == 'windows' )
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: fail-logs-${{ matrix.os }}
         path: C:\cabal\logs\*\pdxparse*.log
@@ -75,7 +75,7 @@ jobs:
         cp settings.yml dist/
         cp README.md dist/
     - name: Store binary
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pdxparse-${{github.ref_name}}-${{ vars.GAME }}-${{ matrix.os }}
         path: dist
@@ -87,7 +87,7 @@ jobs:
       contents: write
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         ref: ${{ github.ref }}
     - name: Get tag annotation
@@ -97,11 +97,11 @@ jobs:
         echo "annotation=$(git tag -l --format='%(contents)' $GITHUB_REF_NAME)"
         echo "annotation=$(git tag -l --format='%(contents)' $GITHUB_REF_NAME)" >> "$GITHUB_OUTPUT"
     - name: Download all workflow run artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
     - name: Zip artifacts
       run: for folder in pdxparse-${{github.ref_name}}-${{ vars.GAME }}-*; do echo "creating ${folder}.zip ..."; zip -r ${folder}.zip $folder; done
     - name: Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         name: ${{ steps.tagannotation.outputs.annotation }}
         generate_release_notes: true

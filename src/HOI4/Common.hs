@@ -158,7 +158,7 @@ handlersNumericCompare = Tr.fromList
         ,("has_convoys_war_support"          , numericCompare "more than" "less than" MsgHasConvoysWarSupport MsgHasConvoysWarSupportVar)
         ,("has_equipment"                    , numericCompareCompoundLoc "More than" "Less than" MsgHasEquipment MsgHasEquipmentVar)
         ,("has_navy_experience"              , numericCompare "more than" "less than" MsgHasNavyExperience MsgHasNavyExperienceVar)
-        ,("has_army_manpower"                , numericCompareCompound "more than" "less than" MsgHasArmyManpower MsgHasArmyManpowerVar)
+        ,("has_army_manpower"                , numericCompareCompound "At least" "At most" MsgHasArmyManpower MsgHasArmyManpowerVar)
         ,("has_legitimacy"                   , numericCompare "more than" "less than" MsgHasLegitimacy MsgHasLegitimacyVar)
         ,("has_manpower"                     , numericCompare "more than" "less than" MsgHasManpower MsgHasManpowerVar)
         ,("has_political_power"              , numericCompare "more than" "less than" MsgHasPoliticalPower MsgHasPoliticalPowerVar)

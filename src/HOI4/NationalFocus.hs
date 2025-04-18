@@ -44,7 +44,7 @@ import HOI4.Common -- everything
 -- | Empty national focus. Starts off Nothing/empty everywhere, except id and name
 -- (which should get filled in immediately).
 newHOI4NationalFocus :: HOI4NationalFocus
-newHOI4NationalFocus = HOI4NationalFocus "(Unknown)" "(Unknown)" Nothing Nothing "GFX_goal_unknown" undefined Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined
+newHOI4NationalFocus = HOI4NationalFocus "(Unknown)" "(Unknown)" Nothing Nothing "GFX_goal_unknown" Nothing undefined Nothing [] Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing undefined
 
 -- | Take the decisions scripts from game data and parse them into decision
 -- data structures.
@@ -146,6 +146,16 @@ nationalFocusAddSection nf stmt
                     nf { nf_icon = txtd}
                 CompoundRhs _ ->
                     nf { nf_icon = "Multiple Pictures possible, check script."}
+                _-> trace ("bad nf icon in: " ++ show stmt) nf
+            "alternate_icon" -> case rhs of
+                GenericRhs txt [] ->
+                    let txtd = if "GFX_" `T.isPrefixOf` txt then txt else "GFX_" <> txt in
+                    nf { nf_alt_icon = Just txtd}
+                StringRhs txt ->
+                    let txtd = if "GFX_" `T.isPrefixOf` txt then txt else "GFX_" <> txt in
+                    nf { nf_alt_icon = Just txtd}
+                CompoundRhs _ ->
+                    nf { nf_alt_icon = Just "Multiple Pictures possible, check script."}
                 _-> trace ("bad nf icon in: " ++ show stmt) nf
             "cost" -> case rhs of
                 (floatRhs -> Just num) -> nf {nf_cost = num}
@@ -328,6 +338,10 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
         case micon of
             Nothing -> getGameInterface "goal_unknown" (nf_icon nf)
             Just idicon -> return idicon
+    alt_icon_pp <- do
+        case nf_alt_icon nf of
+            Nothing -> return ""
+            Just idicon -> return " <!-- ALT icon presentt, check script -->"
     prerequisite_pp <- ppPrereq $ catMaybes $ nf_prerequisite nf
     allowBranch_pp <- ppAllowBranch $ nf_allow_branch nf
     mutuallyExclusive_pp <- ppMutuallyExclusive $ nf_mutually_exclusive nf
@@ -343,7 +357,7 @@ ppNationalFocus nf = setCurrentFile (nf_path nf) $ do
         [ "|- id = \"", Doc.strictText (nf_name_loc nf),"\"" , PP.line
         , "| {{iconbox|image=", Doc.strictText icon_pp, ".png ", PP.line
         , "| ", Doc.strictText (nf_name_loc nf) , "<!-- ", Doc.strictText (nf_id nf), " -->", PP.line
-        , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (nf_name_desc nf), PP.line , "}}", PP.line
+        , "| ",maybe mempty (Doc.strictText . Doc.nl2br) (nf_name_desc nf), PP.line , "}}", Doc.strictText alt_icon_pp, PP.line
         , "| ", PP.line]++
         allowBranch_pp ++
         prerequisite_pp ++

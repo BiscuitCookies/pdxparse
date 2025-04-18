@@ -240,6 +240,10 @@ technologyAddSection ttech stmt
             = trace "unrecognised form for tech section" tech
 
         getbareTech (StatementBare (GenericLhs e [])) = Just e
+        getbareTech stmt@[pdx| $lhs = %rhs |] = case T.map toLower lhs of
+            "limit" -> Nothing
+            other ->
+                trace ("Unknown in getting tech array statement: " ++ show stmt) Nothing
         getbareTech stmt = trace ("Unknown in getting tech array statement: " ++ show stmt) Nothing
 
 

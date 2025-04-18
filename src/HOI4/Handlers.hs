@@ -253,7 +253,7 @@ icon what = case HM.lookup what scriptIconFileTable of
     _ ->  if isPronoun what then
             ""
         else
-            template "icon" [HM.findWithDefault what what scriptIconTable]
+            template "icon" [HM.findWithDefault what what scriptIconTable, "1"]
 iconText :: Text -> Text
 iconText = Doc.doc2text . icon
 
@@ -1833,10 +1833,11 @@ newRM = RandomMod [] []
 randomList :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 randomList stmt@[pdx| %_ = @scr |] =
     let (_,scre) = extractStmt (matchLhsText "seed") scr in -- ugly solution to dealing with seed type in random_list
-    if all chk scre then -- Ugly solution for vars in random list
-        fmtRandomList $ map entry scre
+    let (_,scree) = extractStmt (matchLhsText "log") scre in -- ugly solution to dealing with log type in random_list
+    if all chk scree then -- Ugly solution for vars in random list
+        fmtRandomList $ map entry scree
     else
-        fmtRandomVarList $ map entryv scre
+        fmtRandomVarList $ map entryv scree
     where
         chk [pdx| !weight = @scr |] = True
         chk [pdx| %var = @scr |] = False
@@ -3083,7 +3084,7 @@ data DoctrineCostReduction = DoctrineCostReduction
         ,   dcr_technology :: [Text]
         }
 newDCR :: DoctrineCostReduction
-newDCR = DoctrineCostReduction Nothing undefined 1 [] []
+newDCR = DoctrineCostReduction Nothing 0 1 [] []
 addDoctrineCostReduction :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 addDoctrineCostReduction stmt@[pdx| %_ = @scr |]
     = pp_dcr =<< foldM addLine newDCR scr
@@ -3712,7 +3713,7 @@ data DamageBuilding = DamageBuilding
         }
 
 newDB :: DamageBuilding
-newDB = DamageBuilding undefined Nothing Nothing Nothing
+newDB = DamageBuilding "" Nothing Nothing Nothing
 
 damageBuilding :: forall g m. (HOI4Info g, Monad m) => StatementHandler g m
 damageBuilding stmt@[pdx| %_ = @scr |]
@@ -3720,6 +3721,8 @@ damageBuilding stmt@[pdx| %_ = @scr |]
     where
         addLine :: DamageBuilding -> GenericStatement -> PPT g m DamageBuilding
         addLine db [pdx| type = ?txt |] = return db { db_type = txt }
+        addLine db [pdx| tags = ?txt |] = return db { db_type = txt }
+        addLine db [pdx| tags = @_ |] = return db { db_type = "<!-- Multiple tags check script -->" }
         addLine db [pdx| damage = !num |] = return db { db_damage = Just num }
         addLine db [pdx| damage = $txt |] = return db { db_damagevar = Just txt }
         addLine db [pdx| province = !num |] = return db {db_province = Just num}

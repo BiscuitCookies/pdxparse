@@ -142,6 +142,8 @@ characterAddSection hChar stmt
             return hChar
         characterAddSection' hChar [pdx| navy_leader = %_ |] =
             return hChar
+        characterAddSection' hChar [pdx| scientist = %_ |] =
+            return hChar
         characterAddSection' hChar [pdx| gender = %_ |] =
             return hChar
         characterAddSection' hChar [pdx| instance = %_ |] =
