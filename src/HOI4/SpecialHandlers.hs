@@ -335,7 +335,8 @@ modifierMSG hidden targ stmt@[pdx| $mod = !num |] = let lmod = T.toLower mod in 
             ("experience_gain_" `T.isPrefixOf` lmod && "_combat_factor" `T.isSuffixOf` lmod) ||
             ("trait_" `T.isPrefixOf` lmod && "_xp_gain_factor" `T.isSuffixOf` lmod) ||
             ("repair_speed" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
-            ("state_repair_speed" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) -> do --precision 2
+            ("state_repair_speed" `T.isPrefixOf` lmod && "_factor" `T.isSuffixOf` lmod) ||
+            ("sp_tag_" `T.isPrefixOf` lmod && "_speed_factor" `T.isSuffixOf` lmod) -> do --precision 2
             mloc <- getGameL10nIfPresent ("modifier_" <> lmod)
             case mloc of
                 Just loc ->
@@ -350,7 +351,10 @@ modifierMSG hidden targ stmt@[pdx| $mod = !num |] = let lmod = T.toLower mod in 
                     numericLoc loc' MsgModifierPcNegReduced stmt
                 Nothing -> preStatement stmt
         | "modifier_army_sub_" `T.isPrefixOf` lmod ||
-            ("operation_" `T.isPrefixOf` lmod && "_outcome" `T.isSuffixOf` lmod) -> do
+            (("operation_" `T.isPrefixOf` lmod && "_outcome" `T.isSuffixOf` lmod ) ||
+            "sp_tag_" `T.isPrefixOf` lmod ||
+            "_preferred_weight_factor"` T.isSuffixOf` lmod ||
+            ("specialization_" `T.isPrefixOf` lmod && "_speed_factor" `T.isSuffixOf` lmod)) -> do
             mloc <- getGameL10nIfPresent lmod
             case mloc of
                 Just loc ->
@@ -369,6 +373,13 @@ modifierMSG hidden targ stmt@[pdx| $mod = !num |] = let lmod = T.toLower mod in 
             ("country_resource_" `T.isPrefixOf` lmod && not ("country_resource_cost_" `T.isPrefixOf` lmod)) || --precision 0
             "temporary_state_resource_" `T.isPrefixOf` lmod -> do --precision 0
             mloc <- getGameL10nIfPresent lmod
+            case mloc of
+                Just loc ->
+                    let loc' = locprep hidden targ loc in
+                    numericLoc loc' MsgModifierColourPos stmt
+                Nothing -> preStatement stmt
+        |  "_intel_decryption_bonus" `T.isSuffixOf` lmod -> do --precision 0
+            mloc <- getGameL10nIfPresent ("modifier_" <> lmod)
             case mloc of
                 Just loc ->
                     let loc' = locprep hidden targ loc in
@@ -600,6 +611,7 @@ modifiersTable = HM.fromList
         ,("lend_lease_tension"              , ("MODIFIER_LEND_LEASE_TENSION_LIMIT", MsgModifierPcNegReduced))
         ,("opinion_gain_monthly"            , ("MODIFIER_OPINION_GAIN_MONTHLY", MsgModifierColourPos))
         ,("opinion_gain_monthly_factor"     , ("MODIFIER_OPINION_GAIN_MONTHLY_FACTOR", MsgModifierPcPosReduced))
+        ,("opinion_gain_monthly_same_ideology" , ("MODIFIER_OPINION_GAIN_MONTHLY_SAME_IDEOLOGY", MsgModifierColourPos))
         ,("opinion_gain_monthly_same_ideology_factor" , ("MODIFIER_OPINION_GAIN_MONTHLY_SAME_IDEOLOGY_FACTOR", MsgModifierPcPosReduced))
         ,("request_lease_tension"           , ("MODIFIER_REQUEST_LEASE_TENSION_LIMIT", MsgModifierPcNegReduced))
         ,("annex_cost_factor"               , ("MODIFIER_ANNEX_COST_FACTOR", MsgModifierPcNegReduced))
@@ -612,10 +624,13 @@ modifiersTable = HM.fromList
         ,("embargo_threshold_factor"        , ("MODIFIER_EMBARGO_THRESHOLD_FACTOR", MsgModifierPcNegReduced))
         ,("embargo_cost_factor"             , ("MODIFIER_EMBARGO_COST_FACTOR", MsgModifierPcNegReduced))
 
+        ,("resource_trade_cost_bonus_per_factory", ("MODIFIER_RESOURCE_TRADE_COST_BONUS_PER_FACTORY", MsgModifierColourPos))
+
             -- autonomy
         ,("autonomy_gain"                   , ("MODIFIER_AUTONOMY_GAIN", MsgModifierColourPos))
         ,("autonomy_gain_global_factor"     , ("MODIFIER_AUTONOMY_GAIN_GLOBAL_FACTOR", MsgModifierPcPosReduced))
         ,("subjects_autonomy_gain"          , ("MODIFIER_AUTONOMY_SUBJECT_GAIN", MsgModifierColourPos))
+        ,("autonomy_gain_ll_to_overlord"    , ("MODIFIER_AUTONOMY_GAIN_LL_TO_OVERLORD", MsgModifierColourPos))
         ,("autonomy_gain_trade_factor"      , ("MODIFIER_AUTONOMY_GAIN_TRADE_FACTOR", MsgModifierPcPosReduced))
         ,("autonomy_manpower_share"         , ("MODIFIER_AUTONOMY_MANPOWER_SHARE", MsgModifierPcReducedSign))
         ,("can_master_build_for_us"         , ("MODIFIER_CAN_MASTER_BUILD_FOR_US", MsgModifierNoYes))
@@ -667,6 +682,7 @@ modifiersTable = HM.fromList
         ,("land_reinforce_rate"             , ("MODIFIER_LAND_REINFORCE_RATE", MsgModifierPcPosReduced))
         ,("training_time_factor"            , ("MODIFIER_TRAINING_TIME_FACTOR", MsgModifierPcNegReduced))
         ,("minimum_training_level"          , ("MODIFIER_MINIMUM_TRAINING_LEVEL", MsgModifierPcNegReduced))
+        ,("max_training"                    , ("MODIFIER_MAX_TRAINING_XP_FACTOR", MsgModifierPcNegReduced))
         ,("air_doctrine_cost_factor"        , ("MODIFIER_AIR_DOCTRINE_COST_FACTOR", MsgModifierPcNegReduced))
         ,("land_doctrine_cost_factor"       , ("MODIFIER_LAND_DOCTRINE_COST_FACTOR", MsgModifierPcNegReduced))
         ,("naval_doctrine_cost_factor"      , ("MODIFIER_NAVAL_DOCTRINE_COST_FACTOR", MsgModifierPcNegReduced))
@@ -725,6 +741,7 @@ modifiersTable = HM.fromList
         ,("supply_node_range"               , ("MODIFIER_SUPPLY_NODE_RANGE", MsgModifierPcPosReduced))
         ,("static_anti_air_damage_factor"   , ("MODIFIER_STATIC_ANTI_AIR_DAMAGE_FACTOR", MsgModifierPcPosReduced))
         ,("static_anti_air_hit_chance_factor" , ("MODIFIER_STATIC_ANTI_AIR_HIT_CHANCE_FACTOR", MsgModifierPcPosReduced))
+        ,("coastal_bunker_effectiveness_factor" , ("MODIFIER_COASTAL_BUNKER_EFFECTIVENESS_FACTOR", MsgModifierPcPosReduced))
 
             -- resistance and compliance
         ,("compliance_growth_on_our_occupied_states" , ("MODIFIER_COMPLIANCE_GROWTH_ON_OUR_OCCUPIED_STATES", MsgModifierPcNegReduced))
@@ -798,6 +815,9 @@ modifiersTable = HM.fromList
         ,("ai_join_ally_desire_factor"      , ("MODIFIER_AI_JOIN_ALLY_DESIRE_FACTOR", MsgModifierSign))
         ,("ai_license_acceptance"           , ("MODIFIER_AI_LICENSE_ACCEPTANCE", MsgModifierSign))
 
+            -- MIOs
+        ,("military_industrial_organization_funds_gain" , ("MODIFIER_MIO_FUNDS_GAIN", MsgModifierPcPosReduced))
+
             -- Unit Leaders
         ,("female_random_army_leader_chance", ("MODIFIER_FEMALE_ARMY_LEADER_CHANCE", MsgModifierPcReducedSign))
         ,("army_leader_cost_factor"         , ("MODIFIER_ARMY_LEADER_COST_FACTOR", MsgModifierPcNegReduced))
@@ -808,6 +828,7 @@ modifiersTable = HM.fromList
         ,("army_leader_start_planning_level" , ("MODIFIER_ARMY_LEADER_START_PLANNING_LEVEL", MsgModifierColourPos))
         ,("military_leader_cost_factor"     , ("MODIFIER_MILITARY_LEADER_COST_FACTOR", MsgModifierPcNegReduced))
         ,("navy_leader_start_attack_level"  , ("MODIFIER_NAVY_LEADER_START_ATTACK_LEVEL", MsgModifierColourPos)) --precision 0
+        ,("grant_medal_cost_factor"         , ("MODIFIER_GRANT_MEDAL_COST_FACTOR", MsgModifierPcNegReduced))
         ,("female_divisional_commander_chance", ("MODIFIER_FEMALE_DIVISIONAL_COMMANDER_CHANCE", MsgModifierPcReducedSign))
 
             -- General Combat
@@ -868,6 +889,7 @@ modifiersTable = HM.fromList
         ,("special_forces_cap"              , ("MODIFIER_SPECIAL_FORCES_CAP", MsgModifierPcPosReduced))
         ,("special_forces_min"              , ("MODIFIER_SPECIAL_FORCES_MIN", MsgModifierColourPos))
         ,("terrain_penalty_reduction"       , ("MODIFIER_TERRAIN_PENALTY_REDUCTION", MsgModifierPcPosReduced))
+        ,("org_loss_at_low_org_factor"      , ("MODIFIER_ORG_LOSS_AT_LOW_ORG_FACTOR", MsgModifierPcNegReduced))
         ,("org_loss_when_moving"            , ("MODIFIER_ORG_LOSS_WHEN_MOVING", MsgModifierPcNegReduced))
         ,("planning_speed"                  , ("MODIFIER_PLANNING_SPEED", MsgModifierPcPosReduced))
 
@@ -900,6 +922,7 @@ modifiersTable = HM.fromList
         ,("naval_hit_chance"                , ("MODIFIER_NAVAL_HIT_CHANCE", MsgModifierPcPosReduced))
         ,("naval_mines_effect_reduction"    , ("MODIFIER_NAVAL_MINES_EFFECT_REDUCTION", MsgModifierPcPosReduced))
         ,("naval_morale_factor"             , ("MODIFIER_NAVAL_MORALE_FACTOR", MsgModifierPcPosReduced))
+        ,("naval_night_attack"             , ("MODIFIER_NAVAL_MORALE_FACTOR", MsgModifierPcPosReduced))
         ,("naval_retreat_chance"            , ("MODIFIER_NAVAL_RETREAT_CHANCE", MsgModifierPcPosReduced))
         ,("naval_retreat_speed"             , ("MODIFIER_NAVAL_RETREAT_SPEED", MsgModifierPcPosReduced))
         ,("navy_org"                        , ("MODIFIER_NAVY_ORG", MsgModifierColourPos))
@@ -941,6 +964,8 @@ modifiersTable = HM.fromList
         ,("air_agility_factor"              , ("MODIFIER_AIR_AGILITY_FACTOR", MsgModifierPcPosReduced))
         ,("air_attack_factor"               , ("MODIFIER_AIR_ATTACK_FACTOR", MsgModifierPcPosReduced))
         ,("air_defence_factor"              , ("MODIFIER_AIR_DEFENCE_FACTOR", MsgModifierPcPosReduced))
+        ,("air_close_air_support_org_damage_factor" , ("MODIFIER_AIR_CAS_ORG_DAMAGE_FACTOR", MsgModifierPcPosReduced))
+        ,("rocket_attack_factor"            , ("MODIFIER_ROCKET_ATTACK_FACTOR", MsgModifierPcPosReduced))
 
         ,("air_close_air_support_agility_factor" , ("MODIFIER_CAS_AGILITY_FACTOR", MsgModifierPcPosReduced))
         ,("air_close_air_support_attack_factor" , ("MODIFIER_CAS_ATTACK_FACTOR", MsgModifierPcPosReduced))
@@ -1040,6 +1065,8 @@ modifiersTable = HM.fromList
         ,("fortification_collateral_chance" , ("MODIFIER_FORTIFICATION_COLLATERAL_CHANCE", MsgModifierPcPosReduced))
         ,("max_commander_army_size"         , ("MODIFIER_ARMY_LEADER_MAX_ARMY_SIZE", MsgModifierColourPos))
         ,("max_army_group_size"             , ("MODIFIER_ARMY_LEADER_MAX_ARMY_GROUP_SIZE", MsgModifierColourPos))
+        ,("paradrop_organization_factor"    , ("MODIFIER_PARADROP_ORGANIZATION_FACTOR", MsgModifierPcPosReduced))
+        ,("paratrooper_aa_defense"          , ("MODIFIER_PARATROOPER_DEFENSE", MsgModifierPcPosReduced))
         ,("promote_cost_factor"             , ("MODIFIER_UNIT_LEADER_PROMOTE_COST_FACTOR", MsgModifierPcNegReduced))
         ,("reassignment_duration_factor"    , ("MODIFIER_REASSIGNMENT_DURATION_FACTOR", MsgModifierPcNegReduced))
         ,("sickness_chance"                 , ("MODIFIER_SICKNESS_CHANCE", MsgModifierPcNegReduced))
@@ -1051,6 +1078,10 @@ modifiersTable = HM.fromList
         -- Strategic region scope
         ,("air_accidents"                   , ("MODIFIER_AIR_ACCIDENTS", MsgModifierPcNegReduced))
         ,("air_detection"                   , ("MODIFIER_AIR_DETECTION", MsgModifierPcPosReduced))
+
+        -- Special Projects
+        ,("special_project_facility_supply_consumption_factor"  , (T.replace "$FACTOR$" "" "MODIFIER_SPECIAL_PROJECT_FACILITY_SUPPLY_CONSUMPTION_FACTOR", MsgModifierPcNegReduced))
+        ,("special_project_speed_factor"    , ("MODIFIER_SPECIAL_PROJECT_SPEED_FACTOR", MsgModifierPcPosReduced))
 
         -- equipment/stats
         ,("build_cost_ic"           , ("STAT_COMMON_BUILD_COST_IC", MsgModifierPcNegReduced))
