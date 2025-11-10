@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - name: Configure Windows Pagefile
-      uses: al-cheb/configure-pagefile-action@v1.4
+      uses: al-cheb/configure-pagefile-action@v1.5
       if: matrix.os == 'windows'
       with:
         maximum-size: 12GB
