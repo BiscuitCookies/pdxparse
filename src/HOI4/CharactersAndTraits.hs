@@ -272,6 +272,7 @@ parseHOI4CountryLeaderTrait [pdx| $id = @effects |]
             ,   clt_equipment_bonus = Nothing
             ,   clt_hidden_modifier = Nothing
             ,   clt_modifier = Nothing
+            ,   clt_cp_cap = Nothing
             }) effects
         return $ Right (Just cclt)
     where
@@ -287,7 +288,9 @@ parseHOI4CountryLeaderTrait [pdx| $id = @effects |]
             _ -> trace ("Urecognized statement in country_leader: " ++ show stmt) clt
          -- Must be an effect
         addSection clt [pdx| random = %_ |] = clt
-        addSection clt [pdx| command_cap = %_ |] = clt
+        addSection clt [pdx| command_power = %_ |] = clt
+        addSection clt [pdx| command_cap_increase = $txt |] = clt { clt_cp_cap = Just txt }
+        --addSection clt [pdx| command_cap_increase = %_ |] = clt { clt_cp_cap = Just "actual_number_or_something_else,_check_file" }
         addSection clt [pdx| sprite = %_ |] = clt
         addSection clt [pdx| name = $txt |] = clt { clt_name = txt }
         addSection clt stmt =

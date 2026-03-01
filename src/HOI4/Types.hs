@@ -561,6 +561,7 @@ data HOI4CountryLeaderTrait = HOI4CountryLeaderTrait
     ,   clt_equipment_bonus :: Maybe GenericStatement
     ,   clt_hidden_modifier :: Maybe GenericStatement
     ,   clt_modifier :: Maybe GenericScript
+    ,   clt_cp_cap :: Maybe Text
     } deriving (Show)
 
 data HOI4UnitLeaderTrait = HOI4UnitLeaderTrait
