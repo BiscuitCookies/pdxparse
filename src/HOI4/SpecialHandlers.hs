@@ -1119,7 +1119,7 @@ modifiersTable = HM.fromList
         ,("naval_range"             , ("STAT_NAVY_RANGE", MsgModifierPcPosReduced))
         ,("lg_attack"               , ("STAT_NAVY_LG_ATTACK", MsgModifierPcPosReduced))
         ,("hg_attack"               , ("STAT_NAVY_HG_ATTACK", MsgModifierPcPosReduced))
-        ,("carrier_size"            , ("STAT_CARRIER_SIZE", MsgModifierPcPosReduced))
+        ,("carrier_size"            , ("STAT_CARRIER_SIZE", MsgModifierColourPos))
         ,("torpedo_attack"          , ("STAT_NAVY_TORPEDO_ATTACK", MsgModifierPcPosReduced))
         ]
 
