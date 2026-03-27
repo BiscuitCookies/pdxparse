@@ -25,7 +25,7 @@ jobs:
       if: matrix.os == 'windows'
       with:
         maximum-size: 12GB
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Setup Haskell
       uses: haskell/actions/setup@v2
       id: setup
@@ -87,7 +87,7 @@ jobs:
       contents: write
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.ref }}
     - name: Get tag annotation
