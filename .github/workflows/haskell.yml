@@ -97,7 +97,7 @@ jobs:
         echo "annotation=$(git tag -l --format='%(contents)' $GITHUB_REF_NAME)"
         echo "annotation=$(git tag -l --format='%(contents)' $GITHUB_REF_NAME)" >> "$GITHUB_OUTPUT"
     - name: Download all workflow run artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
     - name: Zip artifacts
       run: for folder in pdxparse-${{github.ref_name}}-${{ vars.GAME }}-*; do echo "creating ${folder}.zip ..."; zip -r ${folder}.zip $folder; done
     - name: Release
